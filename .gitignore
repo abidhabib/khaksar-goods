@@ -1,0 +1,27 @@
+# Node
+node_modules/
+client/node_modules/
+server/node_modules/
+
+# Build folders
+dist/
+client/dist/
+build/
+server/build/
+
+# Android
+.gradle/
+.gradle-home/
+CargoAndroidApp/.gradle/
+CargoAndroidApp/.gradle-home/
+CargoAndroidApp/build/
+CargoAndroidApp/app/build/
+local.properties
+
+# Env
+.env
+server/.env
+
+# OS
+.DS_Store
+Thumbs.db
