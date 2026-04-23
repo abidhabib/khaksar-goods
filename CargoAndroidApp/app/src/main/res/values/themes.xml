@@ -1,0 +1,14 @@
+<resources xmlns:tools="http://schemas.android.com/tools">
+    <style name="Base.Theme.IshaqCargo" parent="Theme.Material3.Light.NoActionBar">
+        <item name="android:windowBackground">@color/dashboard_background</item>
+        <item name="colorSurface">@color/white</item>
+        <item name="colorPrimary">@color/button_primary</item>
+        <item name="colorSecondary">@color/history_title</item>
+        <item name="colorTertiary">@color/header_card</item>
+        <item name="android:statusBarColor">@android:color/transparent</item>
+        <item name="android:navigationBarColor">@color/dashboard_background</item>
+        <item name="android:windowLightStatusBar">true</item>
+    </style>
+
+    <style name="Theme.IshaqCargo" parent="Base.Theme.IshaqCargo" />
+</resources>

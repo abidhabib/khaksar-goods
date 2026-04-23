@@ -1,0 +1,58 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  * {
+    @apply border-cargo-border;
+  }
+  
+  body {
+    @apply bg-cargo-dark text-cargo-text;
+  }
+}
+
+@layer components {
+  .card {
+    @apply bg-cargo-card rounded-xl border border-cargo-border p-6;
+  }
+  
+  .btn-primary {
+    @apply bg-primary-600 hover:bg-primary-700 text-white px-4 py-2 rounded-lg font-medium transition-colors;
+  }
+  
+  .btn-secondary {
+    @apply bg-cargo-border hover:bg-cargo-card text-cargo-text px-4 py-2 rounded-lg font-medium transition-colors;
+  }
+  
+  .input-field {
+    @apply bg-cargo-dark border border-cargo-border rounded-lg px-4 py-2 text-cargo-text placeholder-cargo-muted focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent;
+  }
+  
+  .sidebar-link {
+    @apply flex items-center gap-3 px-4 py-3 text-cargo-muted hover:text-cargo-text hover:bg-cargo-card rounded-lg transition-all;
+  }
+  
+  .sidebar-link.active {
+    @apply bg-primary-600/20 text-primary-400 border-r-2 border-primary-500;
+  }
+}
+
+/* Scrollbar styling */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: #0f172a;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #334155;
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #475569;
+}

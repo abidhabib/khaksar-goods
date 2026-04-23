@@ -1,0 +1,6 @@
+<resources xmlns:tools="http://schemas.android.com/tools">
+    <style name="Base.Theme.IshaqCargo" parent="Theme.Material3.Light.NoActionBar">
+        <item name="android:windowBackground">@android:color/white</item>
+        <item name="colorSurface">@android:color/white</item>
+    </style>
+</resources>
