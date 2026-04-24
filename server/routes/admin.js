@@ -12,6 +12,7 @@ const {
     assignCarToDriver,
     updateDriver,
     getDriverReport,
+    getDriversExpenseReport,
     getDashboardStats,
     getReportsData
 } = require('../controllers/adminController');
@@ -33,5 +34,6 @@ router.post('/drivers', authMiddleware, adminOnly, addDriver);
 router.put('/drivers/:id', authMiddleware, adminOnly, updateDriver);
 router.post('/drivers/assign-car', authMiddleware, adminOnly, assignCarToDriver);
 router.get('/drivers/:id/report', authMiddleware, adminOnly, getDriverReport);
+router.get('/drivers-expenses', authMiddleware, adminOnly, getDriversExpenseReport);
 
 module.exports = router;

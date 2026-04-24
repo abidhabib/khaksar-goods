@@ -85,21 +85,50 @@
                         android:orientation="vertical"
                         android:padding="20dp">
 
-                        <com.google.android.material.textfield.TextInputLayout
-                            style="@style/Widget.Material3.TextInputLayout.OutlinedBox"
+                        <TextView
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="@string/manual_or_fetch_location"
+                            android:textColor="@color/section_hint"
+                            android:textSize="12sp" />
+
+                        <LinearLayout
                             android:layout_width="match_parent"
                             android:layout_height="wrap_content"
-                            android:hint="@string/from_location"
-                            app:boxCornerRadiusBottomEnd="18dp"
-                            app:boxCornerRadiusBottomStart="18dp"
-                            app:boxCornerRadiusTopEnd="18dp"
-                            app:boxCornerRadiusTopStart="18dp">
+                            android:layout_marginTop="8dp"
+                            android:gravity="center_vertical"
+                            android:orientation="horizontal">
 
-                            <com.google.android.material.textfield.TextInputEditText
-                                android:id="@+id/startFromInput"
-                                android:layout_width="match_parent"
-                                android:layout_height="wrap_content" />
-                        </com.google.android.material.textfield.TextInputLayout>
+                            <com.google.android.material.textfield.TextInputLayout
+                                style="@style/Widget.Material3.TextInputLayout.OutlinedBox"
+                                android:layout_width="0dp"
+                                android:layout_height="wrap_content"
+                                android:layout_weight="1"
+                                android:hint="@string/from_location"
+                                app:boxCornerRadiusBottomEnd="18dp"
+                                app:boxCornerRadiusBottomStart="18dp"
+                                app:boxCornerRadiusTopEnd="18dp"
+                                app:boxCornerRadiusTopStart="18dp">
+
+                                <com.google.android.material.textfield.TextInputEditText
+                                    android:id="@+id/startFromInput"
+                                    android:layout_width="match_parent"
+                                    android:layout_height="wrap_content" />
+                            </com.google.android.material.textfield.TextInputLayout>
+
+                            <ImageView
+                                android:id="@+id/fetchStartLocationButton"
+                                android:layout_width="42dp"
+                                android:layout_height="42dp"
+                                android:layout_marginStart="12dp"
+                                android:background="@drawable/bg_icon_button"
+                                android:clickable="true"
+                                android:contentDescription="@string/fetch_current_location"
+                                android:focusable="true"
+                                android:padding="10dp"
+                                android:src="@android:drawable/ic_menu_mylocation"
+                                app:tint="@color/button_primary" />
+                        </LinearLayout>
 
                         <com.google.android.material.textfield.TextInputLayout
                             style="@style/Widget.Material3.TextInputLayout.OutlinedBox"
@@ -154,11 +183,29 @@
                                 android:inputType="numberDecimal" />
                         </com.google.android.material.textfield.TextInputLayout>
 
+                        <com.google.android.material.textfield.TextInputLayout
+                            style="@style/Widget.Material3.TextInputLayout.OutlinedBox"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="14dp"
+                            android:hint="@string/bilty_commission_amount"
+                            app:boxCornerRadiusBottomEnd="18dp"
+                            app:boxCornerRadiusBottomStart="18dp"
+                            app:boxCornerRadiusTopEnd="18dp"
+                            app:boxCornerRadiusTopStart="18dp">
+
+                            <com.google.android.material.textfield.TextInputEditText
+                                android:id="@+id/biltyCommissionInput"
+                                android:layout_width="match_parent"
+                                android:layout_height="wrap_content"
+                                android:inputType="numberDecimal" />
+                        </com.google.android.material.textfield.TextInputLayout>
+
                         <TextView
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
                             android:layout_marginTop="18dp"
-                            android:text="@string/meter_photo_optional"
+                            android:text="@string/meter_photo_required"
                             android:textColor="@color/section_label"
                             android:textSize="14sp" />
 
@@ -180,6 +227,36 @@
                             android:gravity="center"
                             android:padding="16dp"
                             android:text="@string/start_trip_add_photo"
+                            android:textColor="@color/button_primary"
+                            android:textSize="15sp"
+                            android:textStyle="bold" />
+
+                        <TextView
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="18dp"
+                            android:text="@string/bilty_photo_required"
+                            android:textColor="@color/section_label"
+                            android:textSize="14sp" />
+
+                        <ImageView
+                            android:id="@+id/biltyImagePreview"
+                            android:layout_width="match_parent"
+                            android:layout_height="180dp"
+                            android:layout_marginTop="12dp"
+                            android:background="@drawable/bg_image_placeholder"
+                            android:scaleType="centerCrop"
+                            android:visibility="gone" />
+
+                        <TextView
+                            android:id="@+id/biltyUploadHint"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="12dp"
+                            android:background="@drawable/bg_upload_hint"
+                            android:gravity="center"
+                            android:padding="16dp"
+                            android:text="@string/bilty_add_photo"
                             android:textColor="@color/button_primary"
                             android:textSize="15sp"
                             android:textStyle="bold" />
@@ -278,7 +355,7 @@
             android:layout_marginTop="12dp"
             android:text="@string/start_trip_loading"
             android:textColor="@color/section_title"
-            android:textSize="15sp" />
+            android:textSize="15sp"
+            android:textStyle="bold" />
     </LinearLayout>
-
 </FrameLayout>

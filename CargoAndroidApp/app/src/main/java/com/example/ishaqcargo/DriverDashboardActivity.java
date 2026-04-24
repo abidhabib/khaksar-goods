@@ -36,6 +36,7 @@ public class DriverDashboardActivity extends AppCompatActivity {
     private SessionManager sessionManager;
     private JSONObject ongoingTrip;
     private String baseUrl;
+    private boolean redirectingToEndTrip;
 
     private final ActivityResultLauncher<Intent> startTripLauncher = registerForActivityResult(
             new ActivityResultContracts.StartActivityForResult(),
@@ -79,9 +80,18 @@ public class DriverDashboardActivity extends AppCompatActivity {
         binding.tripHistoryCard.setOnClickListener(v ->
                 startActivity(new Intent(this, TripHistoryActivity.class))
         );
+        binding.dailyExpenseCard.setOnClickListener(v ->
+                startActivity(new Intent(this, DailyExpensesActivity.class))
+        );
         binding.dashboardSwipeRefresh.setOnRefreshListener(this::fetchDashboard);
 
         fetchDashboard();
+    }
+
+    @Override
+    protected void onResume() {
+        super.onResume();
+        redirectingToEndTrip = false;
     }
 
     private void applyWindowInsets() {
@@ -150,6 +160,7 @@ public class DriverDashboardActivity extends AppCompatActivity {
                     ongoingTrip = root.optJSONObject("ongoingTrip");
 
                     runOnUiThread(() -> {
+                        maybeForceEndTrip(ongoingTrip);
                         bindDashboard(lifetime, todayStats, recentTrips, ongoingTrip);
                         binding.dashboardSwipeRefresh.setRefreshing(false);
                         setLoading(false);
@@ -163,6 +174,32 @@ public class DriverDashboardActivity extends AppCompatActivity {
                 }
             }
         });
+    }
+
+    private void maybeForceEndTrip(JSONObject ongoingTripJson) {
+        if (redirectingToEndTrip || ongoingTripJson == null || ongoingTripJson.length() == 0) {
+            return;
+        }
+
+        String tripId = ongoingTripJson.optString("id", "");
+        if (TextUtils.isEmpty(tripId)) {
+            return;
+        }
+
+        redirectingToEndTrip = true;
+        Intent intent = new Intent(this, EndTripActivity.class);
+        intent.putExtra(EndTripActivity.EXTRA_TRIP_ID, tripId);
+        intent.putExtra(
+                EndTripActivity.EXTRA_ROUTE,
+                getString(
+                        R.string.trip_route_format,
+                        ongoingTripJson.optString("from_location", "-"),
+                        ongoingTripJson.optString("to_location", "-")
+                )
+        );
+        intent.putExtra(EndTripActivity.EXTRA_LOCKED_MODE, true);
+        startActivity(intent);
+        finish();
     }
 
     private void bindDashboard(
@@ -265,12 +302,14 @@ public class DriverDashboardActivity extends AppCompatActivity {
                         ongoingTrip.optString("to_location", "-")
                 )
         );
+        intent.putExtra(EndTripActivity.EXTRA_LOCKED_MODE, true);
         endTripLauncher.launch(intent);
     }
 
     private void setLoading(boolean loading) {
         binding.dashboardLoadingOverlay.setVisibility(loading ? View.VISIBLE : View.GONE);
         binding.tripHistoryCard.setEnabled(!loading);
+        binding.dailyExpenseCard.setEnabled(!loading);
         binding.dashboardSwipeRefresh.setEnabled(!loading);
         binding.startTripButton.setEnabled(!loading && (ongoingTrip == null || ongoingTrip.length() == 0));
         binding.endTripButton.setEnabled(!loading && ongoingTrip != null && ongoingTrip.length() > 0);

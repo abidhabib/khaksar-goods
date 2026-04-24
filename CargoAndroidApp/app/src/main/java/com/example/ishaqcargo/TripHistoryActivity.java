@@ -2,6 +2,7 @@ package com.example.ishaqcargo;
 
 import android.content.Intent;
 import android.os.Bundle;
+import android.text.TextUtils;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.widget.ImageView;
@@ -36,7 +37,7 @@ import okhttp3.Response;
 public class TripHistoryActivity extends AppCompatActivity {
 
     private static final DateTimeFormatter SERVER_DATE_TIME = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
-    private static final DateTimeFormatter DISPLAY_DATE_TIME = DateTimeFormatter.ofPattern("dd MMM yyyy, hh:mm a", Locale.US);
+    private static final DateTimeFormatter DISPLAY_DATE_TIME = DateTimeFormatter.ofPattern("EEE, dd MMM yyyy • hh:mm a", Locale.US);
 
     private ActivityTripHistoryBinding binding;
     private SessionManager sessionManager;
@@ -162,8 +163,10 @@ public class TripHistoryActivity extends AppCompatActivity {
         TextView tripNotesText = tripCard.findViewById(R.id.tripNotesText);
         ImageView startMeterImage = tripCard.findViewById(R.id.startMeterImage);
         ImageView endMeterImage = tripCard.findViewById(R.id.endMeterImage);
+        ImageView biltySlipImage = tripCard.findViewById(R.id.biltySlipImage);
         TextView startImageHint = tripCard.findViewById(R.id.startImageHint);
         TextView endImageHint = tripCard.findViewById(R.id.endImageHint);
+        TextView biltyImageHint = tripCard.findViewById(R.id.biltyImageHint);
 
         String from = trip.optString("from_location", "-");
         String to = trip.optString("to_location", "-");
@@ -179,11 +182,19 @@ public class TripHistoryActivity extends AppCompatActivity {
         double tollExpense = trip.optDouble("toll_expense", 0);
         double foodExpense = trip.optDouble("food_expense", 0);
         double otherExpense = trip.optDouble("other_expense", 0);
+        double policeExpense = trip.optDouble("police_expense", 0);
+        double chalaanExpense = trip.optDouble("chalaan_expense", 0);
+        double rewardExpense = trip.optDouble("reward_expense", 0);
+        double biltyCommissionExpense = trip.optDouble("bilty_commission_expense", 0);
         String startedAt = formatTimestamp(trip.optString("started_at", ""));
         String endedAt = formatTimestamp(trip.optString("ended_at", ""));
         String notes = trip.optString("notes", "");
         String startImageUrl = trip.optString("start_meter_image", "");
         String endImageUrl = trip.optString("end_meter_image", "");
+        String biltyImageUrl = trip.optString("bilty_slip_image", "");
+        String liveStartLocation = trip.optString("start_live_location", "");
+        String endLocation = trip.optString("end_location", "");
+        String liveEndLocation = trip.optString("end_live_location", "");
 
         routeText.setText(getString(R.string.trip_route_format, from, to));
         statusText.setText(capitalize(status));
@@ -200,17 +211,35 @@ public class TripHistoryActivity extends AppCompatActivity {
                 formatCurrency(dieselExpense),
                 formatCurrency(tollExpense),
                 formatCurrency(foodExpense),
-                formatCurrency(otherExpense)
+                formatCurrency(otherExpense),
+                formatCurrency(policeExpense),
+                formatCurrency(chalaanExpense),
+                formatCurrency(rewardExpense),
+                formatCurrency(biltyCommissionExpense)
         ));
 
-        if (notes == null || notes.trim().isEmpty()) {
-            tripNotesText.setText(R.string.trip_notes_empty);
-        } else {
-            tripNotesText.setText(getString(R.string.trip_notes_value, notes));
+        StringBuilder notesBuilder = new StringBuilder();
+        if (!TextUtils.isEmpty(liveStartLocation)) {
+            notesBuilder.append("Live start: ").append(liveStartLocation);
         }
+        String finalEndLocation = !TextUtils.isEmpty(endLocation) ? endLocation : liveEndLocation;
+        if (!TextUtils.isEmpty(finalEndLocation)) {
+            if (notesBuilder.length() > 0) {
+                notesBuilder.append('\n');
+            }
+            notesBuilder.append("Actual end: ").append(finalEndLocation);
+        }
+        if (!TextUtils.isEmpty(notes)) {
+            if (notesBuilder.length() > 0) {
+                notesBuilder.append('\n');
+            }
+            notesBuilder.append("Notes: ").append(notes);
+        }
+        tripNotesText.setText(notesBuilder.length() == 0 ? getString(R.string.trip_notes_empty) : notesBuilder.toString());
 
         bindImage(startMeterImage, startImageHint, startImageUrl, getString(R.string.trip_start_image));
         bindImage(endMeterImage, endImageHint, endImageUrl, getString(R.string.trip_end_image));
+        bindImage(biltySlipImage, biltyImageHint, biltyImageUrl, getString(R.string.trip_bilty_image));
     }
 
     private void bindImage(ImageView imageView, TextView hintView, String imageUrl, String title) {

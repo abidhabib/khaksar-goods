@@ -35,6 +35,20 @@ const getDateFilter = (period = 'all', fromDate, toDate, alias = 't') => {
     };
 };
 
+const getMonthFilter = (month, column = 'de.expense_date') => {
+    if (!month || !/^\d{4}-\d{2}$/.test(month)) {
+        return {
+            clause: '',
+            params: []
+        };
+    }
+
+    return {
+        clause: `AND DATE_FORMAT(${column}, '%Y-%m') = ?`,
+        params: [month]
+    };
+};
+
 const hasOngoingTrip = async (connection, driverId) => {
     const [ongoing] = await connection.execute(
         'SELECT id FROM trips WHERE driver_id = ? AND status = "ongoing" LIMIT 1',
@@ -686,6 +700,83 @@ const getDriverReport = async (req, res) => {
     }
 };
 
+const getDriversExpenseReport = async (req, res) => {
+    try {
+        const { driver_id, month } = req.query;
+        const filters = [];
+        const params = [];
+        const monthFilter = getMonthFilter(month);
+
+        if (driver_id) {
+            filters.push('de.driver_id = ?');
+            params.push(driver_id);
+        }
+
+        if (monthFilter.clause) {
+            filters.push(monthFilter.clause.replace(/^AND /, ''));
+            params.push(...monthFilter.params);
+        }
+
+        const whereClause = filters.length ? `WHERE ${filters.join(' AND ')}` : '';
+
+        const [rows] = await pool.execute(
+            `SELECT
+                de.*,
+                u.username AS driver_name,
+                u.phone AS driver_phone,
+                c.car_number,
+                (de.cargo_service_cost + de.mobile_cost + de.moboil_change_cost + de.mechanic_cost +
+                 de.food_cost + de.cargo_security_guard_fee + de.other_cost) AS total_amount
+             FROM driver_daily_expenses de
+             JOIN drivers d ON de.driver_id = d.id
+             JOIN users u ON d.user_id = u.id
+             LEFT JOIN cars c ON d.assigned_car_id = c.id
+             ${whereClause}
+             ORDER BY de.expense_date DESC, u.username ASC`,
+            params
+        );
+
+        const [driverTotals] = await pool.execute(
+            `SELECT
+                de.driver_id,
+                u.username AS driver_name,
+                u.phone AS driver_phone,
+                c.car_number,
+                COUNT(*) AS total_days,
+                COALESCE(SUM(de.cargo_service_cost + de.mobile_cost + de.moboil_change_cost + de.mechanic_cost +
+                    de.food_cost + de.cargo_security_guard_fee + de.other_cost), 0) AS total_amount
+             FROM driver_daily_expenses de
+             JOIN drivers d ON de.driver_id = d.id
+             JOIN users u ON d.user_id = u.id
+             LEFT JOIN cars c ON d.assigned_car_id = c.id
+             ${whereClause}
+             GROUP BY de.driver_id, u.username, u.phone, c.car_number
+             ORDER BY total_amount DESC, u.username ASC`,
+            params
+        );
+
+        const [[summary]] = await pool.execute(
+            `SELECT
+                COUNT(*) AS total_entries,
+                COUNT(DISTINCT de.driver_id) AS total_drivers,
+                COALESCE(SUM(de.cargo_service_cost + de.mobile_cost + de.moboil_change_cost + de.mechanic_cost +
+                    de.food_cost + de.cargo_security_guard_fee + de.other_cost), 0) AS total_amount
+             FROM driver_daily_expenses de
+             ${whereClause}`,
+            params
+        );
+
+        res.json({
+            success: true,
+            summary,
+            rows,
+            driverTotals
+        });
+    } catch (error) {
+        res.status(500).json({ message: 'Server error', error: error.message });
+    }
+};
+
 // ========== DASHBOARD & REPORTS ==========
 
 const getPeriodConfig = (period = 'week') => {
@@ -1089,6 +1180,7 @@ module.exports = {
     assignCarToDriver,
     updateDriver,
     getDriverReport,
+    getDriversExpenseReport,
     
     // Dashboard
     getDashboardStats,

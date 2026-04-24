@@ -14,6 +14,7 @@ const Sidebar = () => {
     { path: '/cars', icon: Car, label: 'Cars' },
     { path: '/drivers', icon: Users, label: 'Drivers' },
     { path: '/trips', icon: Route, label: 'Trips' },
+    { path: '/drivers-expenses', icon: FileText, label: 'Drivers Expenses' },
     { path: '/reports', icon: FileText, label: 'Reports' },
   ];
 

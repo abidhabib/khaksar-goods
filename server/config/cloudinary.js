@@ -7,28 +7,26 @@ cloudinary.config({
     api_secret: process.env.CLOUDINARY_API_SECRET
 });
 
-// For meter reading images
-const meterStorage = new CloudinaryStorage({
+const uploadStorage = new CloudinaryStorage({
     cloudinary: cloudinary,
-    params: {
-        folder: 'cargo-tracker/meter-readings',
-        allowed_formats: ['jpg', 'jpeg', 'png', 'webp'],
-        transformation: [{ width: 1200, height: 1200, crop: 'limit' }]
-    }
-});
+    params: async (req, file) => {
+        const isBilty = file?.fieldname === 'bilty_slip_image';
+        const isReceipt = file?.fieldname === 'receipt_image';
 
-// For expense receipts
-const receiptStorage = new CloudinaryStorage({
-    cloudinary: cloudinary,
-    params: {
-        folder: 'cargo-tracker/receipts',
-        allowed_formats: ['jpg', 'jpeg', 'png', 'webp'],
-        transformation: [{ width: 1200, height: 1200, crop: 'limit' }]
+        return {
+            folder: isBilty
+                ? 'cargo-tracker/bilty-slips'
+                : isReceipt
+                    ? 'cargo-tracker/receipts'
+                    : 'cargo-tracker/meter-readings',
+            allowed_formats: ['jpg', 'jpeg', 'png', 'webp'],
+            transformation: [{ width: 1200, height: 1200, crop: 'limit' }]
+        };
     }
 });
 
 module.exports = {
     cloudinary,
-    meterStorage,
-    receiptStorage
+    meterStorage: uploadStorage,
+    receiptStorage: uploadStorage
 };

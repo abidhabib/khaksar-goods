@@ -12,6 +12,7 @@ import org.json.JSONObject;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
+import java.util.LinkedHashMap;
 import java.util.concurrent.TimeUnit;
 import java.util.Map;
 
@@ -66,10 +67,14 @@ public class ApiClient {
             String token,
             Map<String, String> fields,
             Uri meterImageUri,
+            Uri biltySlipImageUri,
             ContentResolver contentResolver,
             Callback callback
     ) {
-        RequestBody requestBody = buildFormRequestBody(fields, meterImageUri, contentResolver, "meter_image", "start_meter");
+        Map<String, Uri> fileUris = new LinkedHashMap<>();
+        fileUris.put("meter_image", meterImageUri);
+        fileUris.put("bilty_slip_image", biltySlipImageUri);
+        RequestBody requestBody = buildFormRequestBody(fields, fileUris, contentResolver);
 
         Request request = new Request.Builder()
                 .url(baseUrl + "/driver/trips/start")
@@ -89,7 +94,9 @@ public class ApiClient {
             ContentResolver contentResolver,
             Callback callback
     ) {
-        RequestBody requestBody = buildFormRequestBody(fields, meterImageUri, contentResolver, "meter_image", "end_meter");
+        Map<String, Uri> fileUris = new LinkedHashMap<>();
+        fileUris.put("meter_image", meterImageUri);
+        RequestBody requestBody = buildFormRequestBody(fields, fileUris, contentResolver);
 
         Request request = new Request.Builder()
                 .url(baseUrl + "/driver/trips/" + tripId + "/end")
@@ -102,12 +109,20 @@ public class ApiClient {
 
     private static RequestBody buildFormRequestBody(
             Map<String, String> fields,
-            Uri meterImageUri,
-            ContentResolver contentResolver,
-            String fieldName,
-            String defaultName
+            Map<String, Uri> fileUris,
+            ContentResolver contentResolver
     ) {
-        if (meterImageUri == null || contentResolver == null) {
+        boolean hasFiles = false;
+        if (fileUris != null) {
+            for (Uri value : fileUris.values()) {
+                if (value != null) {
+                    hasFiles = true;
+                    break;
+                }
+            }
+        }
+
+        if (!hasFiles || contentResolver == null) {
             FormBody.Builder formBuilder = new FormBody.Builder();
             for (Map.Entry<String, String> entry : fields.entrySet()) {
                 formBuilder.add(entry.getKey(), entry.getValue());
@@ -119,7 +134,11 @@ public class ApiClient {
         for (Map.Entry<String, String> entry : fields.entrySet()) {
             multipartBuilder.addFormDataPart(entry.getKey(), entry.getValue());
         }
-        addImagePartIfExists(multipartBuilder, meterImageUri, contentResolver, fieldName, defaultName);
+        if (fileUris != null) {
+            for (Map.Entry<String, Uri> entry : fileUris.entrySet()) {
+                addImagePartIfExists(multipartBuilder, entry.getValue(), contentResolver, entry.getKey(), entry.getKey());
+            }
+        }
         return multipartBuilder.build();
     }
 
@@ -127,6 +146,36 @@ public class ApiClient {
         Request request = new Request.Builder()
                 .url(baseUrl + "/driver/trips?limit=" + limit)
                 .get()
+                .header("Authorization", "Bearer " + token)
+                .build();
+
+        CLIENT.newCall(request).enqueue(callback);
+    }
+
+    public static void getDailyExpenses(String baseUrl, String token, String month, Callback callback) {
+        String url = baseUrl + "/driver/daily-expenses";
+        if (month != null && !month.trim().isEmpty()) {
+            url += "?month=" + month.trim();
+        }
+
+        Request request = new Request.Builder()
+                .url(url)
+                .get()
+                .header("Authorization", "Bearer " + token)
+                .build();
+
+        CLIENT.newCall(request).enqueue(callback);
+    }
+
+    public static void saveDailyExpense(String baseUrl, String token, Map<String, String> fields, Callback callback) {
+        FormBody.Builder formBuilder = new FormBody.Builder();
+        for (Map.Entry<String, String> entry : fields.entrySet()) {
+            formBuilder.add(entry.getKey(), entry.getValue());
+        }
+
+        Request request = new Request.Builder()
+                .url(baseUrl + "/driver/daily-expenses")
+                .post(formBuilder.build())
                 .header("Authorization", "Bearer " + token)
                 .build();
 

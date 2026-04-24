@@ -81,6 +81,7 @@ const MeterImageCard = ({ label, src, alt }) => (
 
 const TripCard = ({ trip, status = 'completed' }) => {
   const isOngoing = status === 'ongoing';
+  const actualEndLocation = trip.end_location || trip.end_live_location;
 
   return (
     <article className="rounded-xl border border-cargo-border bg-cargo-card/60 p-4 space-y-4">
@@ -128,7 +129,7 @@ const TripCard = ({ trip, status = 'completed' }) => {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
         <div className="rounded-lg border border-cargo-border p-3">
           <p className="text-xs text-cargo-muted flex items-center gap-1"><Gauge className="w-3 h-3" />Start Meter Reading</p>
           <p className="text-sm text-cargo-text mt-1">{(trip.start_meter_reading || 0).toLocaleString()}</p>
@@ -137,11 +138,39 @@ const TripCard = ({ trip, status = 'completed' }) => {
           <p className="text-xs text-cargo-muted flex items-center gap-1"><Gauge className="w-3 h-3" />End Meter Reading</p>
           <p className="text-sm text-cargo-text mt-1">{trip.end_meter_reading ? trip.end_meter_reading.toLocaleString() : isOngoing ? 'Pending' : 'N/A'}</p>
         </div>
+        <div className="rounded-lg border border-cargo-border p-3">
+          <p className="text-xs text-cargo-muted">Live Start Location</p>
+          <p className="text-sm text-cargo-text mt-1">{trip.start_live_location || trip.from_location || 'N/A'}</p>
+        </div>
+        <div className="rounded-lg border border-cargo-border p-3">
+          <p className="text-xs text-cargo-muted">Actual End Location</p>
+          <p className="text-sm text-cargo-text mt-1">{actualEndLocation || (isOngoing ? 'In progress' : 'N/A')}</p>
+        </div>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
         <MeterImageCard label="Start Meter Photo" src={trip.start_meter_image} alt="Start meter" />
         <MeterImageCard label="End Meter Photo" src={trip.end_meter_image} alt="End meter" />
+        <MeterImageCard label="Bilty Slip" src={trip.bilty_slip_image} alt="Bilty slip" />
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
+        <div className="rounded-lg border border-cargo-border p-3">
+          <p className="text-xs text-cargo-muted">Bilty Commission</p>
+          <p className="text-sm text-cargo-text mt-1">{formatCurrency(trip.bilty_commission_amount)}</p>
+        </div>
+        <div className="rounded-lg border border-cargo-border p-3">
+          <p className="text-xs text-cargo-muted">Police Cost</p>
+          <p className="text-sm text-cargo-text mt-1">{formatCurrency((trip.expenses || []).filter((item) => item.category === 'police').reduce((sum, item) => sum + Number(item.amount || 0), 0))}</p>
+        </div>
+        <div className="rounded-lg border border-cargo-border p-3">
+          <p className="text-xs text-cargo-muted">Chalaan Cost</p>
+          <p className="text-sm text-cargo-text mt-1">{formatCurrency((trip.expenses || []).filter((item) => item.category === 'chalaan').reduce((sum, item) => sum + Number(item.amount || 0), 0))}</p>
+        </div>
+        <div className="rounded-lg border border-cargo-border p-3">
+          <p className="text-xs text-cargo-muted">Reward Cost</p>
+          <p className="text-sm text-cargo-text mt-1">{formatCurrency((trip.expenses || []).filter((item) => item.category === 'reward').reduce((sum, item) => sum + Number(item.amount || 0), 0))}</p>
+        </div>
       </div>
 
       <ExpenseBreakdown trip={trip} />

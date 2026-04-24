@@ -6,6 +6,7 @@ require('dotenv').config();
 const authRoutes = require('./routes/auth');
 const adminRoutes = require('./routes/admin');
 const driverRoutes = require('./routes/driver');
+const { ensureSchema } = require('./config/schema');
 
 const app = express();
 
@@ -38,8 +39,11 @@ app.use((req, res) => {
 
 const PORT = process.env.PORT || 5000;
 
-app.listen(PORT, () => {
-    console.log(`
+const startServer = async () => {
+    try {
+        await ensureSchema();
+        app.listen(PORT, () => {
+            console.log(`
     🚀 Cargo Tracker Server Running
     =================================
     Port: ${PORT}
@@ -47,6 +51,13 @@ app.listen(PORT, () => {
     API Health: http://localhost:${PORT}/api/health
     =================================
     `);
-});
+        });
+    } catch (error) {
+        console.error('❌ Schema initialization failed:', error.message);
+        process.exit(1);
+    }
+};
+
+startServer();
 
 module.exports = app;

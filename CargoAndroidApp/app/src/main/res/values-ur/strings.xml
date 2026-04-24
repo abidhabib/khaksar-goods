@@ -17,7 +17,7 @@
     <string name="dashboard_welcome_back">واپس خوش آمدید،</string>
     <string name="dashboard_active_status">فعال حالت</string>
     <string name="dashboard_recent_activity">حالیہ سرگرمی</string>
-    <string name="app_name">کارگو ڈرائیور</string>
+    <string name="app_name">خاکسار گڈز</string>
     <string name="back">واپس</string>
     <string name="dashboard_label">ڈرائیور ڈیش بورڈ</string>
     <string name="dashboard_welcome_placeholder">muhammad adbilal_9989</string>
@@ -54,10 +54,15 @@
     <string name="trip_history_finance">فریٹ: %1$s • خرچ: %2$s • خالص: %3$s</string>
     <string name="trip_notes_empty">نوٹس: کوئی نوٹ شامل نہیں</string>
     <string name="trip_notes_value">نوٹس: %1$s</string>
-    <string name="trip_expense_breakdown">ڈیزل %1$s • ٹول %2$s • کھانا %3$s • دیگر %4$s</string>
+    <string name="daily_expenses">روزانہ اخراجات</string>
+    <string name="daily_expenses_subtitle">ٹرپ سے الگ ڈرائیور کے روزانہ خرچے محفوظ کریں اور ماہانہ ہسٹری دیکھیں۔</string>
+    <string name="daily_expense_history_subtitle">غیر ٹرپ روزانہ خرچ دیکھیں</string>
+    <string name="trip_expense_breakdown">ڈیزل %1$s • ٹول %2$s • کھانا %3$s • دیگر %4$s
+پولیس %5$s • چالان %6$s • انعام %7$s • بلٹی %8$s</string>
     <string name="trip_image_preview">ٹرپ تصویر پیش منظر</string>
     <string name="trip_start_image">شروع کے میٹر کی تصویر</string>
     <string name="trip_end_image">اختتامی میٹر کی تصویر</string>
+    <string name="trip_bilty_image">بلٹی سلپ کی تصویر</string>
     <string name="tap_to_view">مکمل سائز دیکھنے کے لیے دبائیں</string>
     <string name="no_trip_image">کوئی تصویر اپ لوڈ نہیں ہوئی</string>
     <string name="close">بند کریں</string>
@@ -67,6 +72,19 @@
     <string name="start_meter_reading">شروع کا میٹر ریڈنگ</string>
     <string name="end_meter_reading">اختتامی میٹر ریڈنگ</string>
     <string name="meter_photo_optional">میٹر کی تصویر (اختیاری)</string>
+    <string name="meter_photo_required">میٹر کی تصویر (لازمی)</string>
+    <string name="bilty_photo_required">بلٹی سلپ کی تصویر (لازمی)</string>
+    <string name="bilty_add_photo">بلٹی سلپ کی تصویر اپ لوڈ کرنے کے لیے دبائیں</string>
+    <string name="bilty_change_photo">منتخب بلٹی سلپ کی تصویر بدلنے کے لیے دبائیں</string>
+    <string name="bilty_commission_amount">بلٹی کمیشن رقم</string>
+    <string name="manual_or_fetch_location">آپ خود ٹائپ کر سکتے ہیں یا لوکیشن آئیکن دبا کر خودکار طور پر بھر سکتے ہیں۔</string>
+    <string name="fetch_current_location">موجودہ لوکیشن حاصل کریں</string>
+    <string name="location_permission_required">موجودہ لوکیشن لینے کے لیے اجازت ضروری ہے</string>
+    <string name="location_unavailable">اس وقت موجودہ لوکیشن دستیاب نہیں ہے</string>
+    <string name="enable_location_services">پہلے فون کی لوکیشن سروس آن کریں</string>
+    <string name="location_fetched_success">موجودہ لوکیشن کامیابی سے لے لی گئی</string>
+    <string name="fill_required_trip_fields">تمام لازمی ٹرپ فیلڈز بھریں</string>
+    <string name="trip_required_images">شروع کے میٹر اور بلٹی سلپ دونوں تصاویر لازمی ہیں</string>
     <string name="start_trip_screen_subtitle">نیچے ٹرپ کی تفصیل بھریں اور تیار ہونے پر جمع کریں۔</string>
     <string name="start_trip_add_photo">شروع کے میٹر کی تصویر اپ لوڈ کرنے کے لیے دبائیں</string>
     <string name="start_trip_change_photo">منتخب تصویر بدلنے کے لیے دبائیں</string>
@@ -81,7 +99,31 @@
     <string name="toll_cost">ٹول خرچ</string>
     <string name="food_cost">کھانے کا خرچ</string>
     <string name="other_cost">دیگر خرچ</string>
+    <string name="end_location">اختتامی لوکیشن</string>
+    <string name="end_trip_required_fields">اختتامی لوکیشن اور میٹر ریڈنگ لازمی ہیں</string>
+    <string name="police_cost">پولیس خرچہ</string>
+    <string name="chalaan_cost">چالان خرچہ</string>
+    <string name="reward_cost">انعام دیا</string>
+    <string name="filter_month">ماہ فلٹر کریں (YYYY-MM)</string>
+    <string name="load_history">ہسٹری لوڈ کریں</string>
+    <string name="total_days">کل دن</string>
+    <string name="add_update_daily_expense">روزانہ خرچہ شامل یا اپڈیٹ کریں</string>
+    <string name="expense_date">خرچے کی تاریخ (YYYY-MM-DD)</string>
+    <string name="cargo_service_cost">سروس کروانے کا خرچہ</string>
+    <string name="mobile_cost">موبائل خرچہ</string>
+    <string name="moboil_change_cost">موآئل چیینج خرچہ</string>
+    <string name="mechanic_cost">مکینک کا خرچہ</string>
+    <string name="security_guard_fee">چوکیدارا</string>
+    <string name="save_daily_expense">روزانہ خرچہ محفوظ کریں</string>
+    <string name="daily_expense_history">روزانہ خرچے کی ہسٹری</string>
+    <string name="no_daily_expenses">اس مہینے کے لیے کوئی روزانہ خرچہ نہیں ملا۔</string>
+    <string name="daily_expense_saved">روزانہ خرچہ کامیابی سے محفوظ ہو گیا</string>
+    <string name="valid_expense_date_required">درست تاریخ درج کریں جیسے 2026-04-24</string>
+    <string name="daily_expense_breakdown">سروس %1$s • موبائل %2$s
+موآئل %3$s • مکینک %4$s • کھانا %5$s
+چوکیدارا %6$s • دیگر %7$s</string>
     <string name="notes">نوٹس</string>
+    <string name="finish_trip_first">پہلے موجودہ ٹرپ مکمل کریں</string>
     <string name="back_to_dashboard">ڈیش بورڈ پر واپس جائیں</string>
     <string name="submit_trip">ٹرپ جمع کریں</string>
     <string name="success_check">✓</string>
