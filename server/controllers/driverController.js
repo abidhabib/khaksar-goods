@@ -52,6 +52,19 @@ const toExpenseNumber = (value) => {
     return parsed;
 };
 
+const toOptionalDecimal = (value) => {
+    if (value === undefined || value === null || value === '') {
+        return null;
+    }
+
+    const parsed = Number(value);
+    if (!Number.isFinite(parsed) || parsed < 0) {
+        return null;
+    }
+
+    return parsed;
+};
+
 const TRIP_EXPENSE_CATEGORIES = new Set([
     'diesel',
     'toll',
@@ -68,6 +81,7 @@ const DAILY_EXPENSE_CATEGORY_MAP = {
     mobile: 'mobile',
     moboil_change: 'moboil_change',
     mechanic: 'mechanic',
+    medical: 'medical',
     food: 'food',
     cargo_security_guard: 'cargo_security_guard'
 };
@@ -442,9 +456,12 @@ const addTripExpense = async (req, res) => {
         }
 
         const { trip_id } = req.params;
-        const { category, amount } = req.body;
+        const { category, amount, liters, location } = req.body;
+        const receiptImage = req.files?.receipt_image?.[0]?.path || null;
         const normalizedCategory = toNullableString(category);
         const amountValue = toExpenseNumber(amount);
+        const litersValue = toOptionalDecimal(liters);
+        const locationValue = toNullableString(location);
 
         if (!normalizedCategory || !TRIP_EXPENSE_CATEGORIES.has(normalizedCategory)) {
             return res.status(400).json({ message: 'Invalid expense category' });
@@ -464,12 +481,12 @@ const addTripExpense = async (req, res) => {
         }
 
         const [result] = await pool.execute(
-            'INSERT INTO expenses (trip_id, category, amount) VALUES (?, ?, ?)',
-            [trip_id, normalizedCategory, amountValue]
+            'INSERT INTO expenses (trip_id, category, amount, liters, location, receipt_image) VALUES (?, ?, ?, ?, ?, ?)',
+            [trip_id, normalizedCategory, amountValue, litersValue, locationValue, receiptImage]
         );
 
         const [[savedExpense]] = await pool.execute(
-            'SELECT id, trip_id, category, amount, created_at FROM expenses WHERE id = ? LIMIT 1',
+            'SELECT id, trip_id, category, amount, liters, location, receipt_image, created_at FROM expenses WHERE id = ? LIMIT 1',
             [result.insertId]
         );
 
@@ -572,7 +589,7 @@ const getTripDetails = async (req, res) => {
         }
 
         const [expenses] = await pool.execute(
-            'SELECT * FROM expenses WHERE trip_id = ?',
+            'SELECT * FROM expenses WHERE trip_id = ? ORDER BY created_at DESC, id DESC',
             [trip_id]
         );
 
@@ -636,6 +653,7 @@ const getDailyExpenses = async (req, res) => {
                     mobile_cost: 0,
                     moboil_change_cost: 0,
                     mechanic_cost: 0,
+                    medical_cost: 0,
                     food_cost: 0,
                     cargo_security_guard_fee: 0,
                     total_amount: 0
@@ -655,6 +673,9 @@ const getDailyExpenses = async (req, res) => {
                     break;
                 case 'mechanic':
                     expensesByDate[dateKey].mechanic_cost += amountValue;
+                    break;
+                case 'medical':
+                    expensesByDate[dateKey].medical_cost += amountValue;
                     break;
                 case 'food':
                     expensesByDate[dateKey].food_cost += amountValue;
@@ -712,6 +733,7 @@ const saveDailyExpense = async (req, res) => {
             mobile_cost = 0,
             moboil_change_cost = 0,
             mechanic_cost = 0,
+            medical_cost = 0,
             food_cost = 0,
             cargo_security_guard_fee = 0
         } = req.body;
@@ -753,6 +775,7 @@ const saveDailyExpense = async (req, res) => {
                 toExpenseNumber(mobile_cost),
                 toExpenseNumber(moboil_change_cost),
                 toExpenseNumber(mechanic_cost),
+                toExpenseNumber(medical_cost),
                 toExpenseNumber(food_cost),
                 toExpenseNumber(cargo_security_guard_fee)
             ];
@@ -762,8 +785,9 @@ const saveDailyExpense = async (req, res) => {
                 ['mobile', values[1]],
                 ['moboil_change', values[2]],
                 ['mechanic', values[3]],
-                ['food', values[4]],
-                ['cargo_security_guard', values[5]]
+                ['medical', values[4]],
+                ['food', values[5]],
+                ['cargo_security_guard', values[6]]
             ].filter(([, amountValue]) => amountValue > 0);
 
             for (const [categoryName, amountValue] of rows) {

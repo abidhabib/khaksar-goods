@@ -13,7 +13,7 @@
     <string name="login_error_missing_token">Login failed: missing token</string>
     <string name="login_error_driver_only">This app is for driver accounts only</string>
     <string name="login_error_parsing">Login parsing failed</string>
-    <string name="dashboard_welcome_back">Welcome back,</string>
+    <string name="dashboard_welcome_back">License Number</string>
     <string name="dashboard_active_status">Active Status</string>
     <string name="dashboard_recent_activity">Recent Activity</string>
     <string name="app_name">Khaksar Goods</string>
@@ -23,7 +23,7 @@
     <string name="dashboard_welcome">%1$s</string>
     <string name="logout">Logout</string>
     <string name="total_trips">Total Trips</string>
-    <string name="total_km">KM</string>
+    <string name="total_km">Total Kilometers</string>
     <string name="total_expenses">Expenses</string>
     <string name="today_revenue">Revenue</string>
     <string name="current_trip_status">Current Trip Status</string>
@@ -41,11 +41,14 @@
     <string name="history_arrow">→</string>
     <string name="start_trip">Start Trip</string>
     <string name="end_trip">End Trip</string>
+    <string name="end_trip_expenses_subtitle">Add any trip expenses before completing the trip.</string>
+    <string name="end_trip_details">End Trip Details</string>
+    <string name="end_trip_details_subtitle">Confirm the final meter and end location to complete the trip.</string>
     <string name="loading_dashboard">Loading dashboard...</string>
     <string name="trip_history">Trip History</string>
-    <string name="trip_history_subtitle">Review completed and ongoing trips with full meter, finance, and photo details.</string>
+    <string name="trip_history_subtitle">Review completed and ongoing trips details.</string>
     <string name="daily_expenses">Daily Expenses</string>
-    <string name="daily_expenses_subtitle">Save driver daily costs separately from trips with one tap.</string>
+    <string name="daily_expenses_subtitle">Save your daily costs.</string>
     <string name="daily_expense_history_subtitle">Track non-trip daily spending</string>
     <string name="refresh">Refresh</string>
     <string name="loading_trip_history">Loading trip history...</string>
@@ -116,14 +119,15 @@ Chalaan %5$s • Reward %6$s • Bilty %7$s • Tyre %8$s</string>
     <string name="mobile_cost">Mobile Cost</string>
     <string name="moboil_change_cost">Moboil Change Cost</string>
     <string name="mechanic_cost">Mechanic Cost</string>
-    <string name="security_guard_fee">Cargo Security Guard Fee</string>
+    <string name="medical_cost">Medical Cost</string>
+    <string name="security_guard_fee">Cargo Security Fee</string>
     <string name="save_daily_expense">Save daily expense</string>
     <string name="daily_expense_history">Daily expense history</string>
     <string name="no_daily_expenses">No daily expenses found for this month.</string>
     <string name="daily_expense_saved">Daily expense saved successfully</string>
     <string name="daily_expense_breakdown">Cargo Service %1$s • Mobile %2$s
-Moboil %3$s • Mechanic %4$s • Food %5$s
-Guard %6$s • Other %7$s</string>
+Moboil %3$s • Mechanic %4$s • Medical %5$s
+Food %6$s • Guard %7$s • Other %8$s</string>
     <string name="notes">Notes</string>
     <string name="finish_trip_first">Finish the current trip first</string>
     <string name="back_to_dashboard">Back to Dashboard</string>
@@ -132,6 +136,13 @@ Guard %6$s • Other %7$s</string>
     <string name="save_expense_entry">Save expense</string>
     <string name="trip_expense_history">Trip expense history</string>
     <string name="no_trip_expenses_yet">No expenses added yet.</string>
+    <string name="diesel_liters_optional">Liters (optional)</string>
+    <string name="diesel_location_optional">Location (optional)</string>
+    <string name="diesel_meter_photo_optional">Meter photo (optional)</string>
+    <string name="save_diesel_expense">Save diesel expense</string>
+    <string name="open_camera_for_diesel_meter">Tap to open camera for diesel meter photo</string>
+    <string name="change_diesel_meter_photo">Tap to change diesel meter photo</string>
+    <string name="license_number_value">License: %1$s</string>
     <string name="end_meter_photo_required">End meter photo is required</string>
     <string name="open_camera_for_end_meter">Tap to open camera for end meter photo</string>
     <string name="open_camera_for_start_meter">Tap to open camera for start meter photo</string>
@@ -144,12 +155,12 @@ Guard %6$s • Other %7$s</string>
     <string name="select_expense_type_first">Select a cost type first</string>
     <string name="enter_expense_amount">Enter expense amount</string>
     <string name="add_expense_for">Add amount for %1$s</string>
-    <string name="tap_amount_widget">Tap a widget and enter the amount with the numeric keypad.</string>
+    <string name="tap_amount_widget">Tap a widget and enter the amount.</string>
     <string name="tap_expense_widget">Tap a widget, enter the amount, and save it right away.</string>
     <string name="save_amount">Save amount</string>
     <string name="amount_saved">Amount saved</string>
     <string name="today_total">Today total</string>
-    <string name="daily_expenses_help">Date is automatic. Save each daily cost separately when it happens.</string>
+    <string name="daily_expenses_help">.</string>
     <string name="unable_to_load_daily_expenses">Unable to load daily expenses</string>
     <string name="unable_to_save_daily_expense">Unable to save daily expense</string>
     <string name="invalid_daily_expense_response">Invalid daily expense response</string>

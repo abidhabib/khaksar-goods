@@ -190,7 +190,6 @@ public class StartTripActivity extends AppCompatActivity {
                         }
                         updateAmountCards();
                         saveDraft();
-                        Toast.makeText(this, R.string.amount_saved, Toast.LENGTH_SHORT).show();
                     }
             );
         });

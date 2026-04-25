@@ -82,14 +82,8 @@
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
                         android:orientation="vertical"
-                        android:padding="18dp">
+                        android:padding="14dp">
 
-                        <TextView
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:text="@string/daily_expenses_help"
-                            android:textColor="@color/history_subtitle"
-                            android:textSize="13sp" />
 
                         <LinearLayout
                             android:layout_width="match_parent"
@@ -111,7 +105,7 @@
                                 android:layout_width="wrap_content"
                                 android:layout_height="wrap_content"
                                 android:layout_marginTop="4dp"
-                                android:text="Rs 0"
+                                android:text="0"
                                 android:textColor="@color/section_title"
                                 android:textSize="20sp"
                                 android:textStyle="bold" />
@@ -142,18 +136,17 @@
                             android:textColor="@color/section_hint"
                             android:textSize="12sp" />
 
-                        <GridLayout
+                        <LinearLayout
                             android:layout_width="match_parent"
                             android:layout_height="wrap_content"
                             android:layout_marginTop="12dp"
-                            android:columnCount="2">
+                            android:orientation="vertical">
 
                             <com.google.android.material.card.MaterialCardView
                                 android:id="@+id/cargoServiceCard"
-                                android:layout_width="0dp"
+                                android:layout_width="match_parent"
                                 android:layout_height="wrap_content"
-                                android:layout_columnWeight="1"
-                                android:layout_margin="6dp"
+                                android:layout_marginBottom="12dp"
                                 app:cardCornerRadius="20dp"
                                 app:cardElevation="0dp"
                                 app:strokeColor="@color/card_stroke"
@@ -162,41 +155,39 @@
                                 <LinearLayout
                                     android:layout_width="match_parent"
                                     android:layout_height="wrap_content"
-                                    android:orientation="vertical"
+                                    android:gravity="center_vertical"
+                                    android:orientation="horizontal"
                                     android:padding="14dp">
 
                                     <ImageView
                                         android:layout_width="20dp"
                                         android:layout_height="20dp"
+                                        android:layout_marginEnd="12dp"
                                         android:src="@android:drawable/ic_menu_manage"
                                         app:tint="@color/button_primary" />
 
-                                    <TextView
-                                        android:layout_width="wrap_content"
+                                    <LinearLayout
+                                        android:layout_width="0dp"
                                         android:layout_height="wrap_content"
-                                        android:layout_marginTop="8dp"
-                                        android:text="@string/cargo_service_cost"
-                                        android:textColor="@color/section_title"
-                                        android:textSize="13sp"
-                                        android:textStyle="bold" />
+                                        android:layout_weight="1"
+                                        android:orientation="vertical">
 
-                                    <TextView
-                                        android:id="@+id/cargoServiceValue"
-                                        android:layout_width="wrap_content"
-                                        android:layout_height="wrap_content"
-                                        android:layout_marginTop="4dp"
-                                        android:text="Rs 0"
-                                        android:textColor="@color/section_body"
-                                        android:textSize="12sp" />
+                                        <TextView
+                                            android:layout_width="wrap_content"
+                                            android:layout_height="wrap_content"
+                                            android:text="@string/cargo_service_cost"
+                                            android:textColor="@color/section_title"
+                                            android:textSize="14sp"
+                                            android:textStyle="bold" />
+                                    </LinearLayout>
                                 </LinearLayout>
                             </com.google.android.material.card.MaterialCardView>
 
                             <com.google.android.material.card.MaterialCardView
                                 android:id="@+id/mobileCostCard"
-                                android:layout_width="0dp"
+                                android:layout_width="match_parent"
                                 android:layout_height="wrap_content"
-                                android:layout_columnWeight="1"
-                                android:layout_margin="6dp"
+                                android:layout_marginBottom="12dp"
                                 app:cardCornerRadius="20dp"
                                 app:cardElevation="0dp"
                                 app:strokeColor="@color/card_stroke"
@@ -205,41 +196,39 @@
                                 <LinearLayout
                                     android:layout_width="match_parent"
                                     android:layout_height="wrap_content"
-                                    android:orientation="vertical"
+                                    android:gravity="center_vertical"
+                                    android:orientation="horizontal"
                                     android:padding="14dp">
 
                                     <ImageView
                                         android:layout_width="20dp"
                                         android:layout_height="20dp"
+                                        android:layout_marginEnd="12dp"
                                         android:src="@android:drawable/ic_menu_call"
                                         app:tint="@color/button_primary" />
 
-                                    <TextView
-                                        android:layout_width="wrap_content"
+                                    <LinearLayout
+                                        android:layout_width="0dp"
                                         android:layout_height="wrap_content"
-                                        android:layout_marginTop="8dp"
-                                        android:text="@string/mobile_cost"
-                                        android:textColor="@color/section_title"
-                                        android:textSize="13sp"
-                                        android:textStyle="bold" />
+                                        android:layout_weight="1"
+                                        android:orientation="vertical">
 
-                                    <TextView
-                                        android:id="@+id/mobileCostValue"
-                                        android:layout_width="wrap_content"
-                                        android:layout_height="wrap_content"
-                                        android:layout_marginTop="4dp"
-                                        android:text="Rs 0"
-                                        android:textColor="@color/section_body"
-                                        android:textSize="12sp" />
+                                        <TextView
+                                            android:layout_width="wrap_content"
+                                            android:layout_height="wrap_content"
+                                            android:text="@string/mobile_cost"
+                                            android:textColor="@color/section_title"
+                                            android:textSize="14sp"
+                                            android:textStyle="bold" />
+                                    </LinearLayout>
                                 </LinearLayout>
                             </com.google.android.material.card.MaterialCardView>
 
                             <com.google.android.material.card.MaterialCardView
                                 android:id="@+id/moboilChangeCard"
-                                android:layout_width="0dp"
+                                android:layout_width="match_parent"
                                 android:layout_height="wrap_content"
-                                android:layout_columnWeight="1"
-                                android:layout_margin="6dp"
+                                android:layout_marginBottom="12dp"
                                 app:cardCornerRadius="20dp"
                                 app:cardElevation="0dp"
                                 app:strokeColor="@color/card_stroke"
@@ -248,41 +237,39 @@
                                 <LinearLayout
                                     android:layout_width="match_parent"
                                     android:layout_height="wrap_content"
-                                    android:orientation="vertical"
+                                    android:gravity="center_vertical"
+                                    android:orientation="horizontal"
                                     android:padding="14dp">
 
                                     <ImageView
                                         android:layout_width="20dp"
                                         android:layout_height="20dp"
+                                        android:layout_marginEnd="12dp"
                                         android:src="@android:drawable/ic_menu_rotate"
                                         app:tint="@color/button_primary" />
 
-                                    <TextView
-                                        android:layout_width="wrap_content"
+                                    <LinearLayout
+                                        android:layout_width="0dp"
                                         android:layout_height="wrap_content"
-                                        android:layout_marginTop="8dp"
-                                        android:text="@string/moboil_change_cost"
-                                        android:textColor="@color/section_title"
-                                        android:textSize="13sp"
-                                        android:textStyle="bold" />
+                                        android:layout_weight="1"
+                                        android:orientation="vertical">
 
-                                    <TextView
-                                        android:id="@+id/moboilChangeValue"
-                                        android:layout_width="wrap_content"
-                                        android:layout_height="wrap_content"
-                                        android:layout_marginTop="4dp"
-                                        android:text="Rs 0"
-                                        android:textColor="@color/section_body"
-                                        android:textSize="12sp" />
+                                        <TextView
+                                            android:layout_width="wrap_content"
+                                            android:layout_height="wrap_content"
+                                            android:text="@string/moboil_change_cost"
+                                            android:textColor="@color/section_title"
+                                            android:textSize="14sp"
+                                            android:textStyle="bold" />
+                                    </LinearLayout>
                                 </LinearLayout>
                             </com.google.android.material.card.MaterialCardView>
 
                             <com.google.android.material.card.MaterialCardView
                                 android:id="@+id/mechanicCostCard"
-                                android:layout_width="0dp"
+                                android:layout_width="match_parent"
                                 android:layout_height="wrap_content"
-                                android:layout_columnWeight="1"
-                                android:layout_margin="6dp"
+                                android:layout_marginBottom="12dp"
                                 app:cardCornerRadius="20dp"
                                 app:cardElevation="0dp"
                                 app:strokeColor="@color/card_stroke"
@@ -291,41 +278,80 @@
                                 <LinearLayout
                                     android:layout_width="match_parent"
                                     android:layout_height="wrap_content"
-                                    android:orientation="vertical"
+                                    android:gravity="center_vertical"
+                                    android:orientation="horizontal"
                                     android:padding="14dp">
 
                                     <ImageView
                                         android:layout_width="20dp"
                                         android:layout_height="20dp"
+                                        android:layout_marginEnd="12dp"
                                         android:src="@android:drawable/ic_menu_preferences"
                                         app:tint="@color/button_primary" />
 
-                                    <TextView
-                                        android:layout_width="wrap_content"
+                                    <LinearLayout
+                                        android:layout_width="0dp"
                                         android:layout_height="wrap_content"
-                                        android:layout_marginTop="8dp"
-                                        android:text="@string/mechanic_cost"
-                                        android:textColor="@color/section_title"
-                                        android:textSize="13sp"
-                                        android:textStyle="bold" />
+                                        android:layout_weight="1"
+                                        android:orientation="vertical">
 
-                                    <TextView
-                                        android:id="@+id/mechanicCostValue"
-                                        android:layout_width="wrap_content"
+                                        <TextView
+                                            android:layout_width="wrap_content"
+                                            android:layout_height="wrap_content"
+                                            android:text="@string/mechanic_cost"
+                                            android:textColor="@color/section_title"
+                                            android:textSize="14sp"
+                                            android:textStyle="bold" />
+                                    </LinearLayout>
+                                </LinearLayout>
+                            </com.google.android.material.card.MaterialCardView>
+
+                            <com.google.android.material.card.MaterialCardView
+                                android:id="@+id/medicalCostCard"
+                                android:layout_width="match_parent"
+                                android:layout_height="wrap_content"
+                                android:layout_marginBottom="12dp"
+                                app:cardCornerRadius="20dp"
+                                app:cardElevation="0dp"
+                                app:strokeColor="@color/card_stroke"
+                                app:strokeWidth="1dp">
+
+                                <LinearLayout
+                                    android:layout_width="match_parent"
+                                    android:layout_height="wrap_content"
+                                    android:gravity="center_vertical"
+                                    android:orientation="horizontal"
+                                    android:padding="14dp">
+
+                                    <ImageView
+                                        android:layout_width="20dp"
+                                        android:layout_height="20dp"
+                                        android:layout_marginEnd="12dp"
+                                        android:src="@android:drawable/ic_menu_info_details"
+                                        app:tint="@color/button_primary" />
+
+                                    <LinearLayout
+                                        android:layout_width="0dp"
                                         android:layout_height="wrap_content"
-                                        android:layout_marginTop="4dp"
-                                        android:text="Rs 0"
-                                        android:textColor="@color/section_body"
-                                        android:textSize="12sp" />
+                                        android:layout_weight="1"
+                                        android:orientation="vertical">
+
+                                        <TextView
+                                            android:layout_width="wrap_content"
+                                            android:layout_height="wrap_content"
+                                            android:text="@string/medical_cost"
+                                            android:textColor="@color/section_title"
+                                            android:textSize="14sp"
+                                            android:textStyle="bold" />
+                                    </LinearLayout>
                                 </LinearLayout>
                             </com.google.android.material.card.MaterialCardView>
 
                             <com.google.android.material.card.MaterialCardView
                                 android:id="@+id/foodCostCard"
-                                android:layout_width="0dp"
+                                android:layout_width="match_parent"
                                 android:layout_height="wrap_content"
-                                android:layout_columnWeight="1"
-                                android:layout_margin="6dp"
+                                android:layout_marginBottom="12dp"
                                 app:cardCornerRadius="20dp"
                                 app:cardElevation="0dp"
                                 app:strokeColor="@color/card_stroke"
@@ -334,41 +360,38 @@
                                 <LinearLayout
                                     android:layout_width="match_parent"
                                     android:layout_height="wrap_content"
-                                    android:orientation="vertical"
+                                    android:gravity="center_vertical"
+                                    android:orientation="horizontal"
                                     android:padding="14dp">
 
                                     <ImageView
                                         android:layout_width="20dp"
                                         android:layout_height="20dp"
+                                        android:layout_marginEnd="12dp"
                                         android:src="@android:drawable/ic_menu_crop"
                                         app:tint="@color/button_primary" />
 
-                                    <TextView
-                                        android:layout_width="wrap_content"
+                                    <LinearLayout
+                                        android:layout_width="0dp"
                                         android:layout_height="wrap_content"
-                                        android:layout_marginTop="8dp"
-                                        android:text="@string/food_cost"
-                                        android:textColor="@color/section_title"
-                                        android:textSize="13sp"
-                                        android:textStyle="bold" />
+                                        android:layout_weight="1"
+                                        android:orientation="vertical">
 
-                                    <TextView
-                                        android:id="@+id/foodCostValue"
-                                        android:layout_width="wrap_content"
-                                        android:layout_height="wrap_content"
-                                        android:layout_marginTop="4dp"
-                                        android:text="Rs 0"
-                                        android:textColor="@color/section_body"
-                                        android:textSize="12sp" />
+                                        <TextView
+                                            android:layout_width="wrap_content"
+                                            android:layout_height="wrap_content"
+                                            android:text="@string/food_cost"
+                                            android:textColor="@color/section_title"
+                                            android:textSize="14sp"
+                                            android:textStyle="bold" />
+                                    </LinearLayout>
                                 </LinearLayout>
                             </com.google.android.material.card.MaterialCardView>
 
                             <com.google.android.material.card.MaterialCardView
                                 android:id="@+id/securityGuardFeeCard"
-                                android:layout_width="0dp"
+                                android:layout_width="match_parent"
                                 android:layout_height="wrap_content"
-                                android:layout_columnWeight="1"
-                                android:layout_margin="6dp"
                                 app:cardCornerRadius="20dp"
                                 app:cardElevation="0dp"
                                 app:strokeColor="@color/card_stroke"
@@ -377,35 +400,34 @@
                                 <LinearLayout
                                     android:layout_width="match_parent"
                                     android:layout_height="wrap_content"
-                                    android:orientation="vertical"
+                                    android:gravity="center_vertical"
+                                    android:orientation="horizontal"
                                     android:padding="14dp">
 
                                     <ImageView
                                         android:layout_width="20dp"
                                         android:layout_height="20dp"
+                                        android:layout_marginEnd="12dp"
                                         android:src="@android:drawable/ic_lock_idle_lock"
                                         app:tint="@color/button_primary" />
 
-                                    <TextView
-                                        android:layout_width="wrap_content"
+                                    <LinearLayout
+                                        android:layout_width="0dp"
                                         android:layout_height="wrap_content"
-                                        android:layout_marginTop="8dp"
-                                        android:text="@string/security_guard_fee"
-                                        android:textColor="@color/section_title"
-                                        android:textSize="13sp"
-                                        android:textStyle="bold" />
+                                        android:layout_weight="1"
+                                        android:orientation="vertical">
 
-                                    <TextView
-                                        android:id="@+id/securityGuardFeeValue"
-                                        android:layout_width="wrap_content"
-                                        android:layout_height="wrap_content"
-                                        android:layout_marginTop="4dp"
-                                        android:text="Rs 0"
-                                        android:textColor="@color/section_body"
-                                        android:textSize="12sp" />
+                                        <TextView
+                                            android:layout_width="wrap_content"
+                                            android:layout_height="wrap_content"
+                                            android:text="@string/security_guard_fee"
+                                            android:textColor="@color/section_title"
+                                            android:textSize="14sp"
+                                            android:textStyle="bold" />
+                                    </LinearLayout>
                                 </LinearLayout>
                             </com.google.android.material.card.MaterialCardView>
-                        </GridLayout>
+                        </LinearLayout>
 
                         <com.google.android.material.card.MaterialCardView
                             android:id="@+id/expenseEditorCard"

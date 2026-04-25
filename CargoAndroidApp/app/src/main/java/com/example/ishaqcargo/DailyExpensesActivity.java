@@ -101,14 +101,16 @@ public class DailyExpensesActivity extends AppCompatActivity {
         bindExpenseCard(binding.mobileCostCard, "mobile", R.string.mobile_cost);
         bindExpenseCard(binding.moboilChangeCard, "moboil_change", R.string.moboil_change_cost);
         bindExpenseCard(binding.mechanicCostCard, "mechanic", R.string.mechanic_cost);
+        bindExpenseCard(binding.medicalCostCard, "medical", R.string.medical_cost);
         bindExpenseCard(binding.foodCostCard, "food", R.string.food_cost);
         bindExpenseCard(binding.securityGuardFeeCard, "cargo_security_guard", R.string.security_guard_fee);
         styleWidgetCard(binding.cargoServiceCard, R.color.trips_widget_bg, R.drawable.ic_cargo_service);
-        styleWidgetCard(binding.mobileCostCard, R.color.km_widget_bg, R.drawable.ic_widget_mobile);
+        styleWidgetCard(binding.mobileCostCard, R.color.km_widget_bg, R.drawable.ic_cargo_mobile);
         styleWidgetCard(binding.moboilChangeCard, R.color.expenses_widget_bg, R.drawable.ic_cargo_moboil);
-        styleWidgetCard(binding.mechanicCostCard, R.color.revenue_widget_bg, R.drawable.ic_widget_tool);
-        styleWidgetCard(binding.foodCostCard, R.color.button_primary, R.drawable.ic_widget_food_logo);
-        styleWidgetCard(binding.securityGuardFeeCard, R.color.button_emerald_active, R.drawable.ic_widget_police);
+        styleWidgetCard(binding.mechanicCostCard, R.color.revenue_widget_bg, R.drawable.ic_cargo_mechanic);
+        styleWidgetCard(binding.medicalCostCard, R.color.button_amber, android.R.drawable.ic_menu_info_details);
+        styleWidgetCard(binding.foodCostCard, R.color.button_primary, R.drawable.ic_cargo_food);
+        styleWidgetCard(binding.securityGuardFeeCard, R.color.button_emerald_active, R.drawable.ic_cargo_guard);
     }
 
     private void bindExpenseCard(View card, String category, int titleRes) {
@@ -176,6 +178,7 @@ public class DailyExpensesActivity extends AppCompatActivity {
             totals.put("mobile_cost", 0);
             totals.put("moboil_change_cost", 0);
             totals.put("mechanic_cost", 0);
+            totals.put("medical_cost", 0);
             totals.put("food_cost", 0);
             totals.put("cargo_security_guard_fee", 0);
             totals.put("total_amount", 0);
@@ -252,6 +255,9 @@ public class DailyExpensesActivity extends AppCompatActivity {
                     case "mechanic":
                         totals.put("mechanic_cost", totals.optDouble("mechanic_cost", 0) + amount);
                         break;
+                    case "medical":
+                        totals.put("medical_cost", totals.optDouble("medical_cost", 0) + amount);
+                        break;
                     case "food":
                         totals.put("food_cost", totals.optDouble("food_cost", 0) + amount);
                         break;
@@ -295,6 +301,7 @@ public class DailyExpensesActivity extends AppCompatActivity {
             todayTotals.put("mobile", todayExpense.optDouble("mobile_cost", 0));
             todayTotals.put("moboil_change", todayExpense.optDouble("moboil_change_cost", 0));
             todayTotals.put("mechanic", todayExpense.optDouble("mechanic_cost", 0));
+            todayTotals.put("medical", todayExpense.optDouble("medical_cost", 0));
             todayTotals.put("food", todayExpense.optDouble("food_cost", 0));
             todayTotals.put("cargo_security_guard", todayExpense.optDouble("cargo_security_guard_fee", 0));
         }
@@ -304,20 +311,10 @@ public class DailyExpensesActivity extends AppCompatActivity {
                         + todayTotals.getOrDefault("mobile", 0d)
                         + todayTotals.getOrDefault("moboil_change", 0d)
                         + todayTotals.getOrDefault("mechanic", 0d)
+                        + todayTotals.getOrDefault("medical", 0d)
                         + todayTotals.getOrDefault("food", 0d)
                         + todayTotals.getOrDefault("cargo_security_guard", 0d)
         ));
-
-        setExpenseValue(binding.cargoServiceValue, "cargo_service");
-        setExpenseValue(binding.mobileCostValue, "mobile");
-        setExpenseValue(binding.moboilChangeValue, "moboil_change");
-        setExpenseValue(binding.mechanicCostValue, "mechanic");
-        setExpenseValue(binding.foodCostValue, "food");
-        setExpenseValue(binding.securityGuardFeeValue, "cargo_security_guard");
-    }
-
-    private void setExpenseValue(TextView view, String category) {
-        view.setText(formatCurrency(todayTotals.getOrDefault(category, 0d)));
     }
 
     private void saveDailyExpense(String category, String amount) {
@@ -396,6 +393,8 @@ public class DailyExpensesActivity extends AppCompatActivity {
                 return getString(R.string.moboil_change_cost);
             case "mechanic":
                 return getString(R.string.mechanic_cost);
+            case "medical":
+                return getString(R.string.medical_cost);
             case "food":
                 return getString(R.string.food_cost);
             case "cargo_security_guard":
@@ -410,15 +409,17 @@ public class DailyExpensesActivity extends AppCompatActivity {
             case "cargo_service":
                 return R.drawable.ic_cargo_service;
             case "mobile":
-                return R.drawable.ic_widget_mobile;
+                return R.drawable.ic_cargo_mobile;
             case "moboil_change":
                 return R.drawable.ic_cargo_moboil;
             case "mechanic":
-                return R.drawable.ic_widget_tool;
+                return R.drawable.ic_cargo_mechanic;
+            case "medical":
+                return android.R.drawable.ic_menu_info_details;
             case "food":
-                return R.drawable.ic_widget_food_logo;
+                return R.drawable.ic_cargo_food;
             case "cargo_security_guard":
-                return R.drawable.ic_widget_police;
+                return R.drawable.ic_cargo_guard;
             default:
                 return R.drawable.ic_cargo_service;
         }

@@ -14,7 +14,7 @@
     <string name="login_error_driver_only">یہ ایپ صرف ڈرائیور اکاؤنٹس کے لیے ہے</string>
     <string name="login_error_parsing">لاگ اِن جواب پڑھنے میں مسئلہ ہوا</string>
 
-    <string name="dashboard_welcome_back">واپس خوش آمدید،</string>
+    <string name="dashboard_welcome_back">لائسنس نمبر</string>
     <string name="dashboard_active_status">فعال حالت</string>
     <string name="dashboard_recent_activity">حالیہ سرگرمی</string>
     <string name="app_name">خاکسار گڈز</string>
@@ -42,9 +42,12 @@
     <string name="history_arrow">→</string>
     <string name="start_trip">ٹرپ شروع کریں</string>
     <string name="end_trip">ٹرپ ختم کریں</string>
+    <string name="end_trip_expenses_subtitle">ٹرپ مکمل کرنے سے پہلے اخراجات شامل کریں۔</string>
+    <string name="end_trip_details">ٹرپ ختم کرنے کی تفصیل</string>
+    <string name="end_trip_details_subtitle">ٹرپ مکمل کرنے کے لیے آخری میٹر اور مقام درج کریں۔</string>
     <string name="loading_dashboard">ڈیش بورڈ لوڈ ہو رہا ہے...</string>
     <string name="trip_history">ٹرپ ہسٹری</string>
-    <string name="trip_history_subtitle">مکمل اور جاری ٹرپس کو میٹر، مالیات اور تصاویر کی تفصیل کے ساتھ دیکھیں۔</string>
+    <string name="trip_history_subtitle"> ٹرپس میٹر، مالیات اور تصاویر کی تفصیل </string>
     <string name="refresh">ریفریش</string>
     <string name="loading_trip_history">ٹرپ ہسٹری لوڈ ہو رہی ہے...</string>
     <string name="no_history_title">کوئی ٹرپ نہیں ملا</string>
@@ -55,7 +58,7 @@
     <string name="trip_notes_empty">نوٹس: کوئی نوٹ شامل نہیں</string>
     <string name="trip_notes_value">نوٹس: %1$s</string>
     <string name="daily_expenses">روزانہ اخراجات</string>
-    <string name="daily_expenses_subtitle">ٹرپ سے الگ ڈرائیور کے روزانہ خرچے ایک دباؤ میں محفوظ کریں۔</string>
+    <string name="daily_expenses_subtitle">   ڈرائیور کے روزانہ خرچے  محفوظ کریں۔</string>
     <string name="daily_expense_history_subtitle">غیر ٹرپ روزانہ خرچ دیکھیں</string>
     <string name="trip_expense_breakdown">ڈیزل %1$s • ٹول %2$s • کھانا %3$s • پولیس %4$s
 چالان %5$s • انعام %6$s • بلٹی %7$s • پنکچر %8$s</string>
@@ -115,14 +118,15 @@
     <string name="mobile_cost">موبائل خرچہ</string>
     <string name="moboil_change_cost">موآئل چیینج خرچہ</string>
     <string name="mechanic_cost">مکینک کا خرچہ</string>
+    <string name="medical_cost">میڈیکل خرچہ</string>
     <string name="security_guard_fee">چوکیدارا</string>
     <string name="save_daily_expense">روزانہ خرچہ محفوظ کریں</string>
     <string name="daily_expense_history">روزانہ خرچے کی ہسٹری</string>
     <string name="no_daily_expenses">اس مہینے کے لیے کوئی روزانہ خرچہ نہیں ملا۔</string>
     <string name="daily_expense_saved">روزانہ خرچہ کامیابی سے محفوظ ہو گیا</string>
     <string name="daily_expense_breakdown">سروس %1$s • موبائل %2$s
-موآئل %3$s • مکینک %4$s • کھانا %5$s
-چوکیدارا %6$s • دیگر %7$s</string>
+موآئل %3$s • مکینک %4$s • میڈیکل %5$s
+کھانا %6$s • چوکیدارا %7$s • دیگر %8$s</string>
     <string name="notes">نوٹس</string>
     <string name="finish_trip_first">پہلے موجودہ ٹرپ مکمل کریں</string>
     <string name="back_to_dashboard">ڈیش بورڈ پر واپس جائیں</string>
@@ -131,6 +135,13 @@
     <string name="save_expense_entry">خرچہ محفوظ کریں</string>
     <string name="trip_expense_history">ٹرپ خرچہ ہسٹری</string>
     <string name="no_trip_expenses_yet">ابھی کوئی خرچہ شامل نہیں ہوا۔</string>
+    <string name="diesel_liters_optional">لیٹر (اختیاری)</string>
+    <string name="diesel_location_optional">مقام (اختیاری)</string>
+    <string name="diesel_meter_photo_optional">میٹر تصویر (اختیاری)</string>
+    <string name="save_diesel_expense">ڈیزل خرچ محفوظ کریں</string>
+    <string name="open_camera_for_diesel_meter">ڈیزل میٹر تصویر کے لیے کیمرا کھولیں</string>
+    <string name="change_diesel_meter_photo">ڈیزل میٹر تصویر تبدیل کریں</string>
+    <string name="license_number_value">لائسنس: %1$s</string>
     <string name="end_meter_photo_required">اختتامی میٹر کی تصویر لازمی ہے</string>
     <string name="open_camera_for_end_meter">اختتامی میٹر کی تصویر کے لیے کیمرا کھولنے کو دبائیں</string>
     <string name="open_camera_for_start_meter">شروع کے میٹر کی تصویر کے لیے کیمرا کھولنے کو دبائیں</string>
@@ -143,12 +154,12 @@
     <string name="select_expense_type_first">پہلے خرچے کی قسم منتخب کریں</string>
     <string name="enter_expense_amount">خرچے کی رقم درج کریں</string>
     <string name="add_expense_for">%1$s کے لیے رقم درج کریں</string>
-    <string name="tap_amount_widget">کسی ویجٹ پر دبائیں اور عددی کی پیڈ سے رقم درج کریں۔</string>
+    <string name="tap_amount_widget">کسی ویجٹ پر دبائیں اور رقم درج کریں۔</string>
     <string name="tap_expense_widget">کسی ویجٹ پر دبائیں، رقم درج کریں، اور فوراً محفوظ کریں۔</string>
     <string name="save_amount">رقم محفوظ کریں</string>
     <string name="amount_saved">رقم محفوظ ہو گئی</string>
     <string name="today_total">آج کا کل خرچہ</string>
-    <string name="daily_expenses_help">تاریخ خودکار ہے۔ ہر روزانہ خرچہ الگ الگ وقت پر محفوظ کریں۔</string>
+    <string name="daily_expenses_help">۔</string>
     <string name="unable_to_load_daily_expenses">روزانہ خرچے لوڈ نہیں ہو سکے</string>
     <string name="unable_to_save_daily_expense">روزانہ خرچہ محفوظ نہیں ہو سکا</string>
     <string name="invalid_daily_expense_response">روزانہ خرچے کا جواب درست نہیں تھا</string>

@@ -885,7 +885,7 @@ const attachExpensesToTrips = async (trips) => {
     const placeholders = tripIds.map(() => '?').join(', ');
 
     const [expenseRows] = await pool.execute(
-        `SELECT id, trip_id, category, amount, receipt_image, notes, created_at
+        `SELECT id, trip_id, category, amount, liters, location, receipt_image, notes, created_at
          FROM expenses
          WHERE trip_id IN (${placeholders})
          ORDER BY created_at ASC`,

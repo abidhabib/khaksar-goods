@@ -23,6 +23,21 @@ const TRIP_COLUMNS = [
     }
 ];
 
+const EXPENSE_COLUMNS = [
+    {
+        name: 'liters',
+        definition: 'DECIMAL(10,2) NULL AFTER amount'
+    },
+    {
+        name: 'location',
+        definition: 'VARCHAR(255) NULL AFTER liters'
+    },
+    {
+        name: 'receipt_image',
+        definition: 'VARCHAR(500) NULL AFTER location'
+    }
+];
+
 const ensureTripColumns = async (connection, databaseName) => {
     for (const column of TRIP_COLUMNS) {
         const [rows] = await connection.execute(
@@ -100,6 +115,21 @@ const ensureExpensesCategoryColumn = async (connection, databaseName) => {
     }
 };
 
+const ensureExpenseColumns = async (connection, databaseName) => {
+    for (const column of EXPENSE_COLUMNS) {
+        const [rows] = await connection.execute(
+            `SELECT COLUMN_NAME
+             FROM INFORMATION_SCHEMA.COLUMNS
+             WHERE TABLE_SCHEMA = ? AND TABLE_NAME = 'expenses' AND COLUMN_NAME = ?`,
+            [databaseName, column.name]
+        );
+
+        if (!rows.length) {
+            await connection.query(`ALTER TABLE expenses ADD COLUMN ${column.name} ${column.definition}`);
+        }
+    }
+};
+
 const ensureSchema = async () => {
     const connection = await pool.getConnection();
 
@@ -113,6 +143,7 @@ const ensureSchema = async () => {
 
         await ensureTripColumns(connection, databaseName);
         await ensureExpensesCategoryColumn(connection, databaseName);
+        await ensureExpenseColumns(connection, databaseName);
         await ensureDriverDailyExpensesTable(connection);
         await ensureDriverDailyExpenseEntriesTable(connection);
     } finally {

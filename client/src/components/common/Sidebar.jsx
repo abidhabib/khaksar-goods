@@ -42,7 +42,7 @@ const Sidebar = () => {
       <div className="absolute bottom-0 left-0 right-0 p-4 bg-cargo-dark/50">
         <div className="text-xs text-cargo-muted">
           <p className='text-amber-500 mb-3 text-left'>
-            Ch Ishaq Cargo
+            Khaksar Goods
           </p>
           <p>© 2026 Cargo Tracker</p>
         </div>

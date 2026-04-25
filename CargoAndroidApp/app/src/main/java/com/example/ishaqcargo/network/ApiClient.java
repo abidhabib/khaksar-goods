@@ -166,15 +166,26 @@ public class ApiClient {
         CLIENT.newCall(request).enqueue(callback);
     }
 
-    public static void addTripExpense(String baseUrl, String token, String tripId, Map<String, String> fields, Callback callback) {
-        FormBody.Builder formBuilder = new FormBody.Builder();
+    public static void addTripExpense(
+            String baseUrl,
+            String token,
+            String tripId,
+            Map<String, String> fields,
+            Uri receiptImageUri,
+            ContentResolver contentResolver,
+            Callback callback
+    ) {
+        MultipartBody.Builder multipartBuilder = new MultipartBody.Builder().setType(MultipartBody.FORM);
         for (Map.Entry<String, String> entry : fields.entrySet()) {
-            formBuilder.add(entry.getKey(), entry.getValue());
+            multipartBuilder.addFormDataPart(entry.getKey(), entry.getValue());
+        }
+        if (receiptImageUri != null && contentResolver != null) {
+            addImagePartIfExists(multipartBuilder, receiptImageUri, contentResolver, "receipt_image", "receipt_image");
         }
 
         Request request = new Request.Builder()
                 .url(baseUrl + "/driver/trips/" + tripId + "/expenses")
-                .post(formBuilder.build())
+                .post(multipartBuilder.build())
                 .header("Authorization", "Bearer " + token)
                 .build();
 
