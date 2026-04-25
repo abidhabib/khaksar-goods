@@ -62,6 +62,24 @@ const ensureDriverDailyExpensesTable = async (connection) => {
     `);
 };
 
+const ensureDriverDailyExpenseEntriesTable = async (connection) => {
+    await connection.query(`
+        CREATE TABLE IF NOT EXISTS driver_daily_expense_entries (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            driver_id INT NOT NULL,
+            category VARCHAR(50) NOT NULL,
+            amount DECIMAL(10,2) NOT NULL DEFAULT 0.00,
+            expense_date DATE NOT NULL,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+            INDEX idx_driver_daily_expense_entries_driver_date (driver_id, expense_date),
+            CONSTRAINT fk_driver_daily_expense_entries_driver
+                FOREIGN KEY (driver_id) REFERENCES drivers(id)
+                ON DELETE CASCADE
+        )
+    `);
+};
+
 const ensureExpensesCategoryColumn = async (connection, databaseName) => {
     const [[column]] = await connection.execute(
         `SELECT COLUMN_TYPE, DATA_TYPE
@@ -96,11 +114,13 @@ const ensureSchema = async () => {
         await ensureTripColumns(connection, databaseName);
         await ensureExpensesCategoryColumn(connection, databaseName);
         await ensureDriverDailyExpensesTable(connection);
+        await ensureDriverDailyExpenseEntriesTable(connection);
     } finally {
         connection.release();
     }
 };
 
 module.exports = {
-    ensureSchema
+    ensureSchema,
+    ensureDriverDailyExpenseEntriesTable
 };

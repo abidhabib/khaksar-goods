@@ -1,6 +1,5 @@
 const pool = require('../config/database');
-const { validateMeterReading } = require('../utils/helpers');
-
+const { ensureDriverDailyExpenseEntriesTable } = require('../config/schema');
 const getAuthenticatedDriverId = (req) => {
     const driverId = req?.user?.driver_id;
     return driverId !== undefined && driverId !== null ? Number(driverId) : null;
@@ -51,6 +50,26 @@ const toExpenseNumber = (value) => {
     }
 
     return parsed;
+};
+
+const TRIP_EXPENSE_CATEGORIES = new Set([
+    'diesel',
+    'toll',
+    'food',
+    'police',
+    'chalaan',
+    'reward',
+    'tyre_puncture',
+    'bilty_commission'
+]);
+
+const DAILY_EXPENSE_CATEGORY_MAP = {
+    cargo_service: 'cargo_service',
+    mobile: 'mobile',
+    moboil_change: 'moboil_change',
+    mechanic: 'mechanic',
+    food: 'food',
+    cargo_security_guard: 'cargo_security_guard'
 };
 
 const buildMonthFilter = (monthValue, column = 'expense_date') => {
@@ -184,16 +203,19 @@ const startTrip = async (req, res) => {
         const freightValue = toNumberOrDefault(freight_charge, NaN);
         const biltyCommissionValue = toExpenseNumber(bilty_commission_amount);
         const startLiveLocation = toNullableString(start_live_location);
+        const resolvedToLocation = toNullableString(to_location) || 'Pending end location';
 
-        if (
-            !from_location ||
-            !to_location ||
-            !Number.isFinite(meterReadingValue) ||
-            !Number.isFinite(freightValue) ||
-            !meter_image ||
-            !bilty_slip_image
-        ) {
-            return res.status(400).json({ message: 'Invalid trip start payload' });
+        const missingFields = [];
+        if (!from_location) missingFields.push('from_location');
+        if (!Number.isFinite(meterReadingValue)) missingFields.push('meter_reading');
+        if (!Number.isFinite(freightValue)) missingFields.push('freight_charge');
+        if (!meter_image) missingFields.push('meter_image');
+        if (!bilty_slip_image) missingFields.push('bilty_slip_image');
+
+        if (missingFields.length) {
+            return res.status(400).json({
+                message: `Invalid trip start payload: missing ${missingFields.join(', ')}`
+            });
         }
 
         // Check if driver has ongoing trip
@@ -230,12 +252,6 @@ const startTrip = async (req, res) => {
             return res.status(400).json({ message: 'Assigned cargo not found' });
         }
 
-        // Validate meter reading
-        const validation = validateMeterReading(meterReadingValue, car[0].current_meter_reading);
-        if (!validation.valid) {
-            return res.status(400).json({ message: validation.message });
-        }
-
         // Create trip
         const [tripResult] = await connection.execute(
             `INSERT INTO trips 
@@ -248,7 +264,7 @@ const startTrip = async (req, res) => {
                 meterReadingValue,
                 from_location,
                 startLiveLocation,
-                to_location,
+                resolvedToLocation,
                 freightValue,
                 meter_image,
                 bilty_slip_image,
@@ -308,24 +324,22 @@ const endTrip = async (req, res) => {
             diesel_cost = 0, 
             toll_cost = 0, 
             food_cost = 0, 
-            other_cost = 0,
             police_cost = 0,
             chalaan_cost = 0,
             reward_cost = 0,
+            tyre_puncture_cost = 0,
             end_location,
-            end_live_location,
-            notes 
+            end_live_location
         } = req.body;
         const meter_image = req.files?.meter_image?.[0]?.path || req.file?.path || null;
-        const safeNotes = toNullableString(notes);
         const meterReadingValue = toNumberOrDefault(meter_reading, NaN);
         const dieselValue = toExpenseNumber(diesel_cost);
         const tollValue = toExpenseNumber(toll_cost);
         const foodValue = toExpenseNumber(food_cost);
-        const otherValue = toExpenseNumber(other_cost);
         const policeValue = toExpenseNumber(police_cost);
         const chalaanValue = toExpenseNumber(chalaan_cost);
         const rewardValue = toExpenseNumber(reward_cost);
+        const tyrePunctureValue = toExpenseNumber(tyre_puncture_cost);
         const endLocation = toNullableString(end_location);
         const endLiveLocation = toNullableString(end_live_location);
 
@@ -346,12 +360,6 @@ const endTrip = async (req, res) => {
             return res.status(404).json({ message: 'Trip not found or already completed' });
         }
 
-        // Validate meter reading
-        const validation = validateMeterReading(meterReadingValue, trip[0].start_meter_reading);
-        if (!validation.valid) {
-            return res.status(400).json({ message: validation.message });
-        }
-
         const distance_km = meterReadingValue - trip[0].start_meter_reading;
 
         // Update trip
@@ -359,24 +367,24 @@ const endTrip = async (req, res) => {
             `UPDATE trips 
              SET end_meter_reading = ?, 
                  end_meter_image = ?,
+                 to_location = COALESCE(?, to_location),
                  end_location = ?,
                  end_live_location = ?,
                  status = 'completed',
-                 ended_at = CURRENT_TIMESTAMP,
-                 notes = ?
+                 ended_at = CURRENT_TIMESTAMP
              WHERE id = ?`,
-            [meterReadingValue, meter_image, endLocation, endLiveLocation, safeNotes, trip_id]
+            [meterReadingValue, meter_image, endLocation, endLocation, endLiveLocation, trip_id]
         );
 
-        // Add expenses
+        // Backward compatibility for any unsaved totals still sent by older clients
         const expenses = [
             { category: 'diesel', amount: dieselValue },
             { category: 'toll', amount: tollValue },
             { category: 'food', amount: foodValue },
-            { category: 'other', amount: otherValue },
             { category: 'police', amount: policeValue },
             { category: 'chalaan', amount: chalaanValue },
-            { category: 'reward', amount: rewardValue }
+            { category: 'reward', amount: rewardValue },
+            { category: 'tyre_puncture', amount: tyrePunctureValue }
         ];
 
         for (const exp of expenses) {
@@ -426,6 +434,56 @@ const endTrip = async (req, res) => {
     }
 };
 
+const addTripExpense = async (req, res) => {
+    try {
+        const driver_id = await resolveDriverId(req);
+        if (!driver_id) {
+            return res.status(403).json({ message: 'Driver account required' });
+        }
+
+        const { trip_id } = req.params;
+        const { category, amount } = req.body;
+        const normalizedCategory = toNullableString(category);
+        const amountValue = toExpenseNumber(amount);
+
+        if (!normalizedCategory || !TRIP_EXPENSE_CATEGORIES.has(normalizedCategory)) {
+            return res.status(400).json({ message: 'Invalid expense category' });
+        }
+
+        if (!(amountValue > 0)) {
+            return res.status(400).json({ message: 'Expense amount must be greater than zero' });
+        }
+
+        const [trip] = await pool.execute(
+            'SELECT id FROM trips WHERE id = ? AND driver_id = ? AND status = "ongoing" LIMIT 1',
+            [trip_id, driver_id]
+        );
+
+        if (!trip.length) {
+            return res.status(404).json({ message: 'Ongoing trip not found' });
+        }
+
+        const [result] = await pool.execute(
+            'INSERT INTO expenses (trip_id, category, amount) VALUES (?, ?, ?)',
+            [trip_id, normalizedCategory, amountValue]
+        );
+
+        const [[savedExpense]] = await pool.execute(
+            'SELECT id, trip_id, category, amount, created_at FROM expenses WHERE id = ? LIMIT 1',
+            [result.insertId]
+        );
+
+        res.status(201).json({
+            success: true,
+            message: 'Expense saved successfully',
+            expense: savedExpense
+        });
+    } catch (error) {
+        console.error('Add trip expense error:', error);
+        res.status(500).json({ message: 'Server error', error: error.message });
+    }
+};
+
 // Get trip history (for driver)
 const getTripHistory = async (req, res) => {
     try {
@@ -443,10 +501,10 @@ const getTripHistory = async (req, res) => {
                    COALESCE(exp.diesel_expense, 0) as diesel_expense,
                    COALESCE(exp.toll_expense, 0) as toll_expense,
                    COALESCE(exp.food_expense, 0) as food_expense,
-                   COALESCE(exp.other_expense, 0) as other_expense,
                    COALESCE(exp.police_expense, 0) as police_expense,
                    COALESCE(exp.chalaan_expense, 0) as chalaan_expense,
                    COALESCE(exp.reward_expense, 0) as reward_expense,
+                   COALESCE(exp.tyre_puncture_expense, 0) as tyre_puncture_expense,
                    COALESCE(exp.bilty_commission_expense, 0) as bilty_commission_expense,
                    (t.freight_charge - COALESCE(exp.total_expenses, 0)) as net_profit,
                    (t.end_meter_reading - t.start_meter_reading) as distance_km
@@ -459,10 +517,10 @@ const getTripHistory = async (req, res) => {
                     SUM(CASE WHEN category = 'diesel' THEN amount ELSE 0 END) as diesel_expense,
                     SUM(CASE WHEN category = 'toll' THEN amount ELSE 0 END) as toll_expense,
                     SUM(CASE WHEN category = 'food' THEN amount ELSE 0 END) as food_expense,
-                    SUM(CASE WHEN category = 'other' THEN amount ELSE 0 END) as other_expense,
                     SUM(CASE WHEN category = 'police' THEN amount ELSE 0 END) as police_expense,
                     SUM(CASE WHEN category = 'chalaan' THEN amount ELSE 0 END) as chalaan_expense,
                     SUM(CASE WHEN category = 'reward' THEN amount ELSE 0 END) as reward_expense,
+                    SUM(CASE WHEN category = 'tyre_puncture' THEN amount ELSE 0 END) as tyre_puncture_expense,
                     SUM(CASE WHEN category = 'bilty_commission' THEN amount ELSE 0 END) as bilty_commission_expense
                 FROM expenses
                 GROUP BY trip_id
@@ -531,6 +589,13 @@ const getTripDetails = async (req, res) => {
 
 const getDailyExpenses = async (req, res) => {
     try {
+        const schemaConnection = await pool.getConnection();
+        try {
+            await ensureDriverDailyExpenseEntriesTable(schemaConnection);
+        } finally {
+            schemaConnection.release();
+        }
+
         const driver_id = await resolveDriverId(req);
         if (!driver_id) {
             return res.status(403).json({ message: 'Driver account required' });
@@ -538,29 +603,86 @@ const getDailyExpenses = async (req, res) => {
 
         const monthFilter = buildMonthFilter(req.query.month, 'expense_date');
 
-        const [expenses] = await pool.execute(
-            `SELECT *,
-                    (cargo_service_cost + mobile_cost + moboil_change_cost + mechanic_cost +
-                     food_cost + cargo_security_guard_fee + other_cost) AS total_amount
-             FROM driver_daily_expenses
+        const [entries] = await pool.execute(
+            `SELECT id, driver_id, category, amount, expense_date, created_at
+             FROM driver_daily_expense_entries
              WHERE driver_id = ? ${monthFilter.clause}
-             ORDER BY expense_date DESC, created_at DESC`,
+             ORDER BY created_at DESC, id DESC`,
             [driver_id, ...monthFilter.params]
         );
 
+        const [categoryTotals] = await pool.execute(
+            `SELECT
+                expense_date,
+                category,
+                COALESCE(SUM(amount), 0) AS total_amount
+             FROM driver_daily_expense_entries
+             WHERE driver_id = ? ${monthFilter.clause}
+             GROUP BY expense_date, category
+             ORDER BY expense_date DESC`,
+            [driver_id, ...monthFilter.params]
+        );
+
+        const expensesByDate = {};
+        for (const row of categoryTotals) {
+            const dateKey = row.expense_date instanceof Date
+                ? row.expense_date.toISOString().slice(0, 10)
+                : String(row.expense_date).slice(0, 10);
+
+            if (!expensesByDate[dateKey]) {
+                expensesByDate[dateKey] = {
+                    expense_date: dateKey,
+                    cargo_service_cost: 0,
+                    mobile_cost: 0,
+                    moboil_change_cost: 0,
+                    mechanic_cost: 0,
+                    food_cost: 0,
+                    cargo_security_guard_fee: 0,
+                    total_amount: 0
+                };
+            }
+
+            const amountValue = Number(row.total_amount) || 0;
+            switch (row.category) {
+                case 'cargo_service':
+                    expensesByDate[dateKey].cargo_service_cost += amountValue;
+                    break;
+                case 'mobile':
+                    expensesByDate[dateKey].mobile_cost += amountValue;
+                    break;
+                case 'moboil_change':
+                    expensesByDate[dateKey].moboil_change_cost += amountValue;
+                    break;
+                case 'mechanic':
+                    expensesByDate[dateKey].mechanic_cost += amountValue;
+                    break;
+                case 'food':
+                    expensesByDate[dateKey].food_cost += amountValue;
+                    break;
+                case 'cargo_security_guard':
+                    expensesByDate[dateKey].cargo_security_guard_fee += amountValue;
+                    break;
+                default:
+                    break;
+            }
+
+            expensesByDate[dateKey].total_amount += amountValue;
+        }
+
         const [[summary]] = await pool.execute(
             `SELECT
-                COUNT(*) AS total_days,
-                COALESCE(SUM(cargo_service_cost + mobile_cost + moboil_change_cost + mechanic_cost +
-                    food_cost + cargo_security_guard_fee + other_cost), 0) AS total_amount
-             FROM driver_daily_expenses
+                COUNT(*) AS total_entries,
+                COUNT(DISTINCT expense_date) AS total_days,
+                COALESCE(SUM(amount), 0) AS total_amount
+             FROM driver_daily_expense_entries
              WHERE driver_id = ? ${monthFilter.clause}`,
             [driver_id, ...monthFilter.params]
         );
 
         res.json({
             success: true,
-            expenses,
+            expenses: Object.values(expensesByDate),
+            entries,
             summary
         });
     } catch (error) {
@@ -571,58 +693,88 @@ const getDailyExpenses = async (req, res) => {
 
 const saveDailyExpense = async (req, res) => {
     try {
+        const schemaConnection = await pool.getConnection();
+        try {
+            await ensureDriverDailyExpenseEntriesTable(schemaConnection);
+        } finally {
+            schemaConnection.release();
+        }
+
         const driver_id = await resolveDriverId(req);
         if (!driver_id) {
             return res.status(403).json({ message: 'Driver account required' });
         }
 
         const {
-            expense_date,
+            category,
+            amount,
             cargo_service_cost = 0,
             mobile_cost = 0,
             moboil_change_cost = 0,
             mechanic_cost = 0,
             food_cost = 0,
-            cargo_security_guard_fee = 0,
-            other_cost = 0,
-            notes
+            cargo_security_guard_fee = 0
         } = req.body;
 
-        if (!expense_date || !/^\d{4}-\d{2}-\d{2}$/.test(expense_date)) {
-            return res.status(400).json({ message: 'Valid expense date is required' });
+        const normalizedCategory = toNullableString(category);
+        if (normalizedCategory && amount !== undefined) {
+            const amountValue = toExpenseNumber(amount);
+
+            if (!DAILY_EXPENSE_CATEGORY_MAP[normalizedCategory]) {
+                return res.status(400).json({ message: 'Invalid daily expense category' });
+            }
+
+            if (!(amountValue > 0)) {
+                return res.status(400).json({ message: 'Expense amount must be greater than zero' });
+            }
+
+            const [result] = await pool.execute(
+                `INSERT INTO driver_daily_expense_entries
+                 (driver_id, category, amount, expense_date)
+                 VALUES (?, ?, ?, CURDATE())`,
+                [driver_id, normalizedCategory, amountValue]
+            );
+
+            const [[entry]] = await pool.execute(
+                `SELECT id, driver_id, category, amount, expense_date, created_at
+                 FROM driver_daily_expense_entries
+                 WHERE id = ? LIMIT 1`,
+                [result.insertId]
+            );
+
+            return res.json({
+                success: true,
+                message: 'Daily expense saved successfully',
+                entry
+            });
+        } else {
+            const values = [
+                toExpenseNumber(cargo_service_cost),
+                toExpenseNumber(mobile_cost),
+                toExpenseNumber(moboil_change_cost),
+                toExpenseNumber(mechanic_cost),
+                toExpenseNumber(food_cost),
+                toExpenseNumber(cargo_security_guard_fee)
+            ];
+
+            const rows = [
+                ['cargo_service', values[0]],
+                ['mobile', values[1]],
+                ['moboil_change', values[2]],
+                ['mechanic', values[3]],
+                ['food', values[4]],
+                ['cargo_security_guard', values[5]]
+            ].filter(([, amountValue]) => amountValue > 0);
+
+            for (const [categoryName, amountValue] of rows) {
+                await pool.execute(
+                    `INSERT INTO driver_daily_expense_entries
+                     (driver_id, category, amount, expense_date)
+                     VALUES (?, ?, ?, CURDATE())`,
+                    [driver_id, categoryName, amountValue]
+                );
+            }
         }
-
-        const values = [
-            toExpenseNumber(cargo_service_cost),
-            toExpenseNumber(mobile_cost),
-            toExpenseNumber(moboil_change_cost),
-            toExpenseNumber(mechanic_cost),
-            toExpenseNumber(food_cost),
-            toExpenseNumber(cargo_security_guard_fee),
-            toExpenseNumber(other_cost)
-        ];
-
-        await pool.execute(
-            `INSERT INTO driver_daily_expenses
-             (driver_id, expense_date, cargo_service_cost, mobile_cost, moboil_change_cost,
-              mechanic_cost, food_cost, cargo_security_guard_fee, other_cost, notes)
-             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-             ON DUPLICATE KEY UPDATE
-                cargo_service_cost = VALUES(cargo_service_cost),
-                mobile_cost = VALUES(mobile_cost),
-                moboil_change_cost = VALUES(moboil_change_cost),
-                mechanic_cost = VALUES(mechanic_cost),
-                food_cost = VALUES(food_cost),
-                cargo_security_guard_fee = VALUES(cargo_security_guard_fee),
-                other_cost = VALUES(other_cost),
-                notes = VALUES(notes)`,
-            [
-                driver_id,
-                expense_date,
-                ...values,
-                toNullableString(notes)
-            ]
-        );
 
         res.json({
             success: true,
@@ -638,6 +790,7 @@ module.exports = {
     getDashboard,
     startTrip,
     endTrip,
+    addTripExpense,
     getTripHistory,
     getTripDetails,
     getDailyExpenses,

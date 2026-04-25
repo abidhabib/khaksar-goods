@@ -37,6 +37,7 @@ public class DriverDashboardActivity extends AppCompatActivity {
     private JSONObject ongoingTrip;
     private String baseUrl;
     private boolean redirectingToEndTrip;
+    private double currentCarMeterReading;
 
     private final ActivityResultLauncher<Intent> startTripLauncher = registerForActivityResult(
             new ActivityResultContracts.StartActivityForResult(),
@@ -117,7 +118,9 @@ public class DriverDashboardActivity extends AppCompatActivity {
             return;
         }
 
-        startTripLauncher.launch(new Intent(this, StartTripActivity.class));
+        Intent intent = new Intent(this, StartTripActivity.class);
+        intent.putExtra(StartTripActivity.EXTRA_INITIAL_METER, currentCarMeterReading);
+        startTripLauncher.launch(intent);
     }
 
     private void fetchDashboard() {
@@ -157,7 +160,9 @@ public class DriverDashboardActivity extends AppCompatActivity {
                     JSONObject lifetime = root.optJSONObject("lifetimeStats");
                     JSONObject todayStats = root.optJSONObject("todayStats");
                     JSONArray recentTrips = root.optJSONArray("recentTrips");
+                    JSONObject profile = root.optJSONObject("profile");
                     ongoingTrip = root.optJSONObject("ongoingTrip");
+                    currentCarMeterReading = profile != null ? profile.optDouble("current_meter_reading", 0) : 0;
 
                     runOnUiThread(() -> {
                         maybeForceEndTrip(ongoingTrip);
@@ -197,6 +202,8 @@ public class DriverDashboardActivity extends AppCompatActivity {
                         ongoingTripJson.optString("to_location", "-")
                 )
         );
+        intent.putExtra(EndTripActivity.EXTRA_START_METER, ongoingTripJson.optDouble("start_meter_reading", 0));
+        intent.putExtra(EndTripActivity.EXTRA_DESTINATION, ongoingTripJson.optString("to_location", "-"));
         intent.putExtra(EndTripActivity.EXTRA_LOCKED_MODE, true);
         startActivity(intent);
         finish();
@@ -302,6 +309,8 @@ public class DriverDashboardActivity extends AppCompatActivity {
                         ongoingTrip.optString("to_location", "-")
                 )
         );
+        intent.putExtra(EndTripActivity.EXTRA_START_METER, ongoingTrip.optDouble("start_meter_reading", 0));
+        intent.putExtra(EndTripActivity.EXTRA_DESTINATION, ongoingTrip.optString("to_location", "-"));
         intent.putExtra(EndTripActivity.EXTRA_LOCKED_MODE, true);
         endTripLauncher.launch(intent);
     }

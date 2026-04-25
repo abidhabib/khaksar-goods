@@ -86,6 +86,42 @@
                         <LinearLayout
                             android:layout_width="match_parent"
                             android:layout_height="wrap_content"
+                            android:background="@drawable/bg_history_metric_chip"
+                            android:orientation="vertical"
+                            android:padding="14dp">
+
+                            <TextView
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:text="@string/ongoing_trip_details"
+                                android:textColor="@color/history_title"
+                                android:textSize="13sp"
+                                android:textStyle="bold" />
+
+                            <TextView
+                                android:id="@+id/tripDestinationValue"
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:layout_marginTop="8dp"
+                                android:text="-"
+                                android:textColor="@color/section_title"
+                                android:textSize="14sp"
+                                android:textStyle="bold" />
+
+                            <TextView
+                                android:id="@+id/tripStartMeterValue"
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:layout_marginTop="6dp"
+                                android:text="-"
+                                android:textColor="@color/section_body"
+                                android:textSize="13sp" />
+                        </LinearLayout>
+
+                        <LinearLayout
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="14dp"
                             android:gravity="center_vertical"
                             android:orientation="horizontal">
 
@@ -138,155 +174,11 @@
                                 android:inputType="numberDecimal" />
                         </com.google.android.material.textfield.TextInputLayout>
 
-                        <com.google.android.material.textfield.TextInputLayout
-                            style="@style/Widget.Material3.TextInputLayout.OutlinedBox"
-                            android:layout_width="match_parent"
-                            android:layout_height="wrap_content"
-                            android:layout_marginTop="14dp"
-                            android:hint="@string/diesel_cost"
-                            app:boxCornerRadiusBottomEnd="18dp"
-                            app:boxCornerRadiusBottomStart="18dp"
-                            app:boxCornerRadiusTopEnd="18dp"
-                            app:boxCornerRadiusTopStart="18dp">
-
-                            <com.google.android.material.textfield.TextInputEditText
-                                android:id="@+id/dieselCostInput"
-                                android:layout_width="match_parent"
-                                android:layout_height="wrap_content"
-                                android:inputType="numberDecimal" />
-                        </com.google.android.material.textfield.TextInputLayout>
-
-                        <com.google.android.material.textfield.TextInputLayout
-                            style="@style/Widget.Material3.TextInputLayout.OutlinedBox"
-                            android:layout_width="match_parent"
-                            android:layout_height="wrap_content"
-                            android:layout_marginTop="14dp"
-                            android:hint="@string/toll_cost"
-                            app:boxCornerRadiusBottomEnd="18dp"
-                            app:boxCornerRadiusBottomStart="18dp"
-                            app:boxCornerRadiusTopEnd="18dp"
-                            app:boxCornerRadiusTopStart="18dp">
-
-                            <com.google.android.material.textfield.TextInputEditText
-                                android:id="@+id/tollCostInput"
-                                android:layout_width="match_parent"
-                                android:layout_height="wrap_content"
-                                android:inputType="numberDecimal" />
-                        </com.google.android.material.textfield.TextInputLayout>
-
-                        <com.google.android.material.textfield.TextInputLayout
-                            style="@style/Widget.Material3.TextInputLayout.OutlinedBox"
-                            android:layout_width="match_parent"
-                            android:layout_height="wrap_content"
-                            android:layout_marginTop="14dp"
-                            android:hint="@string/food_cost"
-                            app:boxCornerRadiusBottomEnd="18dp"
-                            app:boxCornerRadiusBottomStart="18dp"
-                            app:boxCornerRadiusTopEnd="18dp"
-                            app:boxCornerRadiusTopStart="18dp">
-
-                            <com.google.android.material.textfield.TextInputEditText
-                                android:id="@+id/foodCostInput"
-                                android:layout_width="match_parent"
-                                android:layout_height="wrap_content"
-                                android:inputType="numberDecimal" />
-                        </com.google.android.material.textfield.TextInputLayout>
-
-                        <com.google.android.material.textfield.TextInputLayout
-                            style="@style/Widget.Material3.TextInputLayout.OutlinedBox"
-                            android:layout_width="match_parent"
-                            android:layout_height="wrap_content"
-                            android:layout_marginTop="14dp"
-                            android:hint="@string/other_cost"
-                            app:boxCornerRadiusBottomEnd="18dp"
-                            app:boxCornerRadiusBottomStart="18dp"
-                            app:boxCornerRadiusTopEnd="18dp"
-                            app:boxCornerRadiusTopStart="18dp">
-
-                            <com.google.android.material.textfield.TextInputEditText
-                                android:id="@+id/otherCostInput"
-                                android:layout_width="match_parent"
-                                android:layout_height="wrap_content"
-                                android:inputType="numberDecimal" />
-                        </com.google.android.material.textfield.TextInputLayout>
-
-                        <com.google.android.material.textfield.TextInputLayout
-                            style="@style/Widget.Material3.TextInputLayout.OutlinedBox"
-                            android:layout_width="match_parent"
-                            android:layout_height="wrap_content"
-                            android:layout_marginTop="14dp"
-                            android:hint="@string/police_cost"
-                            app:boxCornerRadiusBottomEnd="18dp"
-                            app:boxCornerRadiusBottomStart="18dp"
-                            app:boxCornerRadiusTopEnd="18dp"
-                            app:boxCornerRadiusTopStart="18dp">
-
-                            <com.google.android.material.textfield.TextInputEditText
-                                android:id="@+id/policeCostInput"
-                                android:layout_width="match_parent"
-                                android:layout_height="wrap_content"
-                                android:inputType="numberDecimal" />
-                        </com.google.android.material.textfield.TextInputLayout>
-
-                        <com.google.android.material.textfield.TextInputLayout
-                            style="@style/Widget.Material3.TextInputLayout.OutlinedBox"
-                            android:layout_width="match_parent"
-                            android:layout_height="wrap_content"
-                            android:layout_marginTop="14dp"
-                            android:hint="@string/chalaan_cost"
-                            app:boxCornerRadiusBottomEnd="18dp"
-                            app:boxCornerRadiusBottomStart="18dp"
-                            app:boxCornerRadiusTopEnd="18dp"
-                            app:boxCornerRadiusTopStart="18dp">
-
-                            <com.google.android.material.textfield.TextInputEditText
-                                android:id="@+id/chalaanCostInput"
-                                android:layout_width="match_parent"
-                                android:layout_height="wrap_content"
-                                android:inputType="numberDecimal" />
-                        </com.google.android.material.textfield.TextInputLayout>
-
-                        <com.google.android.material.textfield.TextInputLayout
-                            style="@style/Widget.Material3.TextInputLayout.OutlinedBox"
-                            android:layout_width="match_parent"
-                            android:layout_height="wrap_content"
-                            android:layout_marginTop="14dp"
-                            android:hint="@string/reward_cost"
-                            app:boxCornerRadiusBottomEnd="18dp"
-                            app:boxCornerRadiusBottomStart="18dp"
-                            app:boxCornerRadiusTopEnd="18dp"
-                            app:boxCornerRadiusTopStart="18dp">
-
-                            <com.google.android.material.textfield.TextInputEditText
-                                android:id="@+id/rewardCostInput"
-                                android:layout_width="match_parent"
-                                android:layout_height="wrap_content"
-                                android:inputType="numberDecimal" />
-                        </com.google.android.material.textfield.TextInputLayout>
-
-                        <com.google.android.material.textfield.TextInputLayout
-                            style="@style/Widget.Material3.TextInputLayout.OutlinedBox"
-                            android:layout_width="match_parent"
-                            android:layout_height="wrap_content"
-                            android:layout_marginTop="14dp"
-                            android:hint="@string/notes"
-                            app:boxCornerRadiusBottomEnd="18dp"
-                            app:boxCornerRadiusBottomStart="18dp"
-                            app:boxCornerRadiusTopEnd="18dp"
-                            app:boxCornerRadiusTopStart="18dp">
-
-                            <com.google.android.material.textfield.TextInputEditText
-                                android:id="@+id/notesInput"
-                                android:layout_width="match_parent"
-                                android:layout_height="wrap_content"
-                                android:minLines="3" />
-                        </com.google.android.material.textfield.TextInputLayout>
-
                         <TextView
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
-                            android:layout_marginTop="18dp"
-                            android:text="@string/meter_photo_optional"
+                            android:layout_marginTop="16dp"
+                            android:text="@string/end_meter_photo_required"
                             android:textColor="@color/section_label"
                             android:textSize="14sp" />
 
@@ -294,7 +186,7 @@
                             android:id="@+id/endMeterImagePreview"
                             android:layout_width="match_parent"
                             android:layout_height="180dp"
-                            android:layout_marginTop="12dp"
+                            android:layout_marginTop="10dp"
                             android:background="@drawable/bg_image_placeholder"
                             android:scaleType="centerCrop"
                             android:visibility="gone" />
@@ -307,10 +199,422 @@
                             android:background="@drawable/bg_upload_hint"
                             android:gravity="center"
                             android:padding="16dp"
-                            android:text="@string/end_trip_add_photo"
+                            android:text="@string/open_camera_for_end_meter"
                             android:textColor="@color/button_primary"
                             android:textSize="15sp"
                             android:textStyle="bold" />
+
+                        <TextView
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="18dp"
+                            android:text="@string/add_trip_expenses"
+                            android:textColor="@color/section_title"
+                            android:textSize="16sp"
+                            android:textStyle="bold" />
+
+                        <GridLayout
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="12dp"
+                            android:columnCount="2">
+
+                            <com.google.android.material.card.MaterialCardView
+                                android:id="@+id/dieselExpenseCard"
+                                android:layout_width="0dp"
+                                android:layout_height="wrap_content"
+                                android:layout_columnWeight="1"
+                                android:layout_margin="6dp"
+                                app:cardCornerRadius="20dp"
+                                app:cardElevation="0dp"
+                                app:strokeColor="@color/card_stroke"
+                                app:strokeWidth="1dp">
+
+                                <LinearLayout
+                                    android:layout_width="match_parent"
+                                    android:layout_height="wrap_content"
+                                    android:orientation="vertical"
+                                    android:padding="14dp">
+
+                                    <ImageView
+                                        android:layout_width="20dp"
+                                        android:layout_height="20dp"
+                                        android:src="@android:drawable/ic_menu_compass"
+                                        app:tint="@color/button_primary" />
+
+                                    <TextView
+                                        android:layout_width="wrap_content"
+                                        android:layout_height="wrap_content"
+                                        android:layout_marginTop="8dp"
+                                        android:text="@string/diesel_cost"
+                                        android:textColor="@color/section_title"
+                                        android:textSize="13sp"
+                                        android:textStyle="bold" />
+
+                                    <TextView
+                                        android:id="@+id/dieselExpenseValue"
+                                        android:layout_width="wrap_content"
+                                        android:layout_height="wrap_content"
+                                        android:layout_marginTop="4dp"
+                                        android:text="Rs 0"
+                                        android:textColor="@color/section_body"
+                                        android:textSize="12sp" />
+                                </LinearLayout>
+                            </com.google.android.material.card.MaterialCardView>
+
+                            <com.google.android.material.card.MaterialCardView
+                                android:id="@+id/tollExpenseCard"
+                                android:layout_width="0dp"
+                                android:layout_height="wrap_content"
+                                android:layout_columnWeight="1"
+                                android:layout_margin="6dp"
+                                app:cardCornerRadius="20dp"
+                                app:cardElevation="0dp"
+                                app:strokeColor="@color/card_stroke"
+                                app:strokeWidth="1dp">
+
+                                <LinearLayout
+                                    android:layout_width="match_parent"
+                                    android:layout_height="wrap_content"
+                                    android:orientation="vertical"
+                                    android:padding="14dp">
+
+                                    <ImageView
+                                        android:layout_width="20dp"
+                                        android:layout_height="20dp"
+                                        android:src="@android:drawable/ic_menu_directions"
+                                        app:tint="@color/button_primary" />
+
+                                    <TextView
+                                        android:layout_width="wrap_content"
+                                        android:layout_height="wrap_content"
+                                        android:layout_marginTop="8dp"
+                                        android:text="@string/toll_cost"
+                                        android:textColor="@color/section_title"
+                                        android:textSize="13sp"
+                                        android:textStyle="bold" />
+
+                                    <TextView
+                                        android:id="@+id/tollExpenseValue"
+                                        android:layout_width="wrap_content"
+                                        android:layout_height="wrap_content"
+                                        android:layout_marginTop="4dp"
+                                        android:text="Rs 0"
+                                        android:textColor="@color/section_body"
+                                        android:textSize="12sp" />
+                                </LinearLayout>
+                            </com.google.android.material.card.MaterialCardView>
+
+                            <com.google.android.material.card.MaterialCardView
+                                android:id="@+id/foodExpenseCard"
+                                android:layout_width="0dp"
+                                android:layout_height="wrap_content"
+                                android:layout_columnWeight="1"
+                                android:layout_margin="6dp"
+                                app:cardCornerRadius="20dp"
+                                app:cardElevation="0dp"
+                                app:strokeColor="@color/card_stroke"
+                                app:strokeWidth="1dp">
+
+                                <LinearLayout
+                                    android:layout_width="match_parent"
+                                    android:layout_height="wrap_content"
+                                    android:orientation="vertical"
+                                    android:padding="14dp">
+
+                                    <ImageView
+                                        android:layout_width="20dp"
+                                        android:layout_height="20dp"
+                                        android:src="@android:drawable/ic_menu_crop"
+                                        app:tint="@color/button_primary" />
+
+                                    <TextView
+                                        android:layout_width="wrap_content"
+                                        android:layout_height="wrap_content"
+                                        android:layout_marginTop="8dp"
+                                        android:text="@string/food_cost"
+                                        android:textColor="@color/section_title"
+                                        android:textSize="13sp"
+                                        android:textStyle="bold" />
+
+                                    <TextView
+                                        android:id="@+id/foodExpenseValue"
+                                        android:layout_width="wrap_content"
+                                        android:layout_height="wrap_content"
+                                        android:layout_marginTop="4dp"
+                                        android:text="Rs 0"
+                                        android:textColor="@color/section_body"
+                                        android:textSize="12sp" />
+                                </LinearLayout>
+                            </com.google.android.material.card.MaterialCardView>
+
+                            <com.google.android.material.card.MaterialCardView
+                                android:id="@+id/policeExpenseCard"
+                                android:layout_width="0dp"
+                                android:layout_height="wrap_content"
+                                android:layout_columnWeight="1"
+                                android:layout_margin="6dp"
+                                app:cardCornerRadius="20dp"
+                                app:cardElevation="0dp"
+                                app:strokeColor="@color/card_stroke"
+                                app:strokeWidth="1dp">
+
+                                <LinearLayout
+                                    android:layout_width="match_parent"
+                                    android:layout_height="wrap_content"
+                                    android:orientation="vertical"
+                                    android:padding="14dp">
+
+                                    <ImageView
+                                        android:layout_width="20dp"
+                                        android:layout_height="20dp"
+                                        android:src="@android:drawable/ic_lock_lock"
+                                        app:tint="@color/button_primary" />
+
+                                    <TextView
+                                        android:layout_width="wrap_content"
+                                        android:layout_height="wrap_content"
+                                        android:layout_marginTop="8dp"
+                                        android:text="@string/police_cost"
+                                        android:textColor="@color/section_title"
+                                        android:textSize="13sp"
+                                        android:textStyle="bold" />
+
+                                    <TextView
+                                        android:id="@+id/policeExpenseValue"
+                                        android:layout_width="wrap_content"
+                                        android:layout_height="wrap_content"
+                                        android:layout_marginTop="4dp"
+                                        android:text="Rs 0"
+                                        android:textColor="@color/section_body"
+                                        android:textSize="12sp" />
+                                </LinearLayout>
+                            </com.google.android.material.card.MaterialCardView>
+
+                            <com.google.android.material.card.MaterialCardView
+                                android:id="@+id/chalaanExpenseCard"
+                                android:layout_width="0dp"
+                                android:layout_height="wrap_content"
+                                android:layout_columnWeight="1"
+                                android:layout_margin="6dp"
+                                app:cardCornerRadius="20dp"
+                                app:cardElevation="0dp"
+                                app:strokeColor="@color/card_stroke"
+                                app:strokeWidth="1dp">
+
+                                <LinearLayout
+                                    android:layout_width="match_parent"
+                                    android:layout_height="wrap_content"
+                                    android:orientation="vertical"
+                                    android:padding="14dp">
+
+                                    <ImageView
+                                        android:layout_width="20dp"
+                                        android:layout_height="20dp"
+                                        android:src="@android:drawable/ic_menu_info_details"
+                                        app:tint="@color/button_primary" />
+
+                                    <TextView
+                                        android:layout_width="wrap_content"
+                                        android:layout_height="wrap_content"
+                                        android:layout_marginTop="8dp"
+                                        android:text="@string/chalaan_cost"
+                                        android:textColor="@color/section_title"
+                                        android:textSize="13sp"
+                                        android:textStyle="bold" />
+
+                                    <TextView
+                                        android:id="@+id/chalaanExpenseValue"
+                                        android:layout_width="wrap_content"
+                                        android:layout_height="wrap_content"
+                                        android:layout_marginTop="4dp"
+                                        android:text="Rs 0"
+                                        android:textColor="@color/section_body"
+                                        android:textSize="12sp" />
+                                </LinearLayout>
+                            </com.google.android.material.card.MaterialCardView>
+
+                            <com.google.android.material.card.MaterialCardView
+                                android:id="@+id/rewardExpenseCard"
+                                android:layout_width="0dp"
+                                android:layout_height="wrap_content"
+                                android:layout_columnWeight="1"
+                                android:layout_margin="6dp"
+                                app:cardCornerRadius="20dp"
+                                app:cardElevation="0dp"
+                                app:strokeColor="@color/card_stroke"
+                                app:strokeWidth="1dp">
+
+                                <LinearLayout
+                                    android:layout_width="match_parent"
+                                    android:layout_height="wrap_content"
+                                    android:orientation="vertical"
+                                    android:padding="14dp">
+
+                                    <ImageView
+                                        android:layout_width="20dp"
+                                        android:layout_height="20dp"
+                                        android:src="@android:drawable/btn_star_big_on"
+                                        app:tint="@color/button_primary" />
+
+                                    <TextView
+                                        android:layout_width="wrap_content"
+                                        android:layout_height="wrap_content"
+                                        android:layout_marginTop="8dp"
+                                        android:text="@string/reward_cost"
+                                        android:textColor="@color/section_title"
+                                        android:textSize="13sp"
+                                        android:textStyle="bold" />
+
+                                    <TextView
+                                        android:id="@+id/rewardExpenseValue"
+                                        android:layout_width="wrap_content"
+                                        android:layout_height="wrap_content"
+                                        android:layout_marginTop="4dp"
+                                        android:text="Rs 0"
+                                        android:textColor="@color/section_body"
+                                        android:textSize="12sp" />
+                                </LinearLayout>
+                            </com.google.android.material.card.MaterialCardView>
+
+                            <com.google.android.material.card.MaterialCardView
+                                android:id="@+id/tyrePunctureExpenseCard"
+                                android:layout_width="0dp"
+                                android:layout_height="wrap_content"
+                                android:layout_columnWeight="1"
+                                android:layout_margin="6dp"
+                                app:cardCornerRadius="20dp"
+                                app:cardElevation="0dp"
+                                app:strokeColor="@color/card_stroke"
+                                app:strokeWidth="1dp">
+
+                                <LinearLayout
+                                    android:layout_width="match_parent"
+                                    android:layout_height="wrap_content"
+                                    android:orientation="vertical"
+                                    android:padding="14dp">
+
+                                    <ImageView
+                                        android:layout_width="20dp"
+                                        android:layout_height="20dp"
+                                        android:src="@android:drawable/ic_delete"
+                                        app:tint="@color/button_primary" />
+
+                                    <TextView
+                                        android:layout_width="wrap_content"
+                                        android:layout_height="wrap_content"
+                                        android:layout_marginTop="8dp"
+                                        android:text="@string/tyre_puncture_cost"
+                                        android:textColor="@color/section_title"
+                                        android:textSize="13sp"
+                                        android:textStyle="bold" />
+
+                                    <TextView
+                                        android:id="@+id/tyrePunctureExpenseValue"
+                                        android:layout_width="wrap_content"
+                                        android:layout_height="wrap_content"
+                                        android:layout_marginTop="4dp"
+                                        android:text="Rs 0"
+                                        android:textColor="@color/section_body"
+                                        android:textSize="12sp" />
+                                </LinearLayout>
+                            </com.google.android.material.card.MaterialCardView>
+                        </GridLayout>
+
+                        <com.google.android.material.card.MaterialCardView
+                            android:id="@+id/expenseEditorCard"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="16dp"
+                            android:visibility="gone"
+                            app:cardBackgroundColor="@color/trip_idle_bg"
+                            app:cardCornerRadius="22dp"
+                            app:cardElevation="0dp">
+
+                            <LinearLayout
+                                android:layout_width="match_parent"
+                                android:layout_height="wrap_content"
+                                android:orientation="vertical"
+                                android:padding="16dp">
+
+                                <TextView
+                                    android:id="@+id/selectedExpenseTitle"
+                                    android:layout_width="wrap_content"
+                                    android:layout_height="wrap_content"
+                                    android:text="-"
+                                    android:textColor="@color/section_title"
+                                    android:textSize="15sp"
+                                    android:textStyle="bold" />
+
+                                <com.google.android.material.textfield.TextInputLayout
+                                    style="@style/Widget.Material3.TextInputLayout.OutlinedBox"
+                                    android:layout_width="match_parent"
+                                    android:layout_height="wrap_content"
+                                    android:layout_marginTop="12dp"
+                                    android:hint="@string/expense_amount"
+                                    app:boxCornerRadiusBottomEnd="18dp"
+                                    app:boxCornerRadiusBottomStart="18dp"
+                                    app:boxCornerRadiusTopEnd="18dp"
+                                    app:boxCornerRadiusTopStart="18dp">
+
+                                    <com.google.android.material.textfield.TextInputEditText
+                                        android:id="@+id/expenseAmountInput"
+                                        android:layout_width="match_parent"
+                                        android:layout_height="wrap_content"
+                                        android:inputType="numberDecimal" />
+                                </com.google.android.material.textfield.TextInputLayout>
+
+                                <com.google.android.material.button.MaterialButton
+                                    android:id="@+id/saveExpenseButton"
+                                    android:layout_width="match_parent"
+                                    android:layout_height="52dp"
+                                    android:layout_marginTop="14dp"
+                                    android:text="@string/save_expense_entry"
+                                    android:textAllCaps="false"
+                                    app:backgroundTint="@color/button_primary"
+                                    app:cornerRadius="18dp" />
+                            </LinearLayout>
+                        </com.google.android.material.card.MaterialCardView>
+                    </LinearLayout>
+                </com.google.android.material.card.MaterialCardView>
+
+                <com.google.android.material.card.MaterialCardView
+                    android:id="@+id/expenseHistoryCard"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="16dp"
+                    app:cardBackgroundColor="@color/white"
+                    app:cardCornerRadius="24dp"
+                    app:cardElevation="0dp">
+
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:orientation="vertical"
+                        android:padding="18dp">
+
+                        <TextView
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="@string/trip_expense_history"
+                            android:textColor="@color/section_title"
+                            android:textSize="16sp"
+                            android:textStyle="bold" />
+
+                        <TextView
+                            android:id="@+id/expenseHistoryEmpty"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="12dp"
+                            android:text="@string/no_trip_expenses_yet"
+                            android:textColor="@color/section_hint" />
+
+                        <LinearLayout
+                            android:id="@+id/expenseHistoryContainer"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="12dp"
+                            android:orientation="vertical" />
                     </LinearLayout>
                 </com.google.android.material.card.MaterialCardView>
 

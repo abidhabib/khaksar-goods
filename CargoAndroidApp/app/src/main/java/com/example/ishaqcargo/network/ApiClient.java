@@ -1,6 +1,8 @@
 package com.example.ishaqcargo.network;
 
 import android.content.ContentResolver;
+import android.graphics.Bitmap;
+import android.graphics.BitmapFactory;
 import android.net.Uri;
 import android.webkit.MimeTypeMap;
 
@@ -27,6 +29,8 @@ import okhttp3.RequestBody;
 import okhttp3.Response;
 
 public class ApiClient {
+    private static final int MAX_IMAGE_DIMENSION = 1600;
+    private static final int JPEG_QUALITY = 72;
     private static final OkHttpClient CLIENT = new OkHttpClient.Builder()
             .connectTimeout(30, TimeUnit.SECONDS)
             .readTimeout(90, TimeUnit.SECONDS)
@@ -152,6 +156,31 @@ public class ApiClient {
         CLIENT.newCall(request).enqueue(callback);
     }
 
+    public static void getTripDetails(String baseUrl, String token, String tripId, Callback callback) {
+        Request request = new Request.Builder()
+                .url(baseUrl + "/driver/trips/" + tripId)
+                .get()
+                .header("Authorization", "Bearer " + token)
+                .build();
+
+        CLIENT.newCall(request).enqueue(callback);
+    }
+
+    public static void addTripExpense(String baseUrl, String token, String tripId, Map<String, String> fields, Callback callback) {
+        FormBody.Builder formBuilder = new FormBody.Builder();
+        for (Map.Entry<String, String> entry : fields.entrySet()) {
+            formBuilder.add(entry.getKey(), entry.getValue());
+        }
+
+        Request request = new Request.Builder()
+                .url(baseUrl + "/driver/trips/" + tripId + "/expenses")
+                .post(formBuilder.build())
+                .header("Authorization", "Bearer " + token)
+                .build();
+
+        CLIENT.newCall(request).enqueue(callback);
+    }
+
     public static void getDailyExpenses(String baseUrl, String token, String month, Callback callback) {
         String url = baseUrl + "/driver/daily-expenses";
         if (month != null && !month.trim().isEmpty()) {
@@ -194,14 +223,14 @@ public class ApiClient {
         }
 
         try {
-            byte[] imageBytes = readAllBytes(resolver, uri);
-            if (imageBytes == null) {
-                return;
-            }
-
             String mimeType = resolver.getType(uri);
             if (mimeType == null || mimeType.trim().isEmpty()) {
                 mimeType = "image/jpeg";
+            }
+
+            byte[] imageBytes = readImageBytes(resolver, uri, mimeType);
+            if (imageBytes == null) {
+                return;
             }
 
             String extension = MimeTypeMap.getSingleton().getExtensionFromMimeType(mimeType);
@@ -210,10 +239,64 @@ public class ApiClient {
             }
 
             String fileName = defaultName + "." + extension;
-            RequestBody imageBody = RequestBody.create(imageBytes, MediaType.get(mimeType));
+            RequestBody imageBody = RequestBody.create(imageBytes, MediaType.get("image/jpeg"));
             builder.addFormDataPart(fieldName, fileName, imageBody);
         } catch (Exception ignored) {
         }
+    }
+
+    private static byte[] readImageBytes(ContentResolver resolver, Uri uri, String mimeType) throws IOException {
+        if (mimeType.startsWith("image/")) {
+            byte[] compressedBytes = readCompressedImageBytes(resolver, uri);
+            if (compressedBytes != null) {
+                return compressedBytes;
+            }
+        }
+
+        return readAllBytes(resolver, uri);
+    }
+
+    private static byte[] readCompressedImageBytes(ContentResolver resolver, Uri uri) throws IOException {
+        BitmapFactory.Options boundsOptions = new BitmapFactory.Options();
+        boundsOptions.inJustDecodeBounds = true;
+
+        InputStream boundsStream = resolver.openInputStream(uri);
+        if (boundsStream == null) {
+            return null;
+        }
+        BitmapFactory.decodeStream(boundsStream, null, boundsOptions);
+        boundsStream.close();
+
+        BitmapFactory.Options bitmapOptions = new BitmapFactory.Options();
+        bitmapOptions.inSampleSize = calculateInSampleSize(boundsOptions, MAX_IMAGE_DIMENSION, MAX_IMAGE_DIMENSION);
+
+        InputStream bitmapStream = resolver.openInputStream(uri);
+        if (bitmapStream == null) {
+            return null;
+        }
+
+        Bitmap bitmap = BitmapFactory.decodeStream(bitmapStream, null, bitmapOptions);
+        bitmapStream.close();
+        if (bitmap == null) {
+            return null;
+        }
+
+        ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
+        bitmap.compress(Bitmap.CompressFormat.JPEG, JPEG_QUALITY, outputStream);
+        bitmap.recycle();
+        return outputStream.toByteArray();
+    }
+
+    private static int calculateInSampleSize(BitmapFactory.Options options, int reqWidth, int reqHeight) {
+        int height = options.outHeight;
+        int width = options.outWidth;
+        int inSampleSize = 1;
+
+        while ((height / inSampleSize) > reqHeight || (width / inSampleSize) > reqWidth) {
+            inSampleSize *= 2;
+        }
+
+        return Math.max(inSampleSize, 1);
     }
 
     private static byte[] readAllBytes(ContentResolver resolver, Uri uri) throws IOException {

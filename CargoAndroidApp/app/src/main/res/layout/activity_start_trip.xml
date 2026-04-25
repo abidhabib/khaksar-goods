@@ -152,24 +152,6 @@
                             android:layout_width="match_parent"
                             android:layout_height="wrap_content"
                             android:layout_marginTop="14dp"
-                            android:hint="@string/freight_charge"
-                            app:boxCornerRadiusBottomEnd="18dp"
-                            app:boxCornerRadiusBottomStart="18dp"
-                            app:boxCornerRadiusTopEnd="18dp"
-                            app:boxCornerRadiusTopStart="18dp">
-
-                            <com.google.android.material.textfield.TextInputEditText
-                                android:id="@+id/startFreightInput"
-                                android:layout_width="match_parent"
-                                android:layout_height="wrap_content"
-                                android:inputType="numberDecimal" />
-                        </com.google.android.material.textfield.TextInputLayout>
-
-                        <com.google.android.material.textfield.TextInputLayout
-                            style="@style/Widget.Material3.TextInputLayout.OutlinedBox"
-                            android:layout_width="match_parent"
-                            android:layout_height="wrap_content"
-                            android:layout_marginTop="14dp"
                             android:hint="@string/start_meter_reading"
                             app:boxCornerRadiusBottomEnd="18dp"
                             app:boxCornerRadiusBottomStart="18dp"
@@ -183,23 +165,160 @@
                                 android:inputType="numberDecimal" />
                         </com.google.android.material.textfield.TextInputLayout>
 
-                        <com.google.android.material.textfield.TextInputLayout
-                            style="@style/Widget.Material3.TextInputLayout.OutlinedBox"
+                        <TextView
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="18dp"
+                            android:text="@string/tap_amount_widget"
+                            android:textColor="@color/section_hint"
+                            android:textSize="12sp" />
+
+                        <GridLayout
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="12dp"
+                            android:columnCount="2">
+
+                            <com.google.android.material.card.MaterialCardView
+                                android:id="@+id/freightChargeCard"
+                                android:layout_width="0dp"
+                                android:layout_height="wrap_content"
+                                android:layout_columnWeight="1"
+                                android:layout_margin="6dp"
+                                app:cardCornerRadius="20dp"
+                                app:cardElevation="0dp"
+                                app:strokeColor="@color/card_stroke"
+                                app:strokeWidth="1dp">
+
+                                <LinearLayout
+                                    android:layout_width="match_parent"
+                                    android:layout_height="wrap_content"
+                                    android:orientation="vertical"
+                                    android:padding="14dp">
+
+                                    <ImageView
+                                        android:layout_width="20dp"
+                                        android:layout_height="20dp"
+                                        android:src="@android:drawable/ic_menu_send"
+                                        app:tint="@color/button_primary" />
+
+                                    <TextView
+                                        android:layout_width="wrap_content"
+                                        android:layout_height="wrap_content"
+                                        android:layout_marginTop="8dp"
+                                        android:text="@string/freight_charge"
+                                        android:textColor="@color/section_title"
+                                        android:textSize="13sp"
+                                        android:textStyle="bold" />
+
+                                    <TextView
+                                        android:id="@+id/freightChargeValue"
+                                        android:layout_width="wrap_content"
+                                        android:layout_height="wrap_content"
+                                        android:layout_marginTop="4dp"
+                                        android:text="Rs 0"
+                                        android:textColor="@color/section_body"
+                                        android:textSize="12sp" />
+                                </LinearLayout>
+                            </com.google.android.material.card.MaterialCardView>
+
+                            <com.google.android.material.card.MaterialCardView
+                                android:id="@+id/biltyCommissionCard"
+                                android:layout_width="0dp"
+                                android:layout_height="wrap_content"
+                                android:layout_columnWeight="1"
+                                android:layout_margin="6dp"
+                                app:cardCornerRadius="20dp"
+                                app:cardElevation="0dp"
+                                app:strokeColor="@color/card_stroke"
+                                app:strokeWidth="1dp">
+
+                                <LinearLayout
+                                    android:layout_width="match_parent"
+                                    android:layout_height="wrap_content"
+                                    android:orientation="vertical"
+                                    android:padding="14dp">
+
+                                    <ImageView
+                                        android:layout_width="20dp"
+                                        android:layout_height="20dp"
+                                        android:src="@android:drawable/ic_menu_agenda"
+                                        app:tint="@color/button_primary" />
+
+                                    <TextView
+                                        android:layout_width="wrap_content"
+                                        android:layout_height="wrap_content"
+                                        android:layout_marginTop="8dp"
+                                        android:text="@string/bilty_commission_amount"
+                                        android:textColor="@color/section_title"
+                                        android:textSize="13sp"
+                                        android:textStyle="bold" />
+
+                                    <TextView
+                                        android:id="@+id/biltyCommissionValue"
+                                        android:layout_width="wrap_content"
+                                        android:layout_height="wrap_content"
+                                        android:layout_marginTop="4dp"
+                                        android:text="Rs 0"
+                                        android:textColor="@color/section_body"
+                                        android:textSize="12sp" />
+                                </LinearLayout>
+                            </com.google.android.material.card.MaterialCardView>
+                        </GridLayout>
+
+                        <com.google.android.material.card.MaterialCardView
+                            android:id="@+id/amountEditorCard"
                             android:layout_width="match_parent"
                             android:layout_height="wrap_content"
                             android:layout_marginTop="14dp"
-                            android:hint="@string/bilty_commission_amount"
-                            app:boxCornerRadiusBottomEnd="18dp"
-                            app:boxCornerRadiusBottomStart="18dp"
-                            app:boxCornerRadiusTopEnd="18dp"
-                            app:boxCornerRadiusTopStart="18dp">
+                            android:visibility="gone"
+                            app:cardBackgroundColor="@color/dashboard_background"
+                            app:cardCornerRadius="20dp"
+                            app:cardElevation="0dp">
 
-                            <com.google.android.material.textfield.TextInputEditText
-                                android:id="@+id/biltyCommissionInput"
+                            <LinearLayout
                                 android:layout_width="match_parent"
                                 android:layout_height="wrap_content"
-                                android:inputType="numberDecimal" />
-                        </com.google.android.material.textfield.TextInputLayout>
+                                android:orientation="vertical"
+                                android:padding="14dp">
+
+                                <TextView
+                                    android:id="@+id/selectedAmountTitle"
+                                    android:layout_width="wrap_content"
+                                    android:layout_height="wrap_content"
+                                    android:textColor="@color/section_title"
+                                    android:textSize="14sp"
+                                    android:textStyle="bold" />
+
+                                <com.google.android.material.textfield.TextInputLayout
+                                    style="@style/Widget.Material3.TextInputLayout.OutlinedBox"
+                                    android:layout_width="match_parent"
+                                    android:layout_height="wrap_content"
+                                    android:layout_marginTop="10dp"
+                                    android:hint="@string/expense_amount"
+                                    app:boxCornerRadiusBottomEnd="18dp"
+                                    app:boxCornerRadiusBottomStart="18dp"
+                                    app:boxCornerRadiusTopEnd="18dp"
+                                    app:boxCornerRadiusTopStart="18dp">
+
+                                    <com.google.android.material.textfield.TextInputEditText
+                                        android:id="@+id/amountInput"
+                                        android:layout_width="match_parent"
+                                        android:layout_height="wrap_content"
+                                        android:inputType="numberDecimal" />
+                                </com.google.android.material.textfield.TextInputLayout>
+
+                                <com.google.android.material.button.MaterialButton
+                                    android:id="@+id/saveAmountButton"
+                                    android:layout_width="match_parent"
+                                    android:layout_height="52dp"
+                                    android:layout_marginTop="12dp"
+                                    android:text="@string/save_amount"
+                                    android:textAllCaps="false"
+                                    app:backgroundTint="@color/button_secondary_bg"
+                                    app:cornerRadius="18dp" />
+                            </LinearLayout>
+                        </com.google.android.material.card.MaterialCardView>
 
                         <TextView
                             android:layout_width="wrap_content"
@@ -226,7 +345,7 @@
                             android:background="@drawable/bg_upload_hint"
                             android:gravity="center"
                             android:padding="16dp"
-                            android:text="@string/start_trip_add_photo"
+                            android:text="@string/open_camera_for_start_meter"
                             android:textColor="@color/button_primary"
                             android:textSize="15sp"
                             android:textStyle="bold" />
@@ -256,7 +375,7 @@
                             android:background="@drawable/bg_upload_hint"
                             android:gravity="center"
                             android:padding="16dp"
-                            android:text="@string/bilty_add_photo"
+                            android:text="@string/open_camera_for_bilty"
                             android:textColor="@color/button_primary"
                             android:textSize="15sp"
                             android:textStyle="bold" />

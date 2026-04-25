@@ -181,11 +181,11 @@ public class TripHistoryActivity extends AppCompatActivity {
         double dieselExpense = trip.optDouble("diesel_expense", 0);
         double tollExpense = trip.optDouble("toll_expense", 0);
         double foodExpense = trip.optDouble("food_expense", 0);
-        double otherExpense = trip.optDouble("other_expense", 0);
         double policeExpense = trip.optDouble("police_expense", 0);
         double chalaanExpense = trip.optDouble("chalaan_expense", 0);
         double rewardExpense = trip.optDouble("reward_expense", 0);
         double biltyCommissionExpense = trip.optDouble("bilty_commission_expense", 0);
+        double tyrePunctureExpense = trip.optDouble("tyre_puncture_expense", 0);
         String startedAt = formatTimestamp(trip.optString("started_at", ""));
         String endedAt = formatTimestamp(trip.optString("ended_at", ""));
         String notes = trip.optString("notes", "");
@@ -211,11 +211,11 @@ public class TripHistoryActivity extends AppCompatActivity {
                 formatCurrency(dieselExpense),
                 formatCurrency(tollExpense),
                 formatCurrency(foodExpense),
-                formatCurrency(otherExpense),
                 formatCurrency(policeExpense),
                 formatCurrency(chalaanExpense),
                 formatCurrency(rewardExpense),
-                formatCurrency(biltyCommissionExpense)
+                formatCurrency(biltyCommissionExpense),
+                formatCurrency(tyrePunctureExpense)
         ));
 
         StringBuilder notesBuilder = new StringBuilder();

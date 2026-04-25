@@ -721,18 +721,21 @@ const getDriversExpenseReport = async (req, res) => {
 
         const [rows] = await pool.execute(
             `SELECT
-                de.*,
+                de.id,
+                de.driver_id,
+                de.category,
+                de.amount,
+                de.expense_date,
+                de.created_at,
                 u.username AS driver_name,
                 u.phone AS driver_phone,
-                c.car_number,
-                (de.cargo_service_cost + de.mobile_cost + de.moboil_change_cost + de.mechanic_cost +
-                 de.food_cost + de.cargo_security_guard_fee + de.other_cost) AS total_amount
-             FROM driver_daily_expenses de
+                c.car_number
+             FROM driver_daily_expense_entries de
              JOIN drivers d ON de.driver_id = d.id
              JOIN users u ON d.user_id = u.id
              LEFT JOIN cars c ON d.assigned_car_id = c.id
              ${whereClause}
-             ORDER BY de.expense_date DESC, u.username ASC`,
+             ORDER BY de.created_at DESC, de.id DESC`,
             params
         );
 
@@ -742,10 +745,10 @@ const getDriversExpenseReport = async (req, res) => {
                 u.username AS driver_name,
                 u.phone AS driver_phone,
                 c.car_number,
-                COUNT(*) AS total_days,
-                COALESCE(SUM(de.cargo_service_cost + de.mobile_cost + de.moboil_change_cost + de.mechanic_cost +
-                    de.food_cost + de.cargo_security_guard_fee + de.other_cost), 0) AS total_amount
-             FROM driver_daily_expenses de
+                COUNT(*) AS total_entries,
+                COUNT(DISTINCT de.expense_date) AS total_days,
+                COALESCE(SUM(de.amount), 0) AS total_amount
+             FROM driver_daily_expense_entries de
              JOIN drivers d ON de.driver_id = d.id
              JOIN users u ON d.user_id = u.id
              LEFT JOIN cars c ON d.assigned_car_id = c.id
@@ -759,9 +762,8 @@ const getDriversExpenseReport = async (req, res) => {
             `SELECT
                 COUNT(*) AS total_entries,
                 COUNT(DISTINCT de.driver_id) AS total_drivers,
-                COALESCE(SUM(de.cargo_service_cost + de.mobile_cost + de.moboil_change_cost + de.mechanic_cost +
-                    de.food_cost + de.cargo_security_guard_fee + de.other_cost), 0) AS total_amount
-             FROM driver_daily_expenses de
+                COALESCE(SUM(de.amount), 0) AS total_amount
+             FROM driver_daily_expense_entries de
              ${whereClause}`,
             params
         );

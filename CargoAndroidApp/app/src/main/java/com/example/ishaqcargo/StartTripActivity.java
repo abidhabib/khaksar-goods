@@ -2,6 +2,7 @@ package com.example.ishaqcargo;
 
 import android.Manifest;
 import android.content.Intent;
+import android.content.SharedPreferences;
 import android.content.pm.PackageManager;
 import android.location.Address;
 import android.location.Geocoder;
@@ -15,23 +16,33 @@ import android.os.Looper;
 import android.text.TextUtils;
 import android.util.Log;
 import android.view.View;
+import android.view.ViewGroup;
+import android.widget.ImageView;
+import android.widget.LinearLayout;
+import android.widget.TextView;
 import android.widget.Toast;
 
 import androidx.activity.result.ActivityResultLauncher;
 import androidx.activity.result.contract.ActivityResultContracts;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.core.app.ActivityCompat;
+import androidx.core.content.FileProvider;
+import androidx.core.content.ContextCompat;
 import androidx.core.graphics.Insets;
 import androidx.core.view.ViewCompat;
 import androidx.core.view.WindowCompat;
 import androidx.core.view.WindowInsetsCompat;
+import androidx.core.widget.ImageViewCompat;
 
 import com.example.ishaqcargo.databinding.ActivityStartTripBinding;
 import com.example.ishaqcargo.network.ApiClient;
+import com.example.ishaqcargo.util.AmountEntryDialogHelper;
 import com.example.ishaqcargo.util.SessionManager;
+import com.google.android.material.card.MaterialCardView;
 
 import org.json.JSONObject;
 
+import java.io.File;
 import java.io.IOException;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -45,35 +56,44 @@ import okhttp3.Response;
 public class StartTripActivity extends AppCompatActivity {
 
     private static final String TAG = "StartTripActivity";
+    private static final String PREF_NAME = "start_trip_draft";
+    public static final String EXTRA_INITIAL_METER = "initial_meter";
 
     private ActivityStartTripBinding binding;
     private SessionManager sessionManager;
     private Uri meterImageUri;
     private Uri biltySlipImageUri;
+    private Uri pendingMeterCameraUri;
+    private Uri pendingBiltyCameraUri;
     private String baseUrl;
     private String fetchedStartLocation;
     private Runnable startLocationTimeoutRunnable;
+    private String selectedAmountField;
+    private String freightAmount = "";
+    private String biltyCommissionAmount = "";
 
-    private final ActivityResultLauncher<String> pickMeterImageLauncher = registerForActivityResult(
-            new ActivityResultContracts.GetContent(),
-            uri -> {
-                if (uri != null) {
-                    meterImageUri = uri;
-                    binding.startMeterImagePreview.setImageURI(uri);
-                    binding.startMeterImagePreview.setVisibility(View.VISIBLE);
-                    binding.startUploadHint.setText(R.string.start_trip_change_photo);
+    private final ActivityResultLauncher<Uri> takeMeterPhotoLauncher = registerForActivityResult(
+            new ActivityResultContracts.TakePicture(),
+            success -> {
+                if (success && pendingMeterCameraUri != null) {
+                    meterImageUri = pendingMeterCameraUri;
+                    bindMeterImagePreview();
+                    saveDraft();
+                } else {
+                    pendingMeterCameraUri = null;
                 }
             }
     );
 
-    private final ActivityResultLauncher<String> pickBiltyImageLauncher = registerForActivityResult(
-            new ActivityResultContracts.GetContent(),
-            uri -> {
-                if (uri != null) {
-                    biltySlipImageUri = uri;
-                    binding.biltyImagePreview.setImageURI(uri);
-                    binding.biltyImagePreview.setVisibility(View.VISIBLE);
-                    binding.biltyUploadHint.setText(R.string.bilty_change_photo);
+    private final ActivityResultLauncher<Uri> takeBiltyPhotoLauncher = registerForActivityResult(
+            new ActivityResultContracts.TakePicture(),
+            success -> {
+                if (success && pendingBiltyCameraUri != null) {
+                    biltySlipImageUri = pendingBiltyCameraUri;
+                    bindBiltyImagePreview();
+                    saveDraft();
+                } else {
+                    pendingBiltyCameraUri = null;
                 }
             }
     );
@@ -103,14 +123,25 @@ public class StartTripActivity extends AppCompatActivity {
         baseUrl = sessionManager.getBaseUrl();
 
         applyWindowInsets();
+        setupAmountWidgets();
+        prefillStartMeterReading();
+        restoreDraft();
 
         binding.backButton.setOnClickListener(v -> finish());
-        binding.startMeterImagePreview.setOnClickListener(v -> pickMeterImageLauncher.launch("image/*"));
-        binding.startUploadHint.setOnClickListener(v -> pickMeterImageLauncher.launch("image/*"));
-        binding.biltyImagePreview.setOnClickListener(v -> pickBiltyImageLauncher.launch("image/*"));
-        binding.biltyUploadHint.setOnClickListener(v -> pickBiltyImageLauncher.launch("image/*"));
+        binding.startMeterImagePreview.setOnClickListener(v -> openCameraForMeterPhoto());
+        binding.startUploadHint.setOnClickListener(v -> openCameraForMeterPhoto());
+        binding.biltyImagePreview.setOnClickListener(v -> openCameraForBiltyPhoto());
+        binding.biltyUploadHint.setOnClickListener(v -> openCameraForBiltyPhoto());
         binding.fetchStartLocationButton.setOnClickListener(v -> ensureLocationPermissionAndFetch());
         binding.submitTripButton.setOnClickListener(v -> submitTrip());
+        ((View) binding.startToInput.getParent().getParent()).setVisibility(View.GONE);
+        binding.amountEditorCard.setVisibility(View.GONE);
+    }
+
+    @Override
+    protected void onPause() {
+        super.onPause();
+        saveDraft();
     }
 
     private void applyWindowInsets() {
@@ -132,6 +163,46 @@ public class StartTripActivity extends AppCompatActivity {
             );
             return windowInsets;
         });
+    }
+
+    private void setupAmountWidgets() {
+        bindAmountCard(binding.freightChargeCard, "freight", R.string.freight_charge);
+        bindAmountCard(binding.biltyCommissionCard, "bilty_commission", R.string.bilty_commission_amount);
+        styleWidgetCard(binding.freightChargeCard, R.color.trips_widget_bg, R.drawable.ic_cargo_service);
+        styleWidgetCard(binding.biltyCommissionCard, R.color.expenses_widget_bg, R.drawable.ic_cargo_toll);
+        updateAmountCards();
+    }
+
+    private void bindAmountCard(View card, String field, int titleRes) {
+        card.setOnClickListener(v -> {
+            int iconRes = "freight".equals(field) ? R.drawable.ic_cargo_service : R.drawable.ic_cargo_toll;
+            String initialAmount = "freight".equals(field) ? freightAmount : biltyCommissionAmount;
+            AmountEntryDialogHelper.show(
+                    this,
+                    iconRes,
+                    getString(R.string.add_expense_for, getString(titleRes)),
+                    initialAmount,
+                    amount -> {
+                        if ("freight".equals(field)) {
+                            freightAmount = amount;
+                        } else {
+                            biltyCommissionAmount = amount;
+                        }
+                        updateAmountCards();
+                        saveDraft();
+                        Toast.makeText(this, R.string.amount_saved, Toast.LENGTH_SHORT).show();
+                    }
+            );
+        });
+    }
+
+    private void prefillStartMeterReading() {
+        double initialMeter = getIntent().getDoubleExtra(EXTRA_INITIAL_METER, 0);
+        if (initialMeter > 0 && TextUtils.isEmpty(getInput(binding.startMeterInput))) {
+            String meterText = String.format(Locale.US, "%.0f", initialMeter);
+            binding.startMeterInput.setText(meterText);
+            binding.startMeterInput.setSelection(meterText.length());
+        }
     }
 
     private void ensureLocationPermissionAndFetch() {
@@ -159,8 +230,8 @@ public class StartTripActivity extends AppCompatActivity {
         String provider = locationManager.isProviderEnabled(LocationManager.GPS_PROVIDER)
                 ? LocationManager.GPS_PROVIDER
                 : locationManager.isProviderEnabled(LocationManager.NETWORK_PROVIDER)
-                    ? LocationManager.NETWORK_PROVIDER
-                    : null;
+                ? LocationManager.NETWORK_PROVIDER
+                : null;
 
         if (provider == null) {
             Toast.makeText(this, R.string.enable_location_services, Toast.LENGTH_SHORT).show();
@@ -252,6 +323,7 @@ public class StartTripActivity extends AppCompatActivity {
         fetchedStartLocation = resolvedLocation;
         binding.startFromInput.setText(resolvedLocation);
         binding.startFromInput.setSelection(resolvedLocation.length());
+        saveDraft();
         Toast.makeText(this, R.string.location_fetched_success, Toast.LENGTH_SHORT).show();
     }
 
@@ -290,14 +362,63 @@ public class StartTripActivity extends AppCompatActivity {
         return null;
     }
 
+    private void updateAmountCards() {
+        binding.freightChargeValue.setText(formatCurrency(parseDouble(freightAmount)));
+        binding.biltyCommissionValue.setText(formatCurrency(parseDouble(biltyCommissionAmount)));
+    }
+
+    private void openCameraForMeterPhoto() {
+        try {
+            pendingMeterCameraUri = createTempImageUri("start_meter_");
+            takeMeterPhotoLauncher.launch(pendingMeterCameraUri);
+        } catch (Exception exception) {
+            Toast.makeText(this, R.string.unable_to_open_camera, Toast.LENGTH_SHORT).show();
+        }
+    }
+
+    private void openCameraForBiltyPhoto() {
+        try {
+            pendingBiltyCameraUri = createTempImageUri("bilty_slip_");
+            takeBiltyPhotoLauncher.launch(pendingBiltyCameraUri);
+        } catch (Exception exception) {
+            Toast.makeText(this, R.string.unable_to_open_camera, Toast.LENGTH_SHORT).show();
+        }
+    }
+
+    private Uri createTempImageUri(String prefix) throws IOException {
+        File mediaDir = new File(getFilesDir(), "trip-media");
+        if (!mediaDir.exists() && !mediaDir.mkdirs()) {
+            throw new IOException("Unable to create media directory");
+        }
+
+        File imageFile = File.createTempFile(prefix + System.currentTimeMillis(), ".jpg", mediaDir);
+        return FileProvider.getUriForFile(this, getPackageName() + ".fileprovider", imageFile);
+    }
+
+    private void bindMeterImagePreview() {
+        if (meterImageUri == null) {
+            return;
+        }
+        binding.startMeterImagePreview.setImageURI(meterImageUri);
+        binding.startMeterImagePreview.setVisibility(View.VISIBLE);
+        binding.startUploadHint.setText(R.string.start_trip_change_photo);
+    }
+
+    private void bindBiltyImagePreview() {
+        if (biltySlipImageUri == null) {
+            return;
+        }
+        binding.biltyImagePreview.setImageURI(biltySlipImageUri);
+        binding.biltyImagePreview.setVisibility(View.VISIBLE);
+        binding.biltyUploadHint.setText(R.string.bilty_change_photo);
+    }
+
     private void submitTrip() {
         String from = getInput(binding.startFromInput);
-        String to = getInput(binding.startToInput);
-        String freight = getInput(binding.startFreightInput);
         String meter = getInput(binding.startMeterInput);
         String token = sessionManager.getToken();
 
-        if (TextUtils.isEmpty(from) || TextUtils.isEmpty(to) || TextUtils.isEmpty(freight) || TextUtils.isEmpty(meter)) {
+        if (TextUtils.isEmpty(from) || TextUtils.isEmpty(meter) || TextUtils.isEmpty(freightAmount)) {
             Toast.makeText(this, R.string.fill_required_trip_fields, Toast.LENGTH_SHORT).show();
             return;
         }
@@ -309,10 +430,9 @@ public class StartTripActivity extends AppCompatActivity {
 
         Map<String, String> fields = new LinkedHashMap<>();
         fields.put("from_location", from);
-        fields.put("to_location", to);
-        fields.put("freight_charge", freight);
+        fields.put("freight_charge", freightAmount);
         fields.put("meter_reading", meter);
-        fields.put("bilty_commission_amount", getNumericInput(binding.biltyCommissionInput));
+        fields.put("bilty_commission_amount", TextUtils.isEmpty(biltyCommissionAmount) ? "0" : biltyCommissionAmount);
         fields.put("start_live_location", TextUtils.isEmpty(fetchedStartLocation) ? from : fetchedStartLocation);
 
         setSubmitting(true);
@@ -343,7 +463,7 @@ public class StartTripActivity extends AppCompatActivity {
                     return;
                 }
 
-                String routeText = from + " to " + to;
+                String routeText = from;
                 String createdTripId = null;
                 try {
                     JSONObject root = new JSONObject(body);
@@ -355,12 +475,14 @@ public class StartTripActivity extends AppCompatActivity {
                 }
 
                 String finalCreatedTripId = createdTripId;
-                runOnUiThread(() -> showSuccess(routeText, finalCreatedTripId));
+                String startMeterValue = meter;
+                runOnUiThread(() -> showSuccess(routeText, finalCreatedTripId, startMeterValue, from));
             }
         });
     }
 
-    private void showSuccess(String routeText, String tripId) {
+    private void showSuccess(String routeText, String tripId, String startMeterValue, String destination) {
+        clearDraft();
         setSubmitting(false);
         binding.successRouteText.setText(routeText);
         binding.successState.setVisibility(View.VISIBLE);
@@ -372,6 +494,8 @@ public class StartTripActivity extends AppCompatActivity {
                 Intent intent = new Intent(StartTripActivity.this, EndTripActivity.class);
                 intent.putExtra(EndTripActivity.EXTRA_TRIP_ID, tripId);
                 intent.putExtra(EndTripActivity.EXTRA_ROUTE, routeText);
+                intent.putExtra(EndTripActivity.EXTRA_START_METER, parseDouble(startMeterValue));
+                intent.putExtra(EndTripActivity.EXTRA_DESTINATION, destination);
                 intent.putExtra(EndTripActivity.EXTRA_LOCKED_MODE, true);
                 startActivity(intent);
             }
@@ -382,16 +506,109 @@ public class StartTripActivity extends AppCompatActivity {
     private void setSubmitting(boolean submitting) {
         binding.loadingOverlay.setVisibility(submitting ? View.VISIBLE : View.GONE);
         binding.submitTripButton.setEnabled(!submitting);
+        binding.saveAmountButton.setEnabled(!submitting);
         binding.backButton.setEnabled(!submitting);
         binding.fetchStartLocationButton.setEnabled(!submitting);
+    }
+
+    private void saveDraft() {
+        SharedPreferences preferences = getSharedPreferences(PREF_NAME, MODE_PRIVATE);
+        preferences.edit()
+                .putString("from_location", getInput(binding.startFromInput))
+                .putString("start_meter", getInput(binding.startMeterInput))
+                .putString("freight_amount", freightAmount)
+                .putString("bilty_commission_amount", biltyCommissionAmount)
+                .putString("start_live_location", fetchedStartLocation)
+                .putString("meter_image_uri", meterImageUri != null ? meterImageUri.toString() : null)
+                .putString("bilty_image_uri", biltySlipImageUri != null ? biltySlipImageUri.toString() : null)
+                .apply();
+    }
+
+    private void restoreDraft() {
+        SharedPreferences preferences = getSharedPreferences(PREF_NAME, MODE_PRIVATE);
+
+        String from = preferences.getString("from_location", "");
+        String startMeter = preferences.getString("start_meter", "");
+        freightAmount = preferences.getString("freight_amount", freightAmount);
+        biltyCommissionAmount = preferences.getString("bilty_commission_amount", biltyCommissionAmount);
+        fetchedStartLocation = preferences.getString("start_live_location", null);
+        String meterImage = preferences.getString("meter_image_uri", null);
+        String biltyImage = preferences.getString("bilty_image_uri", null);
+
+        if (!TextUtils.isEmpty(from)) {
+            binding.startFromInput.setText(from);
+        }
+        if (!TextUtils.isEmpty(startMeter)) {
+            binding.startMeterInput.setText(startMeter);
+        }
+        if (!TextUtils.isEmpty(meterImage)) {
+            meterImageUri = Uri.parse(meterImage);
+            bindMeterImagePreview();
+        }
+        if (!TextUtils.isEmpty(biltyImage)) {
+            biltySlipImageUri = Uri.parse(biltyImage);
+            bindBiltyImagePreview();
+        }
+
+        updateAmountCards();
+
+    }
+
+    private void clearDraft() {
+        getSharedPreferences(PREF_NAME, MODE_PRIVATE)
+                .edit()
+                .clear()
+                .apply();
+    }
+
+    private void styleWidgetCard(MaterialCardView card, int colorRes, int iconRes) {
+        int backgroundColor = ContextCompat.getColor(this, colorRes);
+        int foregroundColor = ContextCompat.getColor(this, R.color.white);
+        card.setCardBackgroundColor(backgroundColor);
+        card.setStrokeColor(backgroundColor);
+        card.setRadius(dpToPx(24));
+
+        View child = card.getChildAt(0);
+        if (child instanceof LinearLayout) {
+            LinearLayout layout = (LinearLayout) child;
+            for (int i = 0; i < layout.getChildCount(); i++) {
+                View item = layout.getChildAt(i);
+                if (item instanceof TextView) {
+                    ((TextView) item).setTextColor(foregroundColor);
+                } else if (item instanceof ImageView) {
+                    ImageView imageView = (ImageView) item;
+                    imageView.setImageResource(iconRes);
+                    ImageViewCompat.setImageTintList(imageView, null);
+                    imageView.setBackgroundResource(R.drawable.bg_widget_logo_badge);
+                    imageView.setPadding(dpToPx(9), dpToPx(9), dpToPx(9), dpToPx(9));
+                    imageView.setScaleType(ImageView.ScaleType.CENTER_INSIDE);
+
+                    ViewGroup.LayoutParams params = imageView.getLayoutParams();
+                    params.width = dpToPx(42);
+                    params.height = dpToPx(42);
+                    imageView.setLayoutParams(params);
+                }
+            }
+        }
+    }
+
+    private int dpToPx(int dp) {
+        return Math.round(dp * getResources().getDisplayMetrics().density);
+    }
+
+    private String formatCurrency(double amount) {
+        return String.format(Locale.US, "Rs %.0f", amount);
     }
 
     private String getInput(com.google.android.material.textfield.TextInputEditText input) {
         return input.getText() != null ? input.getText().toString().trim() : "";
     }
 
-    private String getNumericInput(com.google.android.material.textfield.TextInputEditText input) {
-        String value = getInput(input);
-        return TextUtils.isEmpty(value) ? "0" : value;
+    private double parseDouble(String value) {
+        try {
+            return Double.parseDouble(value);
+        } catch (Exception ignored) {
+            return 0;
+        }
     }
 }

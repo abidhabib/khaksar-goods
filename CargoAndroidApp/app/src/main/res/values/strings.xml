@@ -45,7 +45,7 @@
     <string name="trip_history">Trip History</string>
     <string name="trip_history_subtitle">Review completed and ongoing trips with full meter, finance, and photo details.</string>
     <string name="daily_expenses">Daily Expenses</string>
-    <string name="daily_expenses_subtitle">Save driver daily costs separately from trips and review monthly history.</string>
+    <string name="daily_expenses_subtitle">Save driver daily costs separately from trips with one tap.</string>
     <string name="daily_expense_history_subtitle">Track non-trip daily spending</string>
     <string name="refresh">Refresh</string>
     <string name="loading_trip_history">Loading trip history...</string>
@@ -56,8 +56,8 @@
     <string name="trip_history_finance">Freight: %1$s • Expense: %2$s • Net: %3$s</string>
     <string name="trip_notes_empty">Notes: No notes added</string>
     <string name="trip_notes_value">Notes: %1$s</string>
-    <string name="trip_expense_breakdown">Diesel %1$s • Toll %2$s • Food %3$s • Other %4$s
-Police %5$s • Chalaan %6$s • Reward %7$s • Bilty %8$s</string>
+    <string name="trip_expense_breakdown">Diesel %1$s • Toll %2$s • Food %3$s • Police %4$s
+Chalaan %5$s • Reward %6$s • Bilty %7$s • Tyre %8$s</string>
     <string name="trip_image_preview">Trip image preview</string>
     <string name="trip_start_image">Start meter image</string>
     <string name="trip_end_image">End meter image</string>
@@ -73,9 +73,9 @@ Police %5$s • Chalaan %6$s • Reward %7$s • Bilty %8$s</string>
     <string name="meter_photo_optional">Meter photo (optional)</string>
     <string name="meter_photo_required">Meter photo (required)</string>
     <string name="bilty_photo_required">Bilty slip photo (required)</string>
-    <string name="bilty_add_photo">Tap to upload bilty slip photo</string>
+    <string name="bilty_add_photo">Tap to open camera for bilty slip photo</string>
     <string name="bilty_change_photo">Tap to change bilty slip photo</string>
-    <string name="bilty_commission_amount">Bilty commission amount</string>
+    <string name="bilty_commission_amount">Commission amount</string>
     <string name="manual_or_fetch_location">You can type manually or tap the location icon to auto-fill.</string>
     <string name="fetch_current_location">Fetch current location</string>
     <string name="location_permission_required">Location permission is required to fetch current location</string>
@@ -85,7 +85,7 @@ Police %5$s • Chalaan %6$s • Reward %7$s • Bilty %8$s</string>
     <string name="fill_required_trip_fields">Please fill all required trip fields</string>
     <string name="trip_required_images">Start meter photo and bilty slip photo are required</string>
     <string name="start_trip_screen_subtitle">Fill the trip details below and submit when you are ready to move.</string>
-    <string name="start_trip_add_photo">Tap to upload start meter photo</string>
+    <string name="start_trip_add_photo">Tap to open camera for start meter photo</string>
     <string name="start_trip_change_photo">Tap to change selected photo</string>
     <string name="start_trip_loading">Starting trip...</string>
     <string name="trip_started_success">Trip started successfully</string>
@@ -95,14 +95,18 @@ Police %5$s • Chalaan %6$s • Reward %7$s • Bilty %8$s</string>
     <string name="end_trip_change_photo">Tap to change selected photo</string>
     <string name="complete_trip">Complete Trip</string>
     <string name="diesel_cost">Diesel cost</string>
-    <string name="toll_cost">Toll cost</string>
+    <string name="toll_cost">Toll Plaza Cost</string>
     <string name="food_cost">Food cost</string>
     <string name="other_cost">Other cost</string>
     <string name="end_location">End location</string>
     <string name="end_trip_required_fields">End location and meter reading are required</string>
+    <string name="ongoing_trip_details">Ongoing trip details</string>
+    <string name="started_meter_value">Started meter: %1$s</string>
+    <string name="add_trip_expenses">Add trip expenses</string>
     <string name="police_cost">Police Cost</string>
     <string name="chalaan_cost">Chalaan Cost</string>
     <string name="reward_cost">Reward</string>
+    <string name="tyre_puncture_cost">Tyre puncture cost</string>
     <string name="filter_month">Filter month (YYYY-MM)</string>
     <string name="load_history">Load history</string>
     <string name="total_days">Total days</string>
@@ -117,7 +121,6 @@ Police %5$s • Chalaan %6$s • Reward %7$s • Bilty %8$s</string>
     <string name="daily_expense_history">Daily expense history</string>
     <string name="no_daily_expenses">No daily expenses found for this month.</string>
     <string name="daily_expense_saved">Daily expense saved successfully</string>
-    <string name="valid_expense_date_required">Enter a valid expense date like 2026-04-24</string>
     <string name="daily_expense_breakdown">Cargo Service %1$s • Mobile %2$s
 Moboil %3$s • Mechanic %4$s • Food %5$s
 Guard %6$s • Other %7$s</string>
@@ -125,6 +128,31 @@ Guard %6$s • Other %7$s</string>
     <string name="finish_trip_first">Finish the current trip first</string>
     <string name="back_to_dashboard">Back to Dashboard</string>
     <string name="submit_trip">Submit Trip</string>
+    <string name="expense_amount">Amount</string>
+    <string name="save_expense_entry">Save expense</string>
+    <string name="trip_expense_history">Trip expense history</string>
+    <string name="no_trip_expenses_yet">No expenses added yet.</string>
+    <string name="end_meter_photo_required">End meter photo is required</string>
+    <string name="open_camera_for_end_meter">Tap to open camera for end meter photo</string>
+    <string name="open_camera_for_start_meter">Tap to open camera for start meter photo</string>
+    <string name="open_camera_for_bilty">Tap to open camera for bilty slip photo</string>
+    <string name="unable_to_open_camera">Unable to open camera</string>
+    <string name="unable_to_end_trip">Unable to complete trip</string>
+    <string name="unable_to_load_trip_expenses">Unable to load trip expenses</string>
+    <string name="unable_to_save_expense">Unable to save expense</string>
+    <string name="expense_saved_successfully">Expense saved successfully</string>
+    <string name="select_expense_type_first">Select a cost type first</string>
+    <string name="enter_expense_amount">Enter expense amount</string>
+    <string name="add_expense_for">Add amount for %1$s</string>
+    <string name="tap_amount_widget">Tap a widget and enter the amount with the numeric keypad.</string>
+    <string name="tap_expense_widget">Tap a widget, enter the amount, and save it right away.</string>
+    <string name="save_amount">Save amount</string>
+    <string name="amount_saved">Amount saved</string>
+    <string name="today_total">Today total</string>
+    <string name="daily_expenses_help">Date is automatic. Save each daily cost separately when it happens.</string>
+    <string name="unable_to_load_daily_expenses">Unable to load daily expenses</string>
+    <string name="unable_to_save_daily_expense">Unable to save daily expense</string>
+    <string name="invalid_daily_expense_response">Invalid daily expense response</string>
     <string name="success_check">✓</string>
     <string name="action_settings">Settings</string>
     <string name="first_fragment_label">First Fragment</string>
