@@ -52,7 +52,7 @@ const AdminDashboard = () => {
       {/* Stats Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
         <StatCard
-          title="Active Cars"
+          title="Active Cargo"
           value={stats.active_cars}
           subtitle="Total fleet vehicles"
           icon={Car}

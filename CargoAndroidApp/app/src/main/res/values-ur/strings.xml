@@ -58,9 +58,9 @@
     <string name="trip_history_finance">کرایہ: %1$s • خرچ: %2$s • خالص: %3$s</string>
     <string name="trip_notes_empty">نوٹس: کوئی نوٹ شامل نہیں</string>
     <string name="trip_notes_value">نوٹس: %1$s</string>
-    <string name="daily_expenses">روزانہ اخراجات</string>
+    <string name="daily_expenses"> اخراجات</string>
     <string name="daily_expenses_subtitle">   ڈرائیور کے روزانہ خرچے  محفوظ کریں۔</string>
-    <string name="daily_expense_history_subtitle">روزانہ اخراجات شامل کریں اور دیکھیں</string>
+    <string name="daily_expense_history_subtitle"> اخراجات شامل کریں اور دیکھیں</string>
     <string name="trip_expense_breakdown">ڈیزل %1$s • ٹول %2$s • کھانا %3$s • پولیس %4$s
 چالان %5$s • منڈی کاٹ %6$s • انعام %7$s • بلٹی %8$s • پنکچر %9$s</string>
     <string name="trip_image_preview">ٹرپ تصویر پیش منظر</string>
@@ -85,7 +85,7 @@
     <string name="bilty_change_photo">منتخب بلٹی سلپ کی تصویر بدلنے کے لیے دبائیں</string>
     <string name="load_change_photo">لوڈ کی تصویر بدلنے کے لیے دبائیں</string>
     <string name="bilty_commission_amount">بلٹی کمیشن رقم</string>
-    <string name="manual_or_fetch_location">آپ خود ٹائپ کر سکتے ہیں یا لوکیشن آئیکن دبا کر خودکار طور پر بھر سکتے ہیں۔</string>
+    <string name="manual_or_fetch_location">.</string>
     <string name="fetch_current_location">موجودہ لوکیشن حاصل کریں</string>
     <string name="location_permission_required">موجودہ لوکیشن لینے کے لیے اجازت ضروری ہے</string>
     <string name="location_unavailable">اس وقت موجودہ لوکیشن دستیاب نہیں ہے</string>
@@ -118,21 +118,21 @@
     <string name="filter_month">ماہ فلٹر کریں (YYYY-MM)</string>
     <string name="load_history">ہسٹری لوڈ کریں</string>
     <string name="total_days">کل دن</string>
-    <string name="add_update_daily_expense">روزانہ خرچہ شامل یا اپڈیٹ کریں</string>
+    <string name="add_update_daily_expense"> خرچہ شامل  کریں</string>
     <string name="expense_date">خرچے کی تاریخ (YYYY-MM-DD)</string>
     <string name="cargo_service_cost">سروس کروانے کا خرچہ</string>
     <string name="mobile_cost">موبائل خرچہ</string>
-    <string name="moboil_change_cost">موآئل چیینج خرچہ</string>
+    <string name="moboil_change_cost">موب آئل چیینج خرچہ</string>
     <string name="vehicle_maintenance_cost">گاڑی کی مرمت</string>
     <string name="mechanic_cost">مکینک کا خرچہ</string>
     <string name="medical_cost">میڈیکل خرچہ</string>
     <string name="security_guard_fee">چوکیدارا</string>
     <string name="save_daily_expense">روزانہ خرچہ محفوظ کریں</string>
-    <string name="daily_expense_history">روزانہ اخراجات</string>
+    <string name="daily_expense_history"> اخراجات</string>
     <string name="no_daily_expenses">اس مہینے کے لیے کوئی روزانہ خرچہ نہیں ملا۔</string>
     <string name="daily_expense_saved">روزانہ خرچہ کامیابی سے محفوظ ہو گیا</string>
     <string name="daily_expense_breakdown">سروس %1$s • موبائل %2$s
-موآئل %3$s • مرمت %4$s • مکینک %5$s
+موب آئل %3$s • مرمت %4$s • مکینک %5$s
 میڈیکل %6$s • کھانا %7$s • چوکیدارا %8$s</string>
     <string name="notes">نوٹس</string>
     <string name="finish_trip_first">پہلے موجودہ ٹرپ مکمل کریں</string>
@@ -142,12 +142,12 @@
     <string name="save_expense_entry">خرچہ محفوظ کریں</string>
     <string name="trip_expense_history">ٹرپ خرچہ ہسٹری</string>
     <string name="no_trip_expenses_yet">ابھی کوئی خرچہ شامل نہیں ہوا۔</string>
-    <string name="diesel_liters_optional">لیٹر (اختیاری)</string>
+    <string name="diesel_liters_optional">لیٹر </string>
     <string name="diesel_liters_required_label">لیٹر (لازمی)</string>
     <string name="diesel_liters_required">لیٹر درج کریں</string>
-    <string name="diesel_location_optional">مقام (اختیاری)</string>
+    <string name="diesel_location_optional">مقام </string>
     <string name="diesel_location_required">لوکیشن درج کریں</string>
-    <string name="diesel_meter_photo_optional">ڈیزل مشین تصویر (اختیاری)</string>
+    <string name="diesel_meter_photo_optional">ڈیزل مشین تصویر </string>
     <string name="diesel_meter_photo_required">ڈیزل مشین تصویر (لازمی)</string>
     <string name="save_diesel_expense">ڈیزل خرچ محفوظ کریں</string>
     <string name="open_camera_for_diesel_meter">ڈیزل مشین تصویر کے لیے کیمرا کھولیں</string>
