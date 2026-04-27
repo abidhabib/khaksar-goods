@@ -1,5 +1,10 @@
 import { Car, User, Gauge, TrendingUp, AlertCircle, FileText } from 'lucide-react';
 
+const formatAverage = (value) => {
+  const numericValue = Number(value || 0);
+  return numericValue > 0 ? `${numericValue.toFixed(2)} km/L` : 'N/A';
+};
+
 const CarCard = ({ car, onEdit, onDelete, onAssign, onViewHistory }) => {
   const statusColors = {
     active: 'bg-cargo-success/20 text-cargo-success',
@@ -58,6 +63,10 @@ const CarCard = ({ car, onEdit, onDelete, onAssign, onViewHistory }) => {
         <div className="flex items-center gap-2 text-sm">
           <TrendingUp className="w-4 h-4 text-cargo-muted" />
           <span className="text-cargo-text">{car.total_revenue?.toLocaleString()}</span>
+        </div>
+        <div className="flex items-center gap-2 text-sm col-span-2">
+          <Gauge className="w-4 h-4 text-cargo-muted" />
+          <span className="text-cargo-text">Average: {formatAverage(car.overall_average_km_per_liter)}</span>
         </div>
       </div>
 

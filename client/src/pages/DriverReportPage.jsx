@@ -39,6 +39,10 @@ const formatDate = (value, pattern = 'PPP p') => {
 
   return format(date, pattern);
 };
+const formatAverage = (value) => {
+  const numericValue = Number(value || 0);
+  return numericValue > 0 ? `${numericValue.toFixed(2)} km/L` : 'N/A';
+};
 
 const formatCategoryLabel = (value) =>
   String(value || '')
@@ -308,6 +312,7 @@ const TripCard = ({ trip, status = 'completed' }) => {
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
         {[
           { label: 'Bilty Commission', value: formatCurrency(trip.bilty_commission_amount) },
+          { label: 'Trip Avg', value: formatAverage(trip.trip_average_km_per_liter) },
           { label: 'Police Cost', value: formatCurrency((trip.expenses || []).filter((item) => item.category === 'police').reduce((sum, item) => sum + Number(item.amount || 0), 0)) },
           { label: 'Chalaan Cost', value: formatCurrency((trip.expenses || []).filter((item) => item.category === 'chalaan').reduce((sum, item) => sum + Number(item.amount || 0), 0)) },
           { label: 'Reward Cost', value: formatCurrency((trip.expenses || []).filter((item) => item.category === 'reward').reduce((sum, item) => sum + Number(item.amount || 0), 0)) },
@@ -486,6 +491,7 @@ const DriverReportPage = () => {
                   { label: 'Phone', value: reportData?.driver?.phone || 'N/A', icon: Phone },
                   { label: 'License', value: reportData?.driver?.license_number || 'License N/A', icon: IdCard },
                   { label: 'Car', value: reportData?.driver?.car_number || 'No cargo assigned', icon: Car },
+                  { label: 'Overall Avg', value: formatAverage(reportData?.driver?.overall_average_km_per_liter || reportData?.stats?.overall_average_km_per_liter), icon: Activity },
                   { label: 'Status', value: reportData?.driver?.status ? reportData.driver.status.charAt(0).toUpperCase() + reportData.driver.status.slice(1) : 'N/A', icon: User },
                 ].map((item) => (
                   <div key={item.label} className="rounded-lg border border-cargo-border bg-cargo-dark/20 p-4 flex items-center gap-3">

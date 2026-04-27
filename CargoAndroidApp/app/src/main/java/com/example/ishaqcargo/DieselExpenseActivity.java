@@ -1,8 +1,17 @@
 package com.example.ishaqcargo;
 
+import android.Manifest;
 import android.content.ContentResolver;
+import android.content.pm.PackageManager;
+import android.location.Address;
+import android.location.Geocoder;
+import android.location.Location;
+import android.location.LocationListener;
+import android.location.LocationManager;
 import android.net.Uri;
+import android.os.Build;
 import android.os.Bundle;
+import android.os.Looper;
 import android.text.TextUtils;
 import android.view.View;
 import android.widget.Toast;
@@ -10,6 +19,7 @@ import android.widget.Toast;
 import androidx.activity.result.ActivityResultLauncher;
 import androidx.activity.result.contract.ActivityResultContracts;
 import androidx.appcompat.app.AppCompatActivity;
+import androidx.core.app.ActivityCompat;
 import androidx.core.content.FileProvider;
 import androidx.core.graphics.Insets;
 import androidx.core.view.ViewCompat;
@@ -23,6 +33,8 @@ import com.example.ishaqcargo.util.SessionManager;
 import java.io.File;
 import java.io.IOException;
 import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 
 import okhttp3.Call;
@@ -31,12 +43,20 @@ import okhttp3.Response;
 
 public class DieselExpenseActivity extends AppCompatActivity {
 
+    private static final String STATE_PENDING_URI = "state_pending_uri";
+    private static final String STATE_IMAGE_URI = "state_image_uri";
+    private static final String STATE_LOCATION_LABEL = "state_location_label";
+    private static final String STATE_LOCATION_COORDS = "state_location_coords";
+
     private ActivityDieselExpenseBinding binding;
     private SessionManager sessionManager;
     private String baseUrl;
     private String tripId;
     private Uri meterPhotoUri;
     private Uri pendingCameraUri;
+    private String fetchedLocationLabel;
+    private String fetchedLocationCoordinates;
+    private Runnable locationTimeoutRunnable;
 
     private final ActivityResultLauncher<Uri> takeMeterPhotoLauncher = registerForActivityResult(
             new ActivityResultContracts.TakePicture(),
@@ -48,6 +68,18 @@ public class DieselExpenseActivity extends AppCompatActivity {
                     binding.uploadHint.setText(R.string.change_diesel_meter_photo);
                 } else {
                     pendingCameraUri = null;
+                }
+            }
+    );
+
+    private final ActivityResultLauncher<String[]> locationPermissionLauncher = registerForActivityResult(
+            new ActivityResultContracts.RequestMultiplePermissions(),
+            result -> {
+                boolean granted = Boolean.TRUE.equals(result.get(Manifest.permission.ACCESS_FINE_LOCATION))
+                        || Boolean.TRUE.equals(result.get(Manifest.permission.ACCESS_COARSE_LOCATION));
+
+                if (granted) {
+                    fetchCurrentLocation();
                 }
             }
     );
@@ -64,11 +96,22 @@ public class DieselExpenseActivity extends AppCompatActivity {
         tripId = getIntent().getStringExtra(EndTripActivity.EXTRA_TRIP_ID);
 
         applyWindowInsets();
+        restoreTransientState(savedInstanceState);
 
         binding.backButton.setOnClickListener(v -> finish());
         binding.uploadHint.setOnClickListener(v -> openCameraForMeterPhoto());
         binding.meterPhotoPreview.setOnClickListener(v -> openCameraForMeterPhoto());
         binding.saveButton.setOnClickListener(v -> saveExpense());
+        ensureLocationPermissionAndFetch();
+    }
+
+    @Override
+    protected void onSaveInstanceState(Bundle outState) {
+        super.onSaveInstanceState(outState);
+        outState.putString(STATE_PENDING_URI, pendingCameraUri != null ? pendingCameraUri.toString() : null);
+        outState.putString(STATE_IMAGE_URI, meterPhotoUri != null ? meterPhotoUri.toString() : null);
+        outState.putString(STATE_LOCATION_LABEL, fetchedLocationLabel);
+        outState.putString(STATE_LOCATION_COORDS, fetchedLocationCoordinates);
     }
 
     private void applyWindowInsets() {
@@ -94,20 +137,186 @@ public class DieselExpenseActivity extends AppCompatActivity {
 
     private void openCameraForMeterPhoto() {
         try {
-            File imageFile = File.createTempFile(
-                    "diesel_meter_" + System.currentTimeMillis(),
-                    ".jpg",
-                    getCacheDir()
-            );
-            pendingCameraUri = FileProvider.getUriForFile(
-                    this,
-                    getPackageName() + ".fileprovider",
-                    imageFile
-            );
+            pendingCameraUri = createTempImageUri("diesel_meter_");
             takeMeterPhotoLauncher.launch(pendingCameraUri);
         } catch (Exception exception) {
             Toast.makeText(this, R.string.unable_to_open_camera, Toast.LENGTH_SHORT).show();
         }
+    }
+
+    private Uri createTempImageUri(String prefix) throws IOException {
+        File mediaDir = new File(getFilesDir(), "trip-media");
+        if (!mediaDir.exists() && !mediaDir.mkdirs()) {
+            throw new IOException("Unable to create media directory");
+        }
+
+        File imageFile = File.createTempFile(prefix + System.currentTimeMillis(), ".jpg", mediaDir);
+        return FileProvider.getUriForFile(this, getPackageName() + ".fileprovider", imageFile);
+    }
+
+    private void ensureLocationPermissionAndFetch() {
+        boolean fineGranted = ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED;
+        boolean coarseGranted = ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_COARSE_LOCATION) == PackageManager.PERMISSION_GRANTED;
+
+        if (fineGranted || coarseGranted) {
+            fetchCurrentLocation();
+            return;
+        }
+
+        locationPermissionLauncher.launch(new String[]{
+                Manifest.permission.ACCESS_FINE_LOCATION,
+                Manifest.permission.ACCESS_COARSE_LOCATION
+        });
+    }
+
+    private void fetchCurrentLocation() {
+        LocationManager locationManager = (LocationManager) getSystemService(LOCATION_SERVICE);
+        if (locationManager == null) {
+            return;
+        }
+
+        String provider = locationManager.isProviderEnabled(LocationManager.GPS_PROVIDER)
+                ? LocationManager.GPS_PROVIDER
+                : locationManager.isProviderEnabled(LocationManager.NETWORK_PROVIDER)
+                ? LocationManager.NETWORK_PROVIDER
+                : null;
+
+        if (provider == null) {
+            return;
+        }
+
+        if (ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED
+                && ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_COARSE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
+            return;
+        }
+
+        Location cachedLocation = getBestLastKnownLocation(locationManager);
+        if (cachedLocation != null) {
+            handleLocationResult(cachedLocation);
+            return;
+        }
+
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+            locationManager.getCurrentLocation(provider, null, getMainExecutor(), this::handleLocationResult);
+        } else {
+            requestSingleLocationUpdate(locationManager, provider);
+        }
+    }
+
+    private Location getBestLastKnownLocation(LocationManager locationManager) {
+        Location bestLocation = null;
+
+        for (String provider : locationManager.getProviders(true)) {
+            if (ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED
+                    && ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_COARSE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
+                return null;
+            }
+
+            Location candidate = locationManager.getLastKnownLocation(provider);
+            if (candidate == null) {
+                continue;
+            }
+
+            if (bestLocation == null || candidate.getTime() > bestLocation.getTime()) {
+                bestLocation = candidate;
+            }
+        }
+
+        return bestLocation;
+    }
+
+    @SuppressWarnings("deprecation")
+    private void requestSingleLocationUpdate(LocationManager locationManager, String provider) {
+        try {
+            LocationListener listener = new LocationListener() {
+                @Override
+                public void onLocationChanged(Location location) {
+                    locationManager.removeUpdates(this);
+                    handleLocationResult(location);
+                }
+            };
+
+            locationManager.requestLocationUpdates(provider, 0L, 0f, listener, Looper.getMainLooper());
+            clearLocationTimeout();
+            locationTimeoutRunnable = () -> {
+                try {
+                    locationManager.removeUpdates(listener);
+                } catch (Exception ignored) {
+                }
+            };
+            binding.locationInput.postDelayed(locationTimeoutRunnable, 8000L);
+        } catch (Exception ignored) {
+            clearLocationTimeout();
+        }
+    }
+
+    private void handleLocationResult(Location location) {
+        clearLocationTimeout();
+        if (location == null) {
+            return;
+        }
+
+        fetchedLocationLabel = buildLocationLabel(location);
+        fetchedLocationCoordinates = formatCoordinates(location);
+        binding.locationInput.setText(fetchedLocationLabel);
+        binding.locationInput.setSelection(fetchedLocationLabel.length());
+    }
+
+    private void clearLocationTimeout() {
+        if (locationTimeoutRunnable != null) {
+            binding.locationInput.removeCallbacks(locationTimeoutRunnable);
+            locationTimeoutRunnable = null;
+        }
+    }
+
+    private String buildLocationLabel(Location location) {
+        try {
+            Geocoder geocoder = new Geocoder(this, Locale.getDefault());
+            List<Address> addresses = geocoder.getFromLocation(location.getLatitude(), location.getLongitude(), 1);
+            if (addresses != null && !addresses.isEmpty()) {
+                Address address = addresses.get(0);
+                String label = joinLocationParts(
+                        address.getSubLocality(),
+                        address.getLocality(),
+                        address.getAdminArea()
+                );
+                if (!TextUtils.isEmpty(label)) {
+                    return label;
+                }
+            }
+        } catch (IOException ignored) {
+        }
+
+        return String.format(Locale.US, "%.5f, %.5f", location.getLatitude(), location.getLongitude());
+    }
+
+    private String joinLocationParts(String... values) {
+        StringBuilder builder = new StringBuilder();
+        for (String value : values) {
+            if (TextUtils.isEmpty(value)) {
+                continue;
+            }
+
+            String trimmed = value.trim();
+            if (trimmed.isEmpty()) {
+                continue;
+            }
+
+            String current = builder.toString();
+            if (current.contains(trimmed)) {
+                continue;
+            }
+
+            if (builder.length() > 0) {
+                builder.append(", ");
+            }
+            builder.append(trimmed);
+        }
+        return builder.toString();
+    }
+
+    private String formatCoordinates(Location location) {
+        return String.format(Locale.US, "%.6f,%.6f", location.getLatitude(), location.getLongitude());
     }
 
     private void saveExpense() {
@@ -123,6 +332,12 @@ public class DieselExpenseActivity extends AppCompatActivity {
             return;
         }
 
+        String location = getInput(binding.locationInput);
+        if (TextUtils.isEmpty(location)) {
+            binding.locationInput.setError(getString(R.string.diesel_location_required));
+            return;
+        }
+
         if (meterPhotoUri == null) {
             Toast.makeText(this, R.string.diesel_meter_photo_required, Toast.LENGTH_SHORT).show();
             return;
@@ -131,11 +346,10 @@ public class DieselExpenseActivity extends AppCompatActivity {
         Map<String, String> fields = new LinkedHashMap<>();
         fields.put("category", "diesel");
         fields.put("amount", amount);
-
-        String location = getInput(binding.locationInput);
         fields.put("liters", liters);
-        if (!TextUtils.isEmpty(location)) {
-            fields.put("location", location);
+        fields.put("location", location);
+        if (!TextUtils.isEmpty(fetchedLocationCoordinates)) {
+            fields.put("coordinates", fetchedLocationCoordinates);
         }
 
         setSubmitting(true);
@@ -179,5 +393,29 @@ public class DieselExpenseActivity extends AppCompatActivity {
 
     private String getInput(com.google.android.material.textfield.TextInputEditText input) {
         return input.getText() != null ? input.getText().toString().trim() : "";
+    }
+
+    private void restoreTransientState(Bundle savedInstanceState) {
+        if (savedInstanceState == null) {
+            return;
+        }
+
+        String pendingUri = savedInstanceState.getString(STATE_PENDING_URI);
+        String imageUri = savedInstanceState.getString(STATE_IMAGE_URI);
+        fetchedLocationLabel = savedInstanceState.getString(STATE_LOCATION_LABEL);
+        fetchedLocationCoordinates = savedInstanceState.getString(STATE_LOCATION_COORDS);
+
+        if (!TextUtils.isEmpty(pendingUri)) {
+            pendingCameraUri = Uri.parse(pendingUri);
+        }
+        if (!TextUtils.isEmpty(imageUri)) {
+            meterPhotoUri = Uri.parse(imageUri);
+            binding.meterPhotoPreview.setImageURI(meterPhotoUri);
+            binding.meterPhotoPreview.setVisibility(View.VISIBLE);
+            binding.uploadHint.setText(R.string.change_diesel_meter_photo);
+        }
+        if (!TextUtils.isEmpty(fetchedLocationLabel)) {
+            binding.locationInput.setText(fetchedLocationLabel);
+        }
     }
 }

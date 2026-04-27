@@ -6,12 +6,20 @@ const TRIP_COLUMNS = [
         definition: 'VARCHAR(255) NULL AFTER from_location'
     },
     {
+        name: 'start_coordinates',
+        definition: 'VARCHAR(64) NULL AFTER start_live_location'
+    },
+    {
         name: 'end_location',
         definition: 'VARCHAR(255) NULL AFTER to_location'
     },
     {
         name: 'end_live_location',
         definition: 'VARCHAR(255) NULL AFTER end_location'
+    },
+    {
+        name: 'end_coordinates',
+        definition: 'VARCHAR(64) NULL AFTER end_live_location'
     },
     {
         name: 'bilty_slip_image',
@@ -45,8 +53,12 @@ const EXPENSE_COLUMNS = [
         definition: 'VARCHAR(255) NULL AFTER liters'
     },
     {
+        name: 'coordinates',
+        definition: 'VARCHAR(64) NULL AFTER location'
+    },
+    {
         name: 'receipt_image',
-        definition: 'VARCHAR(500) NULL AFTER location'
+        definition: 'VARCHAR(500) NULL AFTER coordinates'
     }
 ];
 

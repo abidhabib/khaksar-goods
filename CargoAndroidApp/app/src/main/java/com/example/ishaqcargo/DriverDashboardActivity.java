@@ -35,6 +35,7 @@ public class DriverDashboardActivity extends AppCompatActivity {
     private boolean redirectingToEndTrip;
     private double currentCarMeterReading;
     private String currentLicenseNumber;
+    private double currentVehicleAverage;
 
     private final ActivityResultLauncher<Intent> startTripLauncher = registerForActivityResult(
             new ActivityResultContracts.StartActivityForResult(),
@@ -149,6 +150,7 @@ public class DriverDashboardActivity extends AppCompatActivity {
                     JSONObject profile = root.optJSONObject("profile");
                     ongoingTrip = root.optJSONObject("ongoingTrip");
                     currentCarMeterReading = profile != null ? profile.optDouble("current_meter_reading", 0) : 0;
+                    currentVehicleAverage = profile != null ? profile.optDouble("overall_average_km_per_liter", 0) : 0;
 
                     runOnUiThread(() -> {
                         maybeForceEndTrip(ongoingTrip);
@@ -214,6 +216,10 @@ public class DriverDashboardActivity extends AppCompatActivity {
                 R.string.license_number_value,
                 TextUtils.isEmpty(currentLicenseNumber) ? "-" : currentLicenseNumber
         ));
+        binding.headerSubtitleText.setText(getString(
+                R.string.dashboard_average_value,
+                formatAverage(currentVehicleAverage)
+        ));
     }
 
     private void setLoading(boolean loading) {
@@ -230,5 +236,12 @@ public class DriverDashboardActivity extends AppCompatActivity {
 
     private String formatKm(double distance) {
         return String.format(Locale.US, "%.0f", distance) + " km";
+    }
+
+    private String formatAverage(double average) {
+        if (!(average > 0)) {
+            return "N/A";
+        }
+        return String.format(Locale.US, "%.2f km/L", average);
     }
 }

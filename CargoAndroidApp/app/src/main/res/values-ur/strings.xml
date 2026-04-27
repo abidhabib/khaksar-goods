@@ -20,6 +20,7 @@
     <string name="app_name">خاکسار گڈز</string>
     <string name="back">واپس</string>
     <string name="dashboard_label">ڈرائیور ڈیش بورڈ</string>
+    <string name="dashboard_average_value">گاڑی کی اوسط: %1$s</string>
     <string name="dashboard_welcome_placeholder">muhammad adbilal_9989</string>
     <string name="dashboard_welcome">%1$s</string>
     <string name="logout">لاگ آؤٹ</string>
@@ -143,6 +144,7 @@
     <string name="diesel_liters_required_label">لیٹر (لازمی)</string>
     <string name="diesel_liters_required">لیٹر درج کریں</string>
     <string name="diesel_location_optional">مقام (اختیاری)</string>
+    <string name="diesel_location_required">لوکیشن درج کریں</string>
     <string name="diesel_meter_photo_optional">میٹر تصویر (اختیاری)</string>
     <string name="diesel_meter_photo_required">میٹر تصویر (لازمی)</string>
     <string name="save_diesel_expense">ڈیزل خرچ محفوظ کریں</string>

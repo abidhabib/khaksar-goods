@@ -126,6 +126,16 @@ const buildMonthFilter = (monthValue, column = 'expense_date') => {
     };
 };
 
+const computeAverageKmPerLiter = (distance, liters) => {
+    const distanceValue = Number(distance) || 0;
+    const litersValue = Number(liters) || 0;
+    if (!(litersValue > 0) || !(distanceValue > 0)) {
+        return null;
+    }
+
+    return Number((distanceValue / litersValue).toFixed(2));
+};
+
 // Get driver's dashboard data
 const getDashboard = async (req, res) => {
     try {
@@ -137,7 +147,18 @@ const getDashboard = async (req, res) => {
         // Driver profile with car
         const [profile] = await pool.execute(`
             SELECT d.*, u.username, u.phone,
-                   c.id as car_id, c.car_number, c.current_meter_reading
+                   c.id as car_id, c.car_number, c.current_meter_reading,
+                   (
+                       SELECT COALESCE(SUM(t2.end_meter_reading - t2.start_meter_reading), 0)
+                       FROM trips t2
+                       WHERE t2.car_id = c.id AND t2.status = 'completed'
+                   ) as car_total_distance,
+                   (
+                       SELECT COALESCE(SUM(e2.liters), 0)
+                       FROM trips t3
+                       JOIN expenses e2 ON e2.trip_id = t3.id AND e2.category = 'diesel'
+                       WHERE t3.car_id = c.id AND t3.status = 'completed'
+                   ) as car_total_diesel_liters
             FROM drivers d
             JOIN users u ON d.user_id = u.id
             LEFT JOIN cars c ON d.assigned_car_id = c.id
@@ -193,19 +214,33 @@ const getDashboard = async (req, res) => {
                 COALESCE(SUM(t.freight_charge), 0) as total_revenue,
                 COALESCE(SUM(exp.total_expenses), 0) as total_expenses,
                 COALESCE(SUM(t.freight_charge), 0) - COALESCE(SUM(exp.total_expenses), 0) as net_earnings,
-                COALESCE(SUM(t.end_meter_reading - t.start_meter_reading), 0) as total_distance
+                COALESCE(SUM(t.end_meter_reading - t.start_meter_reading), 0) as total_distance,
+                COALESCE(SUM(exp.total_diesel_liters), 0) as total_diesel_liters
             FROM trips t
             LEFT JOIN (
-                SELECT trip_id, SUM(amount) as total_expenses
+                SELECT
+                    trip_id,
+                    SUM(amount) as total_expenses,
+                    SUM(CASE WHEN category = 'diesel' THEN COALESCE(liters, 0) ELSE 0 END) as total_diesel_liters
                 FROM expenses
                 GROUP BY trip_id
             ) exp ON t.id = exp.trip_id
             WHERE t.driver_id = ? AND t.status = 'completed'
         `, [driver_id]);
 
+        const profilePayload = profile[0];
+        profilePayload.overall_average_km_per_liter = computeAverageKmPerLiter(
+            profilePayload.car_total_distance,
+            profilePayload.car_total_diesel_liters
+        );
+        lifetimeStats.overall_average_km_per_liter = computeAverageKmPerLiter(
+            lifetimeStats.total_distance,
+            lifetimeStats.total_diesel_liters
+        );
+
         res.json({
             success: true,
-            profile: profile[0],
+            profile: profilePayload,
             ongoingTrip: ongoingTrip[0] || null,
             todayStats,
             recentTrips,
@@ -235,6 +270,7 @@ const startTrip = async (req, res) => {
             freight_charge,
             meter_reading,
             start_live_location,
+            start_coordinates,
             bilty_commission_amount = 0,
             load_name,
             load_weight
@@ -246,6 +282,7 @@ const startTrip = async (req, res) => {
         const freightValue = toNumberOrDefault(freight_charge, NaN);
         const biltyCommissionValue = toExpenseNumber(bilty_commission_amount);
         const startLiveLocation = toNullableString(start_live_location);
+        const startCoordinates = toNullableString(start_coordinates);
         const resolvedToLocation = toNullableString(to_location) || 'Pending end location';
         const loadName = toNullableString(load_name);
         const loadWeight = toNullableString(load_weight);
@@ -303,15 +340,16 @@ const startTrip = async (req, res) => {
         // Create trip
         const [tripResult] = await connection.execute(
             `INSERT INTO trips 
-             (driver_id, car_id, start_meter_reading, from_location, start_live_location, to_location,
+             (driver_id, car_id, start_meter_reading, from_location, start_live_location, start_coordinates, to_location,
               freight_charge, start_meter_image, bilty_slip_image, bilty_commission_amount, load_name, load_weight, load_photo, status) 
-             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'ongoing')`,
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'ongoing')`,
             [
                 driver_id,
                 car_id,
                 meterReadingValue,
                 from_location,
                 startLiveLocation,
+                startCoordinates,
                 resolvedToLocation,
                 freightValue,
                 meter_image,
@@ -341,6 +379,7 @@ const startTrip = async (req, res) => {
                 from_location,
                 to_location,
                 start_live_location: startLiveLocation,
+                start_coordinates: startCoordinates,
                 freight_charge: freightValue,
                 start_meter_reading: meterReadingValue,
                 start_meter_image: meter_image,
@@ -383,7 +422,8 @@ const endTrip = async (req, res) => {
             reward_cost = 0,
             tyre_puncture_cost = 0,
             end_location,
-            end_live_location
+            end_live_location,
+            end_coordinates
         } = req.body;
         const meter_image = req.files?.meter_image?.[0]?.path || req.file?.path || null;
         const meterReadingValue = toNumberOrDefault(meter_reading, NaN);
@@ -396,6 +436,7 @@ const endTrip = async (req, res) => {
         const tyrePunctureValue = toExpenseNumber(tyre_puncture_cost);
         const endLocation = toNullableString(end_location);
         const endLiveLocation = toNullableString(end_live_location);
+        const endCoordinates = toNullableString(end_coordinates);
 
         if (!Number.isFinite(meterReadingValue)) {
             return res.status(400).json({ message: 'Invalid end meter reading' });
@@ -424,10 +465,11 @@ const endTrip = async (req, res) => {
                  to_location = COALESCE(?, to_location),
                  end_location = ?,
                  end_live_location = ?,
+                 end_coordinates = ?,
                  status = 'completed',
                  ended_at = CURRENT_TIMESTAMP
              WHERE id = ?`,
-            [meterReadingValue, meter_image, endLocation, endLocation, endLiveLocation, trip_id]
+            [meterReadingValue, meter_image, endLocation, endLocation, endLiveLocation, endCoordinates, trip_id]
         );
 
         // Backward compatibility for any unsaved totals still sent by older clients
@@ -496,12 +538,13 @@ const addTripExpense = async (req, res) => {
         }
 
         const { trip_id } = req.params;
-        const { category, amount, liters, location } = req.body;
+        const { category, amount, liters, location, coordinates } = req.body;
         const receiptImage = getUploadedFilePath(req, 'receipt_image');
         const normalizedCategory = toNullableString(category);
         const amountValue = toExpenseNumber(amount);
         const litersValue = toOptionalDecimal(liters);
         const locationValue = toNullableString(location);
+        const coordinatesValue = toNullableString(coordinates);
 
         if (!normalizedCategory || !TRIP_EXPENSE_CATEGORIES.has(normalizedCategory)) {
             return res.status(400).json({ message: 'Invalid expense category' });
@@ -514,6 +557,10 @@ const addTripExpense = async (req, res) => {
         if (normalizedCategory === 'diesel') {
             if (litersValue === null) {
                 return res.status(400).json({ message: 'Liters are required for diesel expense' });
+            }
+
+            if (!locationValue) {
+                return res.status(400).json({ message: 'Location is required for diesel expense' });
             }
 
             if (!receiptImage) {
@@ -531,12 +578,12 @@ const addTripExpense = async (req, res) => {
         }
 
         const [result] = await pool.execute(
-            'INSERT INTO expenses (trip_id, category, amount, liters, location, receipt_image) VALUES (?, ?, ?, ?, ?, ?)',
-            [trip_id, normalizedCategory, amountValue, litersValue, locationValue, receiptImage]
+            'INSERT INTO expenses (trip_id, category, amount, liters, location, coordinates, receipt_image) VALUES (?, ?, ?, ?, ?, ?, ?)',
+            [trip_id, normalizedCategory, amountValue, litersValue, locationValue, coordinatesValue, receiptImage]
         );
 
         const [[savedExpense]] = await pool.execute(
-            'SELECT id, trip_id, category, amount, liters, location, receipt_image, created_at FROM expenses WHERE id = ? LIMIT 1',
+            'SELECT id, trip_id, category, amount, liters, location, coordinates, receipt_image, created_at FROM expenses WHERE id = ? LIMIT 1',
             [result.insertId]
         );
 
@@ -565,6 +612,7 @@ const getTripHistory = async (req, res) => {
         const [trips] = await pool.query(`
             SELECT t.*, c.car_number,
                    COALESCE(exp.total_expenses, 0) as total_expenses,
+                   COALESCE(exp.total_diesel_liters, 0) as total_diesel_liters,
                    COALESCE(exp.diesel_expense, 0) as diesel_expense,
                    COALESCE(exp.toll_expense, 0) as toll_expense,
                    COALESCE(exp.food_expense, 0) as food_expense,
@@ -581,6 +629,7 @@ const getTripHistory = async (req, res) => {
                 SELECT
                     trip_id,
                     SUM(amount) as total_expenses,
+                    SUM(CASE WHEN category = 'diesel' THEN COALESCE(liters, 0) ELSE 0 END) as total_diesel_liters,
                     SUM(CASE WHEN category = 'diesel' THEN amount ELSE 0 END) as diesel_expense,
                     SUM(CASE WHEN category = 'toll' THEN amount ELSE 0 END) as toll_expense,
                     SUM(CASE WHEN category = 'food' THEN amount ELSE 0 END) as food_expense,
@@ -604,7 +653,15 @@ const getTripHistory = async (req, res) => {
 
         res.json({
             success: true,
-            trips,
+            trips: trips.map((trip) => {
+                const distanceKm = Number(trip.distance_km) || 0;
+                const totalDieselLiters = Number(trip.total_diesel_liters) || 0;
+                return {
+                    ...trip,
+                    total_diesel_liters: totalDieselLiters,
+                    trip_average_km_per_liter: computeAverageKmPerLiter(distanceKm, totalDieselLiters)
+                };
+            }),
             pagination: {
                 page,
                 limit,

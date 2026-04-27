@@ -19,6 +19,7 @@
     <string name="app_name">Khaksar Goods</string>
     <string name="back">Back</string>
     <string name="dashboard_label">Driver Dashboard</string>
+    <string name="dashboard_average_value">Vehicle Avg: %1$s</string>
     <string name="dashboard_welcome_placeholder">muhammad adbilal_9989</string>
     <string name="dashboard_welcome">%1$s</string>
     <string name="logout">Logout</string>
@@ -144,6 +145,7 @@ Food %6$s • Guard %7$s • Other %8$s</string>
     <string name="diesel_liters_required_label">Liters (required)</string>
     <string name="diesel_liters_required">Liters are required</string>
     <string name="diesel_location_optional">Location (optional)</string>
+    <string name="diesel_location_required">Location is required</string>
     <string name="diesel_meter_photo_optional">Meter photo (optional)</string>
     <string name="diesel_meter_photo_required">Meter photo (required)</string>
     <string name="save_diesel_expense">Save diesel expense</string>

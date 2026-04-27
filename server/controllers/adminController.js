@@ -49,6 +49,16 @@ const getMonthFilter = (month, column = 'de.expense_date') => {
     };
 };
 
+const computeAverageKmPerLiter = (distance, liters) => {
+    const distanceValue = Number(distance) || 0;
+    const litersValue = Number(liters) || 0;
+    if (!(litersValue > 0) || !(distanceValue > 0)) {
+        return null;
+    }
+
+    return Number((distanceValue / litersValue).toFixed(2));
+};
+
 const hasOngoingTrip = async (connection, driverId) => {
     const [ongoing] = await connection.execute(
         'SELECT id FROM trips WHERE driver_id = ? AND status = "ongoing" LIMIT 1',
@@ -165,6 +175,17 @@ const getAllCars = async (req, res) => {
                    d.id as driver_id, 
                    u.username as assigned_driver,
                    u.phone as driver_phone,
+                   (
+                       SELECT COALESCE(SUM(t4.end_meter_reading - t4.start_meter_reading), 0)
+                       FROM trips t4
+                       WHERE t4.car_id = c.id AND t4.status = 'completed'
+                   ) as total_distance_for_average,
+                   (
+                       SELECT COALESCE(SUM(e4.liters), 0)
+                       FROM trips t5
+                       JOIN expenses e4 ON e4.trip_id = t5.id AND e4.category = 'diesel'
+                       WHERE t5.car_id = c.id AND t5.status = 'completed'
+                   ) as total_diesel_liters,
                    ca.start_meter_reading as assigned_at_meter,
                    ot.from_location as ongoing_from_location,
                    ot.to_location as ongoing_to_location,
@@ -197,7 +218,16 @@ const getAllCars = async (req, res) => {
             )
             ORDER BY c.created_at DESC
         `);
-        res.json({ success: true, cars });
+        res.json({
+            success: true,
+            cars: cars.map((car) => ({
+                ...car,
+                overall_average_km_per_liter: computeAverageKmPerLiter(
+                    car.total_distance_for_average,
+                    car.total_diesel_liters
+                )
+            }))
+        });
     } catch (error) {
         res.status(500).json({ message: 'Server error', error: error.message });
     }
@@ -327,7 +357,18 @@ const getCarHistory = async (req, res) => {
         const tripDateFilter = getDateFilter(period, from_date, to_date, 't');
 
         const [car] = await pool.execute(
-            `SELECT c.*, d.id as current_driver_id, u.username as current_driver_name, u.phone as current_driver_phone
+            `SELECT c.*, d.id as current_driver_id, u.username as current_driver_name, u.phone as current_driver_phone,
+                    (
+                        SELECT COALESCE(SUM(t6.end_meter_reading - t6.start_meter_reading), 0)
+                        FROM trips t6
+                        WHERE t6.car_id = c.id AND t6.status = 'completed'
+                    ) as total_distance_for_average,
+                    (
+                        SELECT COALESCE(SUM(e6.liters), 0)
+                        FROM trips t7
+                        JOIN expenses e6 ON e6.trip_id = t7.id AND e6.category = 'diesel'
+                        WHERE t7.car_id = c.id AND t7.status = 'completed'
+                    ) as total_diesel_liters
              FROM cars c
              LEFT JOIN drivers d ON d.assigned_car_id = c.id
              LEFT JOIN users u ON u.id = d.user_id
@@ -392,12 +433,14 @@ const getCarHistory = async (req, res) => {
                 COUNT(trip_summary.id) as total_trips,
                 COALESCE(SUM(trip_summary.freight_charge), 0) as total_revenue,
                 COALESCE(SUM(trip_summary.total_expenses), 0) as total_expenses,
-                COALESCE(SUM(trip_summary.distance), 0) as total_distance
+                COALESCE(SUM(trip_summary.distance), 0) as total_distance,
+                COALESCE(SUM(trip_summary.total_diesel_liters), 0) as total_diesel_liters
             FROM (
                 SELECT
                     t.id,
                     t.freight_charge,
                     COALESCE(SUM(e.amount), 0) as total_expenses,
+                    COALESCE(SUM(CASE WHEN e.category = 'diesel' THEN COALESCE(e.liters, 0) ELSE 0 END), 0) as total_diesel_liters,
                     COALESCE(t.end_meter_reading - t.start_meter_reading, 0) as distance
                 FROM trips t
                 LEFT JOIN expenses e ON e.trip_id = t.id
@@ -408,7 +451,13 @@ const getCarHistory = async (req, res) => {
 
         res.json({
             success: true,
-            car: car[0],
+            car: {
+                ...car[0],
+                overall_average_km_per_liter: computeAverageKmPerLiter(
+                    car[0].total_distance_for_average,
+                    car[0].total_diesel_liters
+                )
+            },
             assignments,
             trips: tripsWithExpenses,
             driverStats,
@@ -417,6 +466,11 @@ const getCarHistory = async (req, res) => {
                 total_expenses: Number(summaryRows[0].total_expenses) || 0,
                 total_revenue: Number(summaryRows[0].total_revenue) || 0,
                 total_distance: Number(summaryRows[0].total_distance) || 0,
+                total_diesel_liters: Number(summaryRows[0].total_diesel_liters) || 0,
+                overall_average_km_per_liter: computeAverageKmPerLiter(
+                    summaryRows[0].total_distance,
+                    summaryRows[0].total_diesel_liters
+                ),
                 net_income: (Number(summaryRows[0].total_revenue) || 0) - (Number(summaryRows[0].total_expenses) || 0)
             }
         });
@@ -623,7 +677,18 @@ const getDriverReport = async (req, res) => {
 
         const [driver] = await pool.execute(`
             SELECT d.*, u.username, u.phone, u.status, u.created_at,
-                   c.car_number, c.current_meter_reading
+                   c.car_number, c.current_meter_reading,
+                   (
+                       SELECT COALESCE(SUM(t2.end_meter_reading - t2.start_meter_reading), 0)
+                       FROM trips t2
+                       WHERE t2.car_id = c.id AND t2.status = 'completed'
+                   ) as car_total_distance,
+                   (
+                       SELECT COALESCE(SUM(e2.liters), 0)
+                       FROM trips t3
+                       JOIN expenses e2 ON e2.trip_id = t3.id AND e2.category = 'diesel'
+                       WHERE t3.car_id = c.id AND t3.status = 'completed'
+                   ) as car_total_diesel_liters
             FROM drivers d
             JOIN users u ON d.user_id = u.id
             LEFT JOIN cars c ON d.assigned_car_id = c.id
@@ -673,13 +738,15 @@ const getDriverReport = async (req, res) => {
                 COALESCE(SUM(trip_summary.freight_charge), 0) as total_revenue,
                 COALESCE(SUM(trip_summary.total_expenses), 0) as total_expenses,
                 COALESCE(SUM(trip_summary.freight_charge), 0) - COALESCE(SUM(trip_summary.total_expenses), 0) as net_profit,
-                COALESCE(SUM(trip_summary.distance), 0) as total_distance
+                COALESCE(SUM(trip_summary.distance), 0) as total_distance,
+                COALESCE(SUM(trip_summary.total_diesel_liters), 0) as total_diesel_liters
             FROM (
                 SELECT
                     t.id,
                     t.status,
                     t.freight_charge,
                     COALESCE(SUM(e.amount), 0) as total_expenses,
+                    COALESCE(SUM(CASE WHEN e.category = 'diesel' THEN COALESCE(e.liters, 0) ELSE 0 END), 0) as total_diesel_liters,
                     COALESCE(t.end_meter_reading - t.start_meter_reading, 0) as distance
                 FROM trips t
                 LEFT JOIN expenses e ON t.id = e.trip_id
@@ -688,9 +755,19 @@ const getDriverReport = async (req, res) => {
             ) trip_summary
         `, [id, ...dateFilter.params]);
 
+        const driverPayload = driver[0];
+        driverPayload.overall_average_km_per_liter = computeAverageKmPerLiter(
+            driverPayload.car_total_distance,
+            driverPayload.car_total_diesel_liters
+        );
+        stats[0].overall_average_km_per_liter = computeAverageKmPerLiter(
+            stats[0].total_distance,
+            stats[0].total_diesel_liters
+        );
+
         res.json({
             success: true,
-            driver: driver[0],
+            driver: driverPayload,
             currentTrip: currentTripWithExpenses,
             trips: tripsWithExpenses,
             stats: stats[0]
@@ -904,14 +981,26 @@ const attachExpensesToTrips = async (trips) => {
         return map;
     }, new Map());
 
-    return trips.map((trip) => ({
+    return trips.map((trip) => {
+        const expenses = expenseMap.get(trip.id) || [];
+        const totalDieselLiters = expenses
+            .filter((expense) => expense.category === 'diesel')
+            .reduce((sum, expense) => sum + (Number(expense.liters) || 0), 0);
+        const distanceKm = Number(trip.end_meter_reading) && Number(trip.start_meter_reading)
+            ? Math.max((Number(trip.end_meter_reading) || 0) - (Number(trip.start_meter_reading) || 0), 0)
+            : Number(trip.distance_km) || 0;
+
+        return {
         ...trip,
         freight_charge: Number(trip.freight_charge) || 0,
         total_expenses: Number(trip.total_expenses) || 0,
+        total_diesel_liters: totalDieselLiters,
+        trip_average_km_per_liter: computeAverageKmPerLiter(distanceKm, totalDieselLiters),
         net_profit: trip.net_profit !== undefined ? Number(trip.net_profit) || 0 : undefined,
         net_income: trip.net_income !== undefined ? Number(trip.net_income) || 0 : undefined,
-        expenses: expenseMap.get(trip.id) || []
-    }));
+        expenses
+        };
+    });
 };
 
 const getDashboardStats = async (req, res) => {

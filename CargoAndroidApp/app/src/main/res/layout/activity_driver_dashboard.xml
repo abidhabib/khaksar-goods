@@ -90,6 +90,7 @@
                                 tools:text="ICT-445566" />
 
                             <TextView
+                                android:id="@+id/headerSubtitleText"
                                 android:layout_width="wrap_content"
                                 android:layout_height="wrap_content"
                                 android:layout_marginTop="2dp"

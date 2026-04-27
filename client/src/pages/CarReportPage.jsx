@@ -37,6 +37,10 @@ const formatDate = (value, pattern = 'PPP p') => {
 
   return format(date, pattern);
 };
+const formatAverage = (value) => {
+  const numericValue = Number(value || 0);
+  return numericValue > 0 ? `${numericValue.toFixed(2)} km/L` : 'N/A';
+};
 
 const formatCategoryLabel = (value) =>
   String(value || '')
@@ -303,6 +307,7 @@ const TripCard = ({ trip, status = 'completed' }) => {
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
         {[
           { label: 'Bilty Commission', value: formatCurrency(trip.bilty_commission_amount) },
+          { label: 'Trip Avg', value: formatAverage(trip.trip_average_km_per_liter) },
           { label: 'Police Cost', value: formatCurrency((trip.expenses || []).filter((item) => item.category === 'police').reduce((sum, item) => sum + Number(item.amount || 0), 0)) },
           { label: 'Chalaan Cost', value: formatCurrency((trip.expenses || []).filter((item) => item.category === 'chalaan').reduce((sum, item) => sum + Number(item.amount || 0), 0)) },
           { label: 'Reward Cost', value: formatCurrency((trip.expenses || []).filter((item) => item.category === 'reward').reduce((sum, item) => sum + Number(item.amount || 0), 0)) },
@@ -478,6 +483,7 @@ const CarReportPage = () => {
                   { label: 'Current Driver', value: reportData?.car?.current_driver_name || 'No active driver' },
                   { label: 'Phone', value: reportData?.car?.current_driver_phone || 'N/A' },
                   { label: 'Current Meter', value: `${(reportData?.car?.current_meter_reading || 0).toLocaleString()} km` },
+                  { label: 'Overall Avg', value: formatAverage(reportData?.car?.overall_average_km_per_liter || reportData?.summary?.overall_average_km_per_liter) },
                 ].map((item) => (
                   <div key={item.label} className="rounded-lg border border-cargo-border bg-cargo-dark/20 p-4">
                     <p className="text-[11px] text-cargo-muted uppercase tracking-wider font-medium">{item.label}</p>

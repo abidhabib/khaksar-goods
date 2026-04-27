@@ -46,6 +46,7 @@ import okhttp3.Response;
 public class EndTripDetailsActivity extends AppCompatActivity {
 
     private static final String PREF_NAME = "end_trip_details_drafts";
+    private static final String STATE_PENDING_URI = "state_pending_uri";
 
     private ActivityEndTripDetailsBinding binding;
     private SessionManager sessionManager;
@@ -54,6 +55,7 @@ public class EndTripDetailsActivity extends AppCompatActivity {
     private Uri pendingCameraUri;
     private String tripId;
     private String fetchedEndLocation;
+    private String fetchedEndCoordinates;
     private Runnable endLocationTimeoutRunnable;
     private double tripStartMeter;
     private String tripDestination;
@@ -102,6 +104,7 @@ public class EndTripDetailsActivity extends AppCompatActivity {
         applyWindowInsets();
         bindStaticTripDetails();
         restoreDraft();
+        restoreTransientState(savedInstanceState);
 
         binding.backButton.setOnClickListener(v -> finish());
         binding.endMeterImagePreview.setOnClickListener(v -> openCameraForMeterPhoto());
@@ -114,6 +117,12 @@ public class EndTripDetailsActivity extends AppCompatActivity {
         });
 
         loadTripDetails();
+    }
+
+    @Override
+    protected void onSaveInstanceState(Bundle outState) {
+        super.onSaveInstanceState(outState);
+        outState.putString(STATE_PENDING_URI, pendingCameraUri != null ? pendingCameraUri.toString() : null);
     }
 
     @Override
@@ -199,20 +208,21 @@ public class EndTripDetailsActivity extends AppCompatActivity {
 
     private void openCameraForMeterPhoto() {
         try {
-            File imageFile = File.createTempFile(
-                    "end_meter_" + System.currentTimeMillis(),
-                    ".jpg",
-                    getCacheDir()
-            );
-            pendingCameraUri = FileProvider.getUriForFile(
-                    this,
-                    getPackageName() + ".fileprovider",
-                    imageFile
-            );
+            pendingCameraUri = createTempImageUri("end_meter_");
             takeMeterPhotoLauncher.launch(pendingCameraUri);
         } catch (Exception exception) {
             Toast.makeText(this, R.string.unable_to_open_camera, Toast.LENGTH_SHORT).show();
         }
+    }
+
+    private Uri createTempImageUri(String prefix) throws IOException {
+        File mediaDir = new File(getFilesDir(), "trip-media");
+        if (!mediaDir.exists() && !mediaDir.mkdirs()) {
+            throw new IOException("Unable to create media directory");
+        }
+
+        File imageFile = File.createTempFile(prefix + System.currentTimeMillis(), ".jpg", mediaDir);
+        return FileProvider.getUriForFile(this, getPackageName() + ".fileprovider", imageFile);
     }
 
     private void ensureLocationPermissionAndFetch() {
@@ -325,6 +335,7 @@ public class EndTripDetailsActivity extends AppCompatActivity {
         }
 
         String resolvedLocation = buildLocationLabel(location);
+        fetchedEndCoordinates = formatCoordinates(location);
         fetchedEndLocation = resolvedLocation;
         binding.endLocationInput.setText(resolvedLocation);
         binding.endLocationInput.setSelection(resolvedLocation.length());
@@ -358,6 +369,10 @@ public class EndTripDetailsActivity extends AppCompatActivity {
         }
 
         return String.format(Locale.US, "%.5f, %.5f", location.getLatitude(), location.getLongitude());
+    }
+
+    private String formatCoordinates(Location location) {
+        return String.format(Locale.US, "%.6f,%.6f", location.getLatitude(), location.getLongitude());
     }
 
     private String firstNonEmpty(String... values) {
@@ -412,6 +427,9 @@ public class EndTripDetailsActivity extends AppCompatActivity {
         fields.put("meter_reading", meter);
         fields.put("end_location", endLocation);
         fields.put("end_live_location", TextUtils.isEmpty(fetchedEndLocation) ? endLocation : fetchedEndLocation);
+        if (!TextUtils.isEmpty(fetchedEndCoordinates)) {
+            fields.put("end_coordinates", fetchedEndCoordinates);
+        }
 
         setSubmitting(true);
 
@@ -466,6 +484,7 @@ public class EndTripDetailsActivity extends AppCompatActivity {
                 .putString(tripId + "_end_location", getInput(binding.endLocationInput))
                 .putString(tripId + "_end_meter", getInput(binding.endMeterInput))
                 .putString(tripId + "_fetched_end_location", fetchedEndLocation)
+                .putString(tripId + "_fetched_end_coordinates", fetchedEndCoordinates)
                 .putString(tripId + "_meter_image_uri", meterImageUri != null ? meterImageUri.toString() : null)
                 .apply();
     }
@@ -479,6 +498,7 @@ public class EndTripDetailsActivity extends AppCompatActivity {
         String endLocation = preferences.getString(tripId + "_end_location", "");
         String endMeter = preferences.getString(tripId + "_end_meter", "");
         fetchedEndLocation = preferences.getString(tripId + "_fetched_end_location", null);
+        fetchedEndCoordinates = preferences.getString(tripId + "_fetched_end_coordinates", null);
         String meterImage = preferences.getString(tripId + "_meter_image_uri", null);
 
         if (!TextUtils.isEmpty(endLocation)) {
@@ -505,8 +525,20 @@ public class EndTripDetailsActivity extends AppCompatActivity {
                 .remove(tripId + "_end_location")
                 .remove(tripId + "_end_meter")
                 .remove(tripId + "_fetched_end_location")
+                .remove(tripId + "_fetched_end_coordinates")
                 .remove(tripId + "_meter_image_uri")
                 .apply();
+    }
+
+    private void restoreTransientState(Bundle savedInstanceState) {
+        if (savedInstanceState == null) {
+            return;
+        }
+
+        String pendingUri = savedInstanceState.getString(STATE_PENDING_URI);
+        if (!TextUtils.isEmpty(pendingUri)) {
+            pendingCameraUri = Uri.parse(pendingUri);
+        }
     }
 
     private String getInput(com.google.android.material.textfield.TextInputEditText input) {

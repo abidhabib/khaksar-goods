@@ -179,6 +179,10 @@ public class TripHistoryActivity extends AppCompatActivity {
         double freight = trip.optDouble("freight_charge", 0);
         double totalExpense = trip.optDouble("total_expenses", 0);
         double dieselExpense = trip.optDouble("diesel_expense", 0);
+        double totalDieselLiters = trip.optDouble("total_diesel_liters", 0);
+        double tripAverage = trip.isNull("trip_average_km_per_liter")
+                ? 0
+                : trip.optDouble("trip_average_km_per_liter", 0);
         double tollExpense = trip.optDouble("toll_expense", 0);
         double foodExpense = trip.optDouble("food_expense", 0);
         double policeExpense = trip.optDouble("police_expense", 0);
@@ -228,6 +232,15 @@ public class TripHistoryActivity extends AppCompatActivity {
                 notesBuilder.append('\n');
             }
             notesBuilder.append("Actual end: ").append(finalEndLocation);
+        }
+        if (totalDieselLiters > 0) {
+            if (notesBuilder.length() > 0) {
+                notesBuilder.append('\n');
+            }
+            notesBuilder.append("Diesel: ")
+                    .append(String.format(Locale.US, "%.2f L", totalDieselLiters))
+                    .append(" • Avg: ")
+                    .append(formatAverage(tripAverage));
         }
         if (!TextUtils.isEmpty(notes)) {
             if (notesBuilder.length() > 0) {
@@ -300,5 +313,12 @@ public class TripHistoryActivity extends AppCompatActivity {
             return "";
         }
         return Character.toUpperCase(value.charAt(0)) + value.substring(1);
+    }
+
+    private String formatAverage(double value) {
+        if (!(value > 0)) {
+            return "N/A";
+        }
+        return String.format(Locale.US, "%.2f km/L", value);
     }
 }
