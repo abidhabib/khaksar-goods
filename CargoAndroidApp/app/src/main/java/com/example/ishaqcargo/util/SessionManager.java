@@ -8,8 +8,8 @@ public class SessionManager {
     private static final String KEY_TOKEN = "token";
     private static final String KEY_USERNAME = "username";
     private static final String KEY_BASE_URL = "base_url";
-//    private static final String DEFAULT_BASE_URL = "https://api.khaksargoods.com/api";
-  private static final String DEFAULT_BASE_URL = "http://192.168.0.109:5000/api";
+    private static final String DEFAULT_BASE_URL = "https://api.khaksargoods.com/api";
+//  private static final String DEFAULT_BASE_URL = "http://192.168.0.109:5000/api";
 
 
 

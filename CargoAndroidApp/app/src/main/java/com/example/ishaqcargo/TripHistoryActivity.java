@@ -187,6 +187,7 @@ public class TripHistoryActivity extends AppCompatActivity {
         double foodExpense = trip.optDouble("food_expense", 0);
         double policeExpense = trip.optDouble("police_expense", 0);
         double chalaanExpense = trip.optDouble("chalaan_expense", 0);
+        double mandiKaatExpense = trip.optDouble("mandi_kaat_expense", 0);
         double rewardExpense = trip.optDouble("reward_expense", 0);
         double biltyCommissionExpense = trip.optDouble("bilty_commission_expense", 0);
         double tyrePunctureExpense = trip.optDouble("tyre_puncture_expense", 0);
@@ -217,6 +218,7 @@ public class TripHistoryActivity extends AppCompatActivity {
                 formatCurrency(foodExpense),
                 formatCurrency(policeExpense),
                 formatCurrency(chalaanExpense),
+                formatCurrency(mandiKaatExpense),
                 formatCurrency(rewardExpense),
                 formatCurrency(biltyCommissionExpense),
                 formatCurrency(tyrePunctureExpense)

@@ -62,6 +62,15 @@ public class EndTripActivity extends AppCompatActivity {
             }
     );
 
+    private final ActivityResultLauncher<Intent> receiptExpenseLauncher = registerForActivityResult(
+            new ActivityResultContracts.StartActivityForResult(),
+            result -> {
+                if (result.getResultCode() == RESULT_OK) {
+                    loadTripExpenseHistory();
+                }
+            }
+    );
+
     private final ActivityResultLauncher<Intent> endTripDetailsLauncher = registerForActivityResult(
             new ActivityResultContracts.StartActivityForResult(),
             result -> {
@@ -136,7 +145,8 @@ public class EndTripActivity extends AppCompatActivity {
         bindSimpleExpenseCard(binding.tollExpenseCard, "toll", R.string.toll_cost);
         bindSimpleExpenseCard(binding.foodExpenseCard, "food", R.string.food_cost);
         bindSimpleExpenseCard(binding.policeExpenseCard, "police", R.string.police_cost);
-        bindSimpleExpenseCard(binding.chalaanExpenseCard, "chalaan", R.string.chalaan_cost);
+        binding.chalaanExpenseCard.setOnClickListener(v -> openReceiptExpenseScreen("chalaan"));
+        bindSimpleExpenseCard(binding.mandiKaatExpenseCard, "mandi_kaat", R.string.mandi_kaat_cost);
         bindSimpleExpenseCard(binding.rewardExpenseCard, "reward", R.string.reward_cost);
         bindSimpleExpenseCard(binding.tyrePunctureExpenseCard, "tyre_puncture", R.string.tyre_puncture_cost);
 
@@ -145,6 +155,7 @@ public class EndTripActivity extends AppCompatActivity {
         styleWidgetCard(binding.foodExpenseCard, R.color.expenses_widget_bg, R.drawable.ic_cargo_food);
         styleWidgetCard(binding.policeExpenseCard, R.color.revenue_widget_bg, R.drawable.ic_cargo_guard);
         styleWidgetCard(binding.chalaanExpenseCard, R.color.button_primary, R.drawable.ic_cargo_service);
+        styleWidgetCard(binding.mandiKaatExpenseCard, R.color.button_primary, R.drawable.ic_cargo_service);
         styleWidgetCard(binding.rewardExpenseCard, R.color.button_emerald_active, R.drawable.ic_cargo_mobile);
         styleWidgetCard(binding.tyrePunctureExpenseCard, R.color.button_amber, R.drawable.ic_cargo_mechanic);
     }
@@ -163,6 +174,18 @@ public class EndTripActivity extends AppCompatActivity {
         Intent intent = new Intent(this, DieselExpenseActivity.class);
         intent.putExtra(EXTRA_TRIP_ID, tripId);
         dieselExpenseLauncher.launch(intent);
+    }
+
+    private void openReceiptExpenseScreen(String expenseCategory) {
+        Intent intent = new Intent(this, ReceiptExpenseActivity.class);
+        intent.putExtra(ReceiptExpenseActivity.EXTRA_TRIP_ID, tripId);
+        intent.putExtra(ReceiptExpenseActivity.EXTRA_CATEGORY, expenseCategory);
+        intent.putExtra(ReceiptExpenseActivity.EXTRA_TITLE, getString(R.string.chalaan_cost));
+        intent.putExtra(ReceiptExpenseActivity.EXTRA_SAVE_LABEL, getString(R.string.save_chalaan_expense));
+        intent.putExtra(ReceiptExpenseActivity.EXTRA_UPLOAD_LABEL, getString(R.string.open_camera_for_chalaan));
+        intent.putExtra(ReceiptExpenseActivity.EXTRA_CHANGE_LABEL, getString(R.string.change_chalaan_photo));
+        intent.putExtra(ReceiptExpenseActivity.EXTRA_PHOTO_REQUIRED_MESSAGE, getString(R.string.chalaan_photo_required));
+        receiptExpenseLauncher.launch(intent);
     }
 
     private void openEndTripDetails() {
@@ -252,6 +275,7 @@ public class EndTripActivity extends AppCompatActivity {
         setExpenseValue(binding.foodExpenseValue, "food");
         setExpenseValue(binding.policeExpenseValue, "police");
         setExpenseValue(binding.chalaanExpenseValue, "chalaan");
+        setExpenseValue(binding.mandiKaatExpenseValue, "mandi_kaat");
         setExpenseValue(binding.rewardExpenseValue, "reward");
         setExpenseValue(binding.tyrePunctureExpenseValue, "tyre_puncture");
     }
@@ -310,6 +334,7 @@ public class EndTripActivity extends AppCompatActivity {
         setCardEnabled(binding.foodExpenseCard, !submitting);
         setCardEnabled(binding.policeExpenseCard, !submitting);
         setCardEnabled(binding.chalaanExpenseCard, !submitting);
+        setCardEnabled(binding.mandiKaatExpenseCard, !submitting);
         setCardEnabled(binding.rewardExpenseCard, !submitting);
         setCardEnabled(binding.tyrePunctureExpenseCard, !submitting);
     }
@@ -328,6 +353,7 @@ public class EndTripActivity extends AppCompatActivity {
             case "police":
                 return R.drawable.ic_cargo_guard;
             case "chalaan":
+            case "mandi_kaat":
                 return R.drawable.ic_cargo_service;
             case "reward":
                 return R.drawable.ic_cargo_mobile;

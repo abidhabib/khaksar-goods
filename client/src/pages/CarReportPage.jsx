@@ -310,6 +310,7 @@ const TripCard = ({ trip, status = 'completed' }) => {
           { label: 'Trip Avg', value: formatAverage(trip.trip_average_km_per_liter) },
           { label: 'Police Cost', value: formatCurrency((trip.expenses || []).filter((item) => item.category === 'police').reduce((sum, item) => sum + Number(item.amount || 0), 0)) },
           { label: 'Chalaan Cost', value: formatCurrency((trip.expenses || []).filter((item) => item.category === 'chalaan').reduce((sum, item) => sum + Number(item.amount || 0), 0)) },
+          { label: 'Mandi Kaat', value: formatCurrency((trip.expenses || []).filter((item) => item.category === 'mandi_kaat').reduce((sum, item) => sum + Number(item.amount || 0), 0)) },
           { label: 'Reward Cost', value: formatCurrency((trip.expenses || []).filter((item) => item.category === 'reward').reduce((sum, item) => sum + Number(item.amount || 0), 0)) },
         ].map((item) => (
           <div key={item.label} className="rounded-lg border border-cargo-border bg-cargo-dark/20 p-3">

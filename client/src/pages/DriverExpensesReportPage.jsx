@@ -14,6 +14,7 @@ const getCategoryLabel = (category) => ({
   cargo_service: 'Cargo Service',
   mobile: 'Mobile Cost',
   moboil_change: 'Moboil Change',
+  vehicle_maintenance: 'Vehicle Maintenance',
   mechanic: 'Mechanic Cost',
   food: 'Food Cost',
   cargo_security_guard: 'Security Guard Fee',
@@ -149,6 +150,7 @@ const DriverExpensesReportPage = () => {
           <div className="rounded-lg border border-cargo-border p-3"><p className="text-xs text-cargo-muted">Cargo Service</p><p className="text-sm text-cargo-text mt-1">{formatCurrency(categoryTotals.cargo_service)}</p></div>
           <div className="rounded-lg border border-cargo-border p-3"><p className="text-xs text-cargo-muted">Mobile</p><p className="text-sm text-cargo-text mt-1">{formatCurrency(categoryTotals.mobile)}</p></div>
           <div className="rounded-lg border border-cargo-border p-3"><p className="text-xs text-cargo-muted">Moboil Change</p><p className="text-sm text-cargo-text mt-1">{formatCurrency(categoryTotals.moboil_change)}</p></div>
+          <div className="rounded-lg border border-cargo-border p-3"><p className="text-xs text-cargo-muted">Vehicle Maintenance</p><p className="text-sm text-cargo-text mt-1">{formatCurrency(categoryTotals.vehicle_maintenance)}</p></div>
           <div className="rounded-lg border border-cargo-border p-3"><p className="text-xs text-cargo-muted">Mechanic</p><p className="text-sm text-cargo-text mt-1">{formatCurrency(categoryTotals.mechanic)}</p></div>
           <div className="rounded-lg border border-cargo-border p-3"><p className="text-xs text-cargo-muted">Food</p><p className="text-sm text-cargo-text mt-1">{formatCurrency(categoryTotals.food)}</p></div>
           <div className="rounded-lg border border-cargo-border p-3"><p className="text-xs text-cargo-muted">Security Guard</p><p className="text-sm text-cargo-text mt-1">{formatCurrency(categoryTotals.cargo_security_guard)}</p></div>
@@ -183,7 +185,7 @@ const DriverExpensesReportPage = () => {
               </tr>
             )) : (
               <tr>
-                <td colSpan="5" className="py-6 text-center text-cargo-muted">No rows found.</td>
+                <td colSpan="6" className="py-6 text-center text-cargo-muted">No rows found.</td>
               </tr>
             )}
           </tbody>

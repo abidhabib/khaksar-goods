@@ -50,7 +50,7 @@
     <string name="trip_history_subtitle">Review completed and ongoing trips details.</string>
     <string name="daily_expenses">Daily Expenses</string>
     <string name="daily_expenses_subtitle">Save your daily costs.</string>
-    <string name="daily_expense_history_subtitle">Track non-trip daily spending</string>
+    <string name="daily_expense_history_subtitle">Add and review daily spending</string>
     <string name="refresh">Refresh</string>
     <string name="loading_trip_history">Loading trip history...</string>
     <string name="no_history_title">No trips found</string>
@@ -61,7 +61,7 @@
     <string name="trip_notes_empty">Notes: No notes added</string>
     <string name="trip_notes_value">Notes: %1$s</string>
     <string name="trip_expense_breakdown">Diesel %1$s • Toll %2$s • Food %3$s • Police %4$s
-Chalaan %5$s • Reward %6$s • Bilty %7$s • Tyre %8$s</string>
+Chalaan %5$s • Mandi Kaat %6$s • Reward %7$s • Bilty %8$s • Tyre %9$s</string>
     <string name="trip_image_preview">Trip image preview</string>
     <string name="trip_start_image">Start meter image</string>
     <string name="trip_end_image">End meter image</string>
@@ -113,6 +113,7 @@ Chalaan %5$s • Reward %6$s • Bilty %7$s • Tyre %8$s</string>
     <string name="add_trip_expenses">Add trip expenses</string>
     <string name="police_cost">Police Cost</string>
     <string name="chalaan_cost">Chalaan Cost</string>
+    <string name="mandi_kaat_cost">Mandi Kaat</string>
     <string name="reward_cost">Reward</string>
     <string name="tyre_puncture_cost">Tyre puncture cost</string>
     <string name="filter_month">Filter month (YYYY-MM)</string>
@@ -123,16 +124,17 @@ Chalaan %5$s • Reward %6$s • Bilty %7$s • Tyre %8$s</string>
     <string name="cargo_service_cost">Cargo Service</string>
     <string name="mobile_cost">Mobile Cost</string>
     <string name="moboil_change_cost">Moboil Change Cost</string>
+    <string name="vehicle_maintenance_cost">Vehicle Maintenance</string>
     <string name="mechanic_cost">Mechanic Cost</string>
     <string name="medical_cost">Medical Cost</string>
     <string name="security_guard_fee">Cargo Security Fee</string>
     <string name="save_daily_expense">Save daily expense</string>
-    <string name="daily_expense_history">Daily expense history</string>
+    <string name="daily_expense_history">Daily Expenses</string>
     <string name="no_daily_expenses">No daily expenses found for this month.</string>
     <string name="daily_expense_saved">Daily expense saved successfully</string>
     <string name="daily_expense_breakdown">Cargo Service %1$s • Mobile %2$s
-Moboil %3$s • Mechanic %4$s • Medical %5$s
-Food %6$s • Guard %7$s • Other %8$s</string>
+Moboil %3$s • Maintenance %4$s • Mechanic %5$s
+Medical %6$s • Food %7$s • Guard %8$s</string>
     <string name="notes">Notes</string>
     <string name="finish_trip_first">Finish the current trip first</string>
     <string name="back_to_dashboard">Back to Dashboard</string>
@@ -146,11 +148,11 @@ Food %6$s • Guard %7$s • Other %8$s</string>
     <string name="diesel_liters_required">Liters are required</string>
     <string name="diesel_location_optional">Location (optional)</string>
     <string name="diesel_location_required">Location is required</string>
-    <string name="diesel_meter_photo_optional">Meter photo (optional)</string>
-    <string name="diesel_meter_photo_required">Meter photo (required)</string>
+    <string name="diesel_meter_photo_optional">Diesel machine photo (optional)</string>
+    <string name="diesel_meter_photo_required">Diesel machine photo (required)</string>
     <string name="save_diesel_expense">Save diesel expense</string>
-    <string name="open_camera_for_diesel_meter">Tap to open camera for diesel meter photo</string>
-    <string name="change_diesel_meter_photo">Tap to change diesel meter photo</string>
+    <string name="open_camera_for_diesel_meter">Tap to open camera for diesel machine photo</string>
+    <string name="change_diesel_meter_photo">Tap to change diesel machine photo</string>
     <string name="license_number_value">License: %1$s</string>
     <string name="end_meter_photo_required">End meter photo is required</string>
     <string name="open_camera_for_end_meter">Tap to open camera for end meter photo</string>
@@ -174,6 +176,34 @@ Food %6$s • Guard %7$s • Other %8$s</string>
     <string name="unable_to_load_daily_expenses">Unable to load daily expenses</string>
     <string name="unable_to_save_daily_expense">Unable to save daily expense</string>
     <string name="invalid_daily_expense_response">Invalid daily expense response</string>
+    <string name="moboil_meter_reading">Moboil meter reading</string>
+    <string name="moboil_meter_required">Meter reading is required</string>
+    <string name="save_moboil_expense">Save moboil change</string>
+    <string name="moboil_alert_title">Moboil Alert</string>
+    <string name="moboil_alert_empty">No moboil change saved yet</string>
+    <string name="moboil_alert_value">Last at %1$s • %2$s km ago</string>
+    <string name="send_payment_to_company">Send Payment to Company</string>
+    <string name="send_payment_subtitle">Submit amount with screenshot</string>
+    <string name="payment_submissions">Payment Submissions</string>
+    <string name="payment_amount">Payment amount</string>
+    <string name="payment_screenshot_required">Payment screenshot is required</string>
+    <string name="payment_amount_required">Payment amount is required</string>
+    <string name="payment_add_screenshot">Tap to open camera for payment screenshot</string>
+    <string name="payment_change_screenshot">Tap to change payment screenshot</string>
+    <string name="submit_payment">Submit Payment</string>
+    <string name="payment_submit_history">History</string>
+    <string name="payment_submit_new">New Submission</string>
+    <string name="payment_total_submissions">Total submissions: %1$s</string>
+    <string name="payment_total_amount">Total amount: %1$s</string>
+    <string name="payment_saved_successfully">Payment submitted successfully</string>
+    <string name="payment_history_empty">No payment submissions found.</string>
+    <string name="payment_filter_month_hint">Month (YYYY-MM)</string>
+    <string name="apply_filter">Apply Filter</string>
+    <string name="chalaan_photo_required">Chalaan photo is required</string>
+    <string name="chalaan_photo">Chalaan Photo</string>
+    <string name="open_camera_for_chalaan">Tap to open camera for chalaan photo</string>
+    <string name="change_chalaan_photo">Tap to change chalaan photo</string>
+    <string name="save_chalaan_expense">Save chalaan expense</string>
     <string name="success_check">✓</string>
     <string name="action_settings">Settings</string>
     <string name="first_fragment_label">First Fragment</string>

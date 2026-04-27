@@ -7,6 +7,7 @@ import DriversManagement from './pages/DriversManagement'
 import CarReportPage from './pages/CarReportPage'
 import DriverReportPage from './pages/DriverReportPage'
 import DriverExpensesReportPage from './pages/DriverExpensesReportPage'
+import PaymentSubmissionsPage from './pages/PaymentSubmissionsPage'
 import TripMonitor from './pages/TripMonitor'
 import Reports from './pages/Reports'
 import ProtectedRoute from './components/common/ProtectedRoute'
@@ -27,6 +28,7 @@ function App() {
           <Route path="/drivers" element={<DriversManagement />} />
           <Route path="/drivers/:id/report" element={<DriverReportPage />} />
           <Route path="/drivers-expenses" element={<DriverExpensesReportPage />} />
+          <Route path="/payment-submissions" element={<PaymentSubmissionsPage />} />
           <Route path="/trips" element={<TripMonitor />} />
           <Route path="/reports" element={<Reports />} />
         </Route>

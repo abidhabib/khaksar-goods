@@ -224,6 +224,42 @@ public class ApiClient {
         CLIENT.newCall(request).enqueue(callback);
     }
 
+    public static void submitCompanyPayment(
+            String baseUrl,
+            String token,
+            Map<String, String> fields,
+            Uri screenshotUri,
+            ContentResolver contentResolver,
+            Callback callback
+    ) {
+        Map<String, Uri> fileUris = new LinkedHashMap<>();
+        fileUris.put("payment_screenshot", screenshotUri);
+        RequestBody requestBody = buildFormRequestBody(fields, fileUris, contentResolver);
+
+        Request request = new Request.Builder()
+                .url(baseUrl + "/driver/company-payments")
+                .post(requestBody)
+                .header("Authorization", "Bearer " + token)
+                .build();
+
+        CLIENT.newCall(request).enqueue(callback);
+    }
+
+    public static void getCompanyPayments(String baseUrl, String token, String month, Callback callback) {
+        String url = baseUrl + "/driver/company-payments";
+        if (month != null && !month.trim().isEmpty()) {
+            url += "?month=" + month.trim();
+        }
+
+        Request request = new Request.Builder()
+                .url(url)
+                .get()
+                .header("Authorization", "Bearer " + token)
+                .build();
+
+        CLIENT.newCall(request).enqueue(callback);
+    }
+
     private static void addImagePartIfExists(
             MultipartBody.Builder builder,
             Uri uri,

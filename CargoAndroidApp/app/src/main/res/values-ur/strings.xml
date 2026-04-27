@@ -60,9 +60,9 @@
     <string name="trip_notes_value">نوٹس: %1$s</string>
     <string name="daily_expenses">روزانہ اخراجات</string>
     <string name="daily_expenses_subtitle">   ڈرائیور کے روزانہ خرچے  محفوظ کریں۔</string>
-    <string name="daily_expense_history_subtitle">غیر ٹرپ روزانہ خرچ دیکھیں</string>
+    <string name="daily_expense_history_subtitle">روزانہ اخراجات شامل کریں اور دیکھیں</string>
     <string name="trip_expense_breakdown">ڈیزل %1$s • ٹول %2$s • کھانا %3$s • پولیس %4$s
-چالان %5$s • انعام %6$s • بلٹی %7$s • پنکچر %8$s</string>
+چالان %5$s • منڈی کاٹ %6$s • انعام %7$s • بلٹی %8$s • پنکچر %9$s</string>
     <string name="trip_image_preview">ٹرپ تصویر پیش منظر</string>
     <string name="trip_start_image">شروع کے میٹر کی تصویر</string>
     <string name="trip_end_image">اختتامی میٹر کی تصویر</string>
@@ -112,6 +112,7 @@
     <string name="add_trip_expenses">ٹرپ اخراجات شامل کریں</string>
     <string name="police_cost">پولیس خرچہ</string>
     <string name="chalaan_cost">چالان خرچہ</string>
+    <string name="mandi_kaat_cost">منڈی کاٹ</string>
     <string name="reward_cost">انعام دیا</string>
     <string name="tyre_puncture_cost">ٹائر پنکچر خرچہ</string>
     <string name="filter_month">ماہ فلٹر کریں (YYYY-MM)</string>
@@ -122,16 +123,17 @@
     <string name="cargo_service_cost">سروس کروانے کا خرچہ</string>
     <string name="mobile_cost">موبائل خرچہ</string>
     <string name="moboil_change_cost">موآئل چیینج خرچہ</string>
+    <string name="vehicle_maintenance_cost">گاڑی کی مرمت</string>
     <string name="mechanic_cost">مکینک کا خرچہ</string>
     <string name="medical_cost">میڈیکل خرچہ</string>
     <string name="security_guard_fee">چوکیدارا</string>
     <string name="save_daily_expense">روزانہ خرچہ محفوظ کریں</string>
-    <string name="daily_expense_history">روزانہ خرچے کی ہسٹری</string>
+    <string name="daily_expense_history">روزانہ اخراجات</string>
     <string name="no_daily_expenses">اس مہینے کے لیے کوئی روزانہ خرچہ نہیں ملا۔</string>
     <string name="daily_expense_saved">روزانہ خرچہ کامیابی سے محفوظ ہو گیا</string>
     <string name="daily_expense_breakdown">سروس %1$s • موبائل %2$s
-موآئل %3$s • مکینک %4$s • میڈیکل %5$s
-کھانا %6$s • چوکیدارا %7$s • دیگر %8$s</string>
+موآئل %3$s • مرمت %4$s • مکینک %5$s
+میڈیکل %6$s • کھانا %7$s • چوکیدارا %8$s</string>
     <string name="notes">نوٹس</string>
     <string name="finish_trip_first">پہلے موجودہ ٹرپ مکمل کریں</string>
     <string name="back_to_dashboard">ڈیش بورڈ پر واپس جائیں</string>
@@ -145,11 +147,11 @@
     <string name="diesel_liters_required">لیٹر درج کریں</string>
     <string name="diesel_location_optional">مقام (اختیاری)</string>
     <string name="diesel_location_required">لوکیشن درج کریں</string>
-    <string name="diesel_meter_photo_optional">میٹر تصویر (اختیاری)</string>
-    <string name="diesel_meter_photo_required">میٹر تصویر (لازمی)</string>
+    <string name="diesel_meter_photo_optional">ڈیزل مشین تصویر (اختیاری)</string>
+    <string name="diesel_meter_photo_required">ڈیزل مشین تصویر (لازمی)</string>
     <string name="save_diesel_expense">ڈیزل خرچ محفوظ کریں</string>
-    <string name="open_camera_for_diesel_meter">ڈیزل میٹر تصویر کے لیے کیمرا کھولیں</string>
-    <string name="change_diesel_meter_photo">ڈیزل میٹر تصویر تبدیل کریں</string>
+    <string name="open_camera_for_diesel_meter">ڈیزل مشین تصویر کے لیے کیمرا کھولیں</string>
+    <string name="change_diesel_meter_photo">ڈیزل مشین تصویر تبدیل کریں</string>
     <string name="license_number_value">لائسنس: %1$s</string>
     <string name="end_meter_photo_required">اختتامی میٹر کی تصویر لازمی ہے</string>
     <string name="open_camera_for_end_meter">اختتامی میٹر کی تصویر کے لیے کیمرا کھولنے کو دبائیں</string>
@@ -173,6 +175,34 @@
     <string name="unable_to_load_daily_expenses">روزانہ خرچے لوڈ نہیں ہو سکے</string>
     <string name="unable_to_save_daily_expense">روزانہ خرچہ محفوظ نہیں ہو سکا</string>
     <string name="invalid_daily_expense_response">روزانہ خرچے کا جواب درست نہیں تھا</string>
+    <string name="moboil_meter_reading">موآئل میٹر ریڈنگ</string>
+    <string name="moboil_meter_required">میٹر ریڈنگ لازمی ہے</string>
+    <string name="save_moboil_expense">موآئل چینج محفوظ کریں</string>
+    <string name="moboil_alert_title">موآئل الرٹ</string>
+    <string name="moboil_alert_empty">ابھی موآئل چینج محفوظ نہیں ہوا</string>
+    <string name="moboil_alert_value">آخری بار %1$s پر • %2$s کلومیٹر پہلے</string>
+    <string name="send_payment_to_company">کمپنی کو ادائیگی بھیجیں</string>
+    <string name="send_payment_subtitle">رقم اور اسکرین شاٹ جمع کریں</string>
+    <string name="payment_submissions">ادائیگی جمع کروائیاں</string>
+    <string name="payment_amount">ادائیگی رقم</string>
+    <string name="payment_screenshot_required">ادائیگی اسکرین شاٹ لازمی ہے</string>
+    <string name="payment_amount_required">ادائیگی رقم لازمی ہے</string>
+    <string name="payment_add_screenshot">ادائیگی اسکرین شاٹ کے لیے کیمرا کھولیں</string>
+    <string name="payment_change_screenshot">ادائیگی اسکرین شاٹ تبدیل کریں</string>
+    <string name="submit_payment">ادائیگی جمع کریں</string>
+    <string name="payment_submit_history">ہسٹری</string>
+    <string name="payment_submit_new">نئی جمع کروائی</string>
+    <string name="payment_total_submissions">کل جمع کروائیاں: %1$s</string>
+    <string name="payment_total_amount">کل رقم: %1$s</string>
+    <string name="payment_saved_successfully">ادائیگی کامیابی سے جمع ہو گئی</string>
+    <string name="payment_history_empty">کوئی ادائیگی جمع کروائی نہیں ملی۔</string>
+    <string name="payment_filter_month_hint">مہینہ (YYYY-MM)</string>
+    <string name="apply_filter">فلٹر لگائیں</string>
+    <string name="chalaan_photo_required">چالان تصویر لازمی ہے</string>
+    <string name="chalaan_photo">چالان تصویر</string>
+    <string name="open_camera_for_chalaan">چالان تصویر کے لیے کیمرا کھولیں</string>
+    <string name="change_chalaan_photo">چالان تصویر تبدیل کریں</string>
+    <string name="save_chalaan_expense">چالان خرچ محفوظ کریں</string>
     <string name="success_check">✓</string>
     <string name="action_settings">ترتیبات</string>
     <string name="first_fragment_label">پہلا فریگمنٹ</string>

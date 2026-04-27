@@ -72,6 +72,9 @@ public class DriverDashboardActivity extends AppCompatActivity {
         binding.dailyExpenseCard.setOnClickListener(v ->
                 startActivity(new Intent(this, DailyExpensesActivity.class))
         );
+        binding.paymentCard.setOnClickListener(v ->
+                startActivity(new Intent(this, PaymentSubmissionActivity.class))
+        );
         binding.dashboardSwipeRefresh.setOnRefreshListener(this::fetchDashboard);
 
         fetchDashboard();
@@ -220,22 +223,38 @@ public class DriverDashboardActivity extends AppCompatActivity {
                 R.string.dashboard_average_value,
                 formatAverage(currentVehicleAverage)
         ));
+
+        JSONObject lastMoboilChange = profile != null ? profile.optJSONObject("last_moboil_change") : null;
+        if (lastMoboilChange != null && !lastMoboilChange.isNull("meter_reading")) {
+            binding.moboilAlertValue.setText(getString(
+                    R.string.moboil_alert_value,
+                    formatPlainNumber(lastMoboilChange.optDouble("meter_reading", 0)),
+                    formatPlainNumber(lastMoboilChange.optDouble("km_since_change", 0))
+            ));
+        } else {
+            binding.moboilAlertValue.setText(R.string.moboil_alert_empty);
+        }
     }
 
     private void setLoading(boolean loading) {
         binding.dashboardLoadingOverlay.setVisibility(loading ? android.view.View.VISIBLE : android.view.View.GONE);
         binding.tripHistoryCard.setEnabled(!loading);
         binding.dailyExpenseCard.setEnabled(!loading);
+        binding.paymentCard.setEnabled(!loading);
         binding.dashboardSwipeRefresh.setEnabled(!loading);
         binding.startTripButton.setEnabled(!loading && (ongoingTrip == null || ongoingTrip.length() == 0));
     }
 
     private String formatCurrency(double amount) {
-        return String.format(Locale.US, "Rs %.0f", amount);
+        return formatPlainNumber(amount);
     }
 
     private String formatKm(double distance) {
-        return String.format(Locale.US, "%.0f", distance) + " km";
+        return formatPlainNumber(distance);
+    }
+
+    private String formatPlainNumber(double value) {
+        return String.format(Locale.US, "%.0f", value);
     }
 
     private String formatAverage(double average) {

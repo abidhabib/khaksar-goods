@@ -1,5 +1,6 @@
 const bcrypt = require('bcryptjs');
 const pool = require('../config/database');
+const { ensureDriverPaymentSubmissionsTable } = require('../config/schema');
 const { generateUsername } = require('../utils/helpers');
 
 const getDateFilter = (period = 'all', fromDate, toDate, alias = 't') => {
@@ -856,6 +857,90 @@ const getDriversExpenseReport = async (req, res) => {
     }
 };
 
+const getDriverPaymentSubmissions = async (req, res) => {
+    try {
+        const schemaConnection = await pool.getConnection();
+        try {
+            await ensureDriverPaymentSubmissionsTable(schemaConnection);
+        } finally {
+            schemaConnection.release();
+        }
+
+        const { driver_id, month } = req.query;
+        const filters = [];
+        const params = [];
+        const monthFilter = getMonthFilter(month, 'ps.created_at');
+
+        if (driver_id) {
+            filters.push('ps.driver_id = ?');
+            params.push(driver_id);
+        }
+
+        if (monthFilter.clause) {
+            filters.push(monthFilter.clause.replace(/^AND /, ''));
+            params.push(...monthFilter.params);
+        }
+
+        const whereClause = filters.length ? `WHERE ${filters.join(' AND ')}` : '';
+
+        const [payments] = await pool.execute(
+            `SELECT
+                ps.id,
+                ps.driver_id,
+                ps.amount,
+                ps.screenshot_image,
+                ps.created_at,
+                u.username AS driver_name,
+                u.phone AS driver_phone,
+                c.car_number
+             FROM driver_payment_submissions ps
+             JOIN drivers d ON ps.driver_id = d.id
+             JOIN users u ON d.user_id = u.id
+             LEFT JOIN cars c ON d.assigned_car_id = c.id
+             ${whereClause}
+             ORDER BY ps.created_at DESC, ps.id DESC`,
+            params
+        );
+
+        const [driverTotals] = await pool.execute(
+            `SELECT
+                ps.driver_id,
+                u.username AS driver_name,
+                u.phone AS driver_phone,
+                c.car_number,
+                COUNT(*) AS total_submissions,
+                COALESCE(SUM(ps.amount), 0) AS total_amount
+             FROM driver_payment_submissions ps
+             JOIN drivers d ON ps.driver_id = d.id
+             JOIN users u ON d.user_id = u.id
+             LEFT JOIN cars c ON d.assigned_car_id = c.id
+             ${whereClause}
+             GROUP BY ps.driver_id, u.username, u.phone, c.car_number
+             ORDER BY total_amount DESC, u.username ASC`,
+            params
+        );
+
+        const [[summary]] = await pool.execute(
+            `SELECT
+                COUNT(*) AS total_submissions,
+                COUNT(DISTINCT ps.driver_id) AS total_drivers,
+                COALESCE(SUM(ps.amount), 0) AS total_amount
+             FROM driver_payment_submissions ps
+             ${whereClause}`,
+            params
+        );
+
+        res.json({
+            success: true,
+            payments,
+            driverTotals,
+            summary
+        });
+    } catch (error) {
+        res.status(500).json({ message: 'Server error', error: error.message });
+    }
+};
+
 // ========== DASHBOARD & REPORTS ==========
 
 const getPeriodConfig = (period = 'week') => {
@@ -1272,6 +1357,7 @@ module.exports = {
     updateDriver,
     getDriverReport,
     getDriversExpenseReport,
+    getDriverPaymentSubmissions,
     
     // Dashboard
     getDashboardStats,

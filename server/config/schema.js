@@ -108,11 +108,44 @@ const ensureDriverDailyExpenseEntriesTable = async (connection) => {
             driver_id INT NOT NULL,
             category VARCHAR(50) NOT NULL,
             amount DECIMAL(10,2) NOT NULL DEFAULT 0.00,
+            meter_reading DECIMAL(10,2) NULL,
             expense_date DATE NOT NULL,
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
             INDEX idx_driver_daily_expense_entries_driver_date (driver_id, expense_date),
             CONSTRAINT fk_driver_daily_expense_entries_driver
+                FOREIGN KEY (driver_id) REFERENCES drivers(id)
+                ON DELETE CASCADE
+        )
+    `);
+};
+
+const ensureDriverDailyExpenseEntryColumns = async (connection, databaseName) => {
+    const [rows] = await connection.execute(
+        `SELECT COLUMN_NAME
+         FROM INFORMATION_SCHEMA.COLUMNS
+         WHERE TABLE_SCHEMA = ? AND TABLE_NAME = 'driver_daily_expense_entries' AND COLUMN_NAME = 'meter_reading'`,
+        [databaseName]
+    );
+
+    if (!rows.length) {
+        await connection.query(
+            'ALTER TABLE driver_daily_expense_entries ADD COLUMN meter_reading DECIMAL(10,2) NULL AFTER amount'
+        );
+    }
+};
+
+const ensureDriverPaymentSubmissionsTable = async (connection) => {
+    await connection.query(`
+        CREATE TABLE IF NOT EXISTS driver_payment_submissions (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            driver_id INT NOT NULL,
+            amount DECIMAL(10,2) NOT NULL DEFAULT 0.00,
+            screenshot_image VARCHAR(500) NULL,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+            INDEX idx_driver_payment_submissions_driver_date (driver_id, created_at),
+            CONSTRAINT fk_driver_payment_submissions_driver
                 FOREIGN KEY (driver_id) REFERENCES drivers(id)
                 ON DELETE CASCADE
         )
@@ -170,6 +203,8 @@ const ensureSchema = async () => {
         await ensureExpenseColumns(connection, databaseName);
         await ensureDriverDailyExpensesTable(connection);
         await ensureDriverDailyExpenseEntriesTable(connection);
+        await ensureDriverDailyExpenseEntryColumns(connection, databaseName);
+        await ensureDriverPaymentSubmissionsTable(connection);
     } finally {
         connection.release();
     }
@@ -177,5 +212,7 @@ const ensureSchema = async () => {
 
 module.exports = {
     ensureSchema,
-    ensureDriverDailyExpenseEntriesTable
+    ensureDriverDailyExpenseEntriesTable,
+    ensureDriverDailyExpenseEntryColumns,
+    ensureDriverPaymentSubmissionsTable
 };

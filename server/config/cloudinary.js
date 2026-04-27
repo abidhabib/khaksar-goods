@@ -13,6 +13,7 @@ const uploadStorage = new CloudinaryStorage({
         const isBilty = file?.fieldname === 'bilty_slip_image';
         const isReceipt = file?.fieldname === 'receipt_image';
         const isLoadPhoto = file?.fieldname === 'load_photo' || file?.fieldname === 'loadPhoto' || file?.fieldname === 'load_image';
+        const isPaymentScreenshot = file?.fieldname === 'payment_screenshot' || file?.fieldname === 'screenshot_image';
 
         return {
             folder: isBilty
@@ -21,7 +22,9 @@ const uploadStorage = new CloudinaryStorage({
                     ? 'cargo-tracker/receipts'
                     : isLoadPhoto
                         ? 'cargo-tracker/load-photos'
-                        : 'cargo-tracker/meter-readings',
+                        : isPaymentScreenshot
+                            ? 'cargo-tracker/payment-submissions'
+                            : 'cargo-tracker/meter-readings',
             allowed_formats: ['jpg', 'jpeg', 'png', 'webp'],
             transformation: [{ width: 1200, height: 1200, crop: 'limit' }]
         };

@@ -5,7 +5,7 @@ import {
   Users, 
   Route, 
   FileText,
-  Settings 
+  Wallet
 } from 'lucide-react';
 
 const Sidebar = () => {
@@ -15,6 +15,7 @@ const Sidebar = () => {
     { path: '/drivers', icon: Users, label: 'Drivers' },
     { path: '/trips', icon: Route, label: 'Trips' },
     { path: '/drivers-expenses', icon: FileText, label: 'Drivers Expenses' },
+    { path: '/payment-submissions', icon: Wallet, label: 'Payment Submissions' },
     { path: '/reports', icon: FileText, label: 'Reports' },
   ];
 

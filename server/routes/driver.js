@@ -11,7 +11,9 @@ const {
     getTripHistory,
     getTripDetails,
     getDailyExpenses,
-    saveDailyExpense
+    saveDailyExpense,
+    submitCompanyPayment,
+    getCompanyPayments
 } = require('../controllers/driverController');
 
 const upload = multer({ storage: meterStorage });
@@ -45,5 +47,13 @@ router.get('/trips', authMiddleware, driverOnly, getTripHistory);
 router.get('/trips/:trip_id', authMiddleware, driverOnly, getTripDetails);
 router.get('/daily-expenses', authMiddleware, driverOnly, getDailyExpenses);
 router.post('/daily-expenses', authMiddleware, driverOnly, saveDailyExpense);
+router.post(
+    '/company-payments',
+    authMiddleware,
+    driverOnly,
+    upload.fields([{ name: 'payment_screenshot', maxCount: 1 }]),
+    submitCompanyPayment
+);
+router.get('/company-payments', authMiddleware, driverOnly, getCompanyPayments);
 
 module.exports = router;

@@ -1,5 +1,9 @@
 const pool = require('../config/database');
-const { ensureDriverDailyExpenseEntriesTable } = require('../config/schema');
+const {
+    ensureDriverDailyExpenseEntriesTable,
+    ensureDriverDailyExpenseEntryColumns,
+    ensureDriverPaymentSubmissionsTable
+} = require('../config/schema');
 const getAuthenticatedDriverId = (req) => {
     const driverId = req?.user?.driver_id;
     return driverId !== undefined && driverId !== null ? Number(driverId) : null;
@@ -97,6 +101,7 @@ const TRIP_EXPENSE_CATEGORIES = new Set([
     'food',
     'police',
     'chalaan',
+    'mandi_kaat',
     'reward',
     'tyre_puncture',
     'bilty_commission'
@@ -106,6 +111,7 @@ const DAILY_EXPENSE_CATEGORY_MAP = {
     cargo_service: 'cargo_service',
     mobile: 'mobile',
     moboil_change: 'moboil_change',
+    vehicle_maintenance: 'vehicle_maintenance',
     mechanic: 'mechanic',
     medical: 'medical',
     food: 'food',
@@ -139,6 +145,16 @@ const computeAverageKmPerLiter = (distance, liters) => {
 // Get driver's dashboard data
 const getDashboard = async (req, res) => {
     try {
+        const schemaConnection = await pool.getConnection();
+        try {
+            const [[databaseRow]] = await schemaConnection.query('SELECT DATABASE() AS database_name');
+            await ensureDriverDailyExpenseEntriesTable(schemaConnection);
+            await ensureDriverDailyExpenseEntryColumns(schemaConnection, databaseRow?.database_name);
+            await ensureDriverPaymentSubmissionsTable(schemaConnection);
+        } finally {
+            schemaConnection.release();
+        }
+
         const driver_id = await resolveDriverId(req);
         if (!driver_id) {
             return res.status(403).json({ message: 'Driver account required' });
@@ -196,6 +212,14 @@ const getDashboard = async (req, res) => {
                 AND t.status = 'completed'
         `, [driver_id]);
 
+        const [lastMoboilRows] = await pool.execute(`
+            SELECT id, amount, meter_reading, expense_date, created_at
+            FROM driver_daily_expense_entries
+            WHERE driver_id = ? AND category = 'moboil_change'
+            ORDER BY expense_date DESC, created_at DESC, id DESC
+            LIMIT 1
+        `, [driver_id]);
+
         // Recent completed trips (last 5)
         const [recentTrips] = await pool.execute(`
             SELECT t.*,
@@ -229,10 +253,24 @@ const getDashboard = async (req, res) => {
         `, [driver_id]);
 
         const profilePayload = profile[0];
+        const lastMoboilChange = lastMoboilRows[0] || null;
         profilePayload.overall_average_km_per_liter = computeAverageKmPerLiter(
             profilePayload.car_total_distance,
             profilePayload.car_total_diesel_liters
         );
+        if (lastMoboilChange) {
+            const currentMeter = Number(profilePayload.current_meter_reading) || 0;
+            const lastMoboilMeter = Number(lastMoboilChange.meter_reading) || 0;
+            profilePayload.last_moboil_change = {
+                ...lastMoboilChange,
+                meter_reading: lastMoboilChange.meter_reading !== null ? lastMoboilMeter : null,
+                km_since_change: lastMoboilMeter > 0 && currentMeter >= lastMoboilMeter
+                    ? Number((currentMeter - lastMoboilMeter).toFixed(2))
+                    : null
+            };
+        } else {
+            profilePayload.last_moboil_change = null;
+        }
         lifetimeStats.overall_average_km_per_liter = computeAverageKmPerLiter(
             lifetimeStats.total_distance,
             lifetimeStats.total_diesel_liters
@@ -419,6 +457,7 @@ const endTrip = async (req, res) => {
             food_cost = 0, 
             police_cost = 0,
             chalaan_cost = 0,
+            mandi_kaat_cost = 0,
             reward_cost = 0,
             tyre_puncture_cost = 0,
             end_location,
@@ -432,6 +471,7 @@ const endTrip = async (req, res) => {
         const foodValue = toExpenseNumber(food_cost);
         const policeValue = toExpenseNumber(police_cost);
         const chalaanValue = toExpenseNumber(chalaan_cost);
+        const mandiKaatValue = toExpenseNumber(mandi_kaat_cost);
         const rewardValue = toExpenseNumber(reward_cost);
         const tyrePunctureValue = toExpenseNumber(tyre_puncture_cost);
         const endLocation = toNullableString(end_location);
@@ -479,6 +519,7 @@ const endTrip = async (req, res) => {
             { category: 'food', amount: foodValue },
             { category: 'police', amount: policeValue },
             { category: 'chalaan', amount: chalaanValue },
+            { category: 'mandi_kaat', amount: mandiKaatValue },
             { category: 'reward', amount: rewardValue },
             { category: 'tyre_puncture', amount: tyrePunctureValue }
         ];
@@ -564,8 +605,12 @@ const addTripExpense = async (req, res) => {
             }
 
             if (!receiptImage) {
-                return res.status(400).json({ message: 'Meter photo is required for diesel expense' });
+                return res.status(400).json({ message: 'Diesel machine photo is required for diesel expense' });
             }
+        }
+
+        if (normalizedCategory === 'chalaan' && !receiptImage) {
+            return res.status(400).json({ message: 'Chalaan photo is required' });
         }
 
         const [trip] = await pool.execute(
@@ -618,6 +663,7 @@ const getTripHistory = async (req, res) => {
                    COALESCE(exp.food_expense, 0) as food_expense,
                    COALESCE(exp.police_expense, 0) as police_expense,
                    COALESCE(exp.chalaan_expense, 0) as chalaan_expense,
+                   COALESCE(exp.mandi_kaat_expense, 0) as mandi_kaat_expense,
                    COALESCE(exp.reward_expense, 0) as reward_expense,
                    COALESCE(exp.tyre_puncture_expense, 0) as tyre_puncture_expense,
                    COALESCE(exp.bilty_commission_expense, 0) as bilty_commission_expense,
@@ -635,6 +681,7 @@ const getTripHistory = async (req, res) => {
                     SUM(CASE WHEN category = 'food' THEN amount ELSE 0 END) as food_expense,
                     SUM(CASE WHEN category = 'police' THEN amount ELSE 0 END) as police_expense,
                     SUM(CASE WHEN category = 'chalaan' THEN amount ELSE 0 END) as chalaan_expense,
+                    SUM(CASE WHEN category = 'mandi_kaat' THEN amount ELSE 0 END) as mandi_kaat_expense,
                     SUM(CASE WHEN category = 'reward' THEN amount ELSE 0 END) as reward_expense,
                     SUM(CASE WHEN category = 'tyre_puncture' THEN amount ELSE 0 END) as tyre_puncture_expense,
                     SUM(CASE WHEN category = 'bilty_commission' THEN amount ELSE 0 END) as bilty_commission_expense
@@ -716,6 +763,8 @@ const getDailyExpenses = async (req, res) => {
         const schemaConnection = await pool.getConnection();
         try {
             await ensureDriverDailyExpenseEntriesTable(schemaConnection);
+            const [[databaseRow]] = await schemaConnection.query('SELECT DATABASE() AS database_name');
+            await ensureDriverDailyExpenseEntryColumns(schemaConnection, databaseRow?.database_name);
         } finally {
             schemaConnection.release();
         }
@@ -728,7 +777,7 @@ const getDailyExpenses = async (req, res) => {
         const monthFilter = buildMonthFilter(req.query.month, 'expense_date');
 
         const [entries] = await pool.execute(
-            `SELECT id, driver_id, category, amount, expense_date, created_at
+            `SELECT id, driver_id, category, amount, meter_reading, expense_date, created_at
              FROM driver_daily_expense_entries
              WHERE driver_id = ? ${monthFilter.clause}
              ORDER BY created_at DESC, id DESC`,
@@ -759,6 +808,7 @@ const getDailyExpenses = async (req, res) => {
                     cargo_service_cost: 0,
                     mobile_cost: 0,
                     moboil_change_cost: 0,
+                    vehicle_maintenance_cost: 0,
                     mechanic_cost: 0,
                     medical_cost: 0,
                     food_cost: 0,
@@ -777,6 +827,9 @@ const getDailyExpenses = async (req, res) => {
                     break;
                 case 'moboil_change':
                     expensesByDate[dateKey].moboil_change_cost += amountValue;
+                    break;
+                case 'vehicle_maintenance':
+                    expensesByDate[dateKey].vehicle_maintenance_cost += amountValue;
                     break;
                 case 'mechanic':
                     expensesByDate[dateKey].mechanic_cost += amountValue;
@@ -824,6 +877,8 @@ const saveDailyExpense = async (req, res) => {
         const schemaConnection = await pool.getConnection();
         try {
             await ensureDriverDailyExpenseEntriesTable(schemaConnection);
+            const [[databaseRow]] = await schemaConnection.query('SELECT DATABASE() AS database_name');
+            await ensureDriverDailyExpenseEntryColumns(schemaConnection, databaseRow?.database_name);
         } finally {
             schemaConnection.release();
         }
@@ -839,15 +894,18 @@ const saveDailyExpense = async (req, res) => {
             cargo_service_cost = 0,
             mobile_cost = 0,
             moboil_change_cost = 0,
+            vehicle_maintenance_cost = 0,
             mechanic_cost = 0,
             medical_cost = 0,
             food_cost = 0,
-            cargo_security_guard_fee = 0
+            cargo_security_guard_fee = 0,
+            meter_reading
         } = req.body;
 
         const normalizedCategory = toNullableString(category);
         if (normalizedCategory && amount !== undefined) {
             const amountValue = toExpenseNumber(amount);
+            const meterReadingValue = toOptionalDecimal(meter_reading);
 
             if (!DAILY_EXPENSE_CATEGORY_MAP[normalizedCategory]) {
                 return res.status(400).json({ message: 'Invalid daily expense category' });
@@ -857,15 +915,19 @@ const saveDailyExpense = async (req, res) => {
                 return res.status(400).json({ message: 'Expense amount must be greater than zero' });
             }
 
+            if (normalizedCategory === 'moboil_change' && meterReadingValue === null) {
+                return res.status(400).json({ message: 'Meter reading is required for moboil change' });
+            }
+
             const [result] = await pool.execute(
                 `INSERT INTO driver_daily_expense_entries
-                 (driver_id, category, amount, expense_date)
-                 VALUES (?, ?, ?, CURDATE())`,
-                [driver_id, normalizedCategory, amountValue]
+                 (driver_id, category, amount, meter_reading, expense_date)
+                 VALUES (?, ?, ?, ?, CURDATE())`,
+                [driver_id, normalizedCategory, amountValue, meterReadingValue]
             );
 
             const [[entry]] = await pool.execute(
-                `SELECT id, driver_id, category, amount, expense_date, created_at
+                `SELECT id, driver_id, category, amount, meter_reading, expense_date, created_at
                  FROM driver_daily_expense_entries
                  WHERE id = ? LIMIT 1`,
                 [result.insertId]
@@ -881,6 +943,7 @@ const saveDailyExpense = async (req, res) => {
                 toExpenseNumber(cargo_service_cost),
                 toExpenseNumber(mobile_cost),
                 toExpenseNumber(moboil_change_cost),
+                toExpenseNumber(vehicle_maintenance_cost),
                 toExpenseNumber(mechanic_cost),
                 toExpenseNumber(medical_cost),
                 toExpenseNumber(food_cost),
@@ -891,10 +954,11 @@ const saveDailyExpense = async (req, res) => {
                 ['cargo_service', values[0]],
                 ['mobile', values[1]],
                 ['moboil_change', values[2]],
-                ['mechanic', values[3]],
-                ['medical', values[4]],
-                ['food', values[5]],
-                ['cargo_security_guard', values[6]]
+                ['vehicle_maintenance', values[3]],
+                ['mechanic', values[4]],
+                ['medical', values[5]],
+                ['food', values[6]],
+                ['cargo_security_guard', values[7]]
             ].filter(([, amountValue]) => amountValue > 0);
 
             for (const [categoryName, amountValue] of rows) {
@@ -917,6 +981,96 @@ const saveDailyExpense = async (req, res) => {
     }
 };
 
+const getCompanyPayments = async (req, res) => {
+    try {
+        const schemaConnection = await pool.getConnection();
+        try {
+            await ensureDriverPaymentSubmissionsTable(schemaConnection);
+        } finally {
+            schemaConnection.release();
+        }
+
+        const driver_id = await resolveDriverId(req);
+        if (!driver_id) {
+            return res.status(403).json({ message: 'Driver account required' });
+        }
+
+        const monthFilter = buildMonthFilter(req.query.month, 'created_at');
+        const [payments] = await pool.execute(
+            `SELECT id, driver_id, amount, screenshot_image, created_at
+             FROM driver_payment_submissions
+             WHERE driver_id = ? ${monthFilter.clause}
+             ORDER BY created_at DESC, id DESC`,
+            [driver_id, ...monthFilter.params]
+        );
+
+        const [[summary]] = await pool.execute(
+            `SELECT COUNT(*) AS total_submissions, COALESCE(SUM(amount), 0) AS total_amount
+             FROM driver_payment_submissions
+             WHERE driver_id = ? ${monthFilter.clause}`,
+            [driver_id, ...monthFilter.params]
+        );
+
+        res.json({
+            success: true,
+            payments,
+            summary
+        });
+    } catch (error) {
+        console.error('Get company payments error:', error);
+        res.status(500).json({ message: 'Server error', error: error.message });
+    }
+};
+
+const submitCompanyPayment = async (req, res) => {
+    try {
+        const schemaConnection = await pool.getConnection();
+        try {
+            await ensureDriverPaymentSubmissionsTable(schemaConnection);
+        } finally {
+            schemaConnection.release();
+        }
+
+        const driver_id = await resolveDriverId(req);
+        if (!driver_id) {
+            return res.status(403).json({ message: 'Driver account required' });
+        }
+
+        const amountValue = toExpenseNumber(req.body?.amount);
+        const screenshotImage = getUploadedFilePath(req, 'payment_screenshot', 'screenshot_image');
+
+        if (!(amountValue > 0)) {
+            return res.status(400).json({ message: 'Payment amount must be greater than zero' });
+        }
+
+        if (!screenshotImage) {
+            return res.status(400).json({ message: 'Payment screenshot is required' });
+        }
+
+        const [result] = await pool.execute(
+            `INSERT INTO driver_payment_submissions (driver_id, amount, screenshot_image)
+             VALUES (?, ?, ?)`,
+            [driver_id, amountValue, screenshotImage]
+        );
+
+        const [[payment]] = await pool.execute(
+            `SELECT id, driver_id, amount, screenshot_image, created_at
+             FROM driver_payment_submissions
+             WHERE id = ? LIMIT 1`,
+            [result.insertId]
+        );
+
+        res.status(201).json({
+            success: true,
+            message: 'Payment submission saved successfully',
+            payment
+        });
+    } catch (error) {
+        console.error('Submit company payment error:', error);
+        res.status(500).json({ message: 'Server error', error: error.message });
+    }
+};
+
 module.exports = {
     getDashboard,
     startTrip,
@@ -925,5 +1079,7 @@ module.exports = {
     getTripHistory,
     getTripDetails,
     getDailyExpenses,
-    saveDailyExpense
+    saveDailyExpense,
+    submitCompanyPayment,
+    getCompanyPayments
 };

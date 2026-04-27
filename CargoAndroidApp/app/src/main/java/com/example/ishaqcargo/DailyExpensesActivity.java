@@ -1,8 +1,10 @@
 package com.example.ishaqcargo;
 
+import android.app.Dialog;
 import android.content.SharedPreferences;
 import android.os.Bundle;
 import android.text.TextUtils;
+import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.ImageView;
@@ -23,6 +25,8 @@ import com.example.ishaqcargo.network.ApiClient;
 import com.example.ishaqcargo.util.AmountEntryDialogHelper;
 import com.example.ishaqcargo.util.SessionManager;
 import com.google.android.material.card.MaterialCardView;
+import com.google.android.material.dialog.MaterialAlertDialogBuilder;
+import com.google.android.material.textfield.TextInputEditText;
 
 import org.json.JSONArray;
 import org.json.JSONObject;
@@ -99,18 +103,24 @@ public class DailyExpensesActivity extends AppCompatActivity {
     private void setupExpenseWidgets() {
         bindExpenseCard(binding.cargoServiceCard, "cargo_service", R.string.cargo_service_cost);
         bindExpenseCard(binding.mobileCostCard, "mobile", R.string.mobile_cost);
-        bindExpenseCard(binding.moboilChangeCard, "moboil_change", R.string.moboil_change_cost);
+        bindMoboilExpenseCard();
+        bindExpenseCard(binding.vehicleMaintenanceCard, "vehicle_maintenance", R.string.vehicle_maintenance_cost);
         bindExpenseCard(binding.mechanicCostCard, "mechanic", R.string.mechanic_cost);
         bindExpenseCard(binding.medicalCostCard, "medical", R.string.medical_cost);
         bindExpenseCard(binding.foodCostCard, "food", R.string.food_cost);
         bindExpenseCard(binding.securityGuardFeeCard, "cargo_security_guard", R.string.security_guard_fee);
         styleWidgetCard(binding.cargoServiceCard, R.color.trips_widget_bg, R.drawable.ic_cargo_service);
-        styleWidgetCard(binding.mobileCostCard, R.color.km_widget_bg, R.drawable.ic_cargo_mobile);
-        styleWidgetCard(binding.moboilChangeCard, R.color.expenses_widget_bg, R.drawable.ic_cargo_moboil);
-        styleWidgetCard(binding.mechanicCostCard, R.color.revenue_widget_bg, R.drawable.ic_cargo_mechanic);
-        styleWidgetCard(binding.medicalCostCard, R.color.button_amber, android.R.drawable.ic_menu_info_details);
-        styleWidgetCard(binding.foodCostCard, R.color.button_primary, R.drawable.ic_cargo_food);
-        styleWidgetCard(binding.securityGuardFeeCard, R.color.button_emerald_active, R.drawable.ic_cargo_guard);
+        styleWidgetCard(binding.mobileCostCard, R.color.trips_widget_bg, R.drawable.ic_cargo_mobile);
+        styleWidgetCard(binding.moboilChangeCard, R.color.trips_widget_bg, R.drawable.ic_cargo_moboil);
+        styleWidgetCard(binding.vehicleMaintenanceCard, R.color.trips_widget_bg, R.drawable.ic_cargo_mechanic);
+        styleWidgetCard(binding.mechanicCostCard, R.color.trips_widget_bg, R.drawable.ic_cargo_mechanic);
+        styleWidgetCard(binding.medicalCostCard, R.color.trips_widget_bg, android.R.drawable.ic_menu_info_details);
+        styleWidgetCard(binding.foodCostCard, R.color.trips_widget_bg, R.drawable.ic_cargo_food);
+        styleWidgetCard(binding.securityGuardFeeCard, R.color.trips_widget_bg, R.drawable.ic_cargo_guard);
+    }
+
+    private void bindMoboilExpenseCard() {
+        binding.moboilChangeCard.setOnClickListener(v -> showMoboilDialog());
     }
 
     private void bindExpenseCard(View card, String category, int titleRes) {
@@ -177,6 +187,7 @@ public class DailyExpensesActivity extends AppCompatActivity {
             totals.put("cargo_service_cost", 0);
             totals.put("mobile_cost", 0);
             totals.put("moboil_change_cost", 0);
+            totals.put("vehicle_maintenance_cost", 0);
             totals.put("mechanic_cost", 0);
             totals.put("medical_cost", 0);
             totals.put("food_cost", 0);
@@ -252,6 +263,9 @@ public class DailyExpensesActivity extends AppCompatActivity {
                     case "moboil_change":
                         totals.put("moboil_change_cost", totals.optDouble("moboil_change_cost", 0) + amount);
                         break;
+                    case "vehicle_maintenance":
+                        totals.put("vehicle_maintenance_cost", totals.optDouble("vehicle_maintenance_cost", 0) + amount);
+                        break;
                     case "mechanic":
                         totals.put("mechanic_cost", totals.optDouble("mechanic_cost", 0) + amount);
                         break;
@@ -300,6 +314,7 @@ public class DailyExpensesActivity extends AppCompatActivity {
             todayTotals.put("cargo_service", todayExpense.optDouble("cargo_service_cost", 0));
             todayTotals.put("mobile", todayExpense.optDouble("mobile_cost", 0));
             todayTotals.put("moboil_change", todayExpense.optDouble("moboil_change_cost", 0));
+            todayTotals.put("vehicle_maintenance", todayExpense.optDouble("vehicle_maintenance_cost", 0));
             todayTotals.put("mechanic", todayExpense.optDouble("mechanic_cost", 0));
             todayTotals.put("medical", todayExpense.optDouble("medical_cost", 0));
             todayTotals.put("food", todayExpense.optDouble("food_cost", 0));
@@ -310,6 +325,7 @@ public class DailyExpensesActivity extends AppCompatActivity {
                 todayTotals.getOrDefault("cargo_service", 0d)
                         + todayTotals.getOrDefault("mobile", 0d)
                         + todayTotals.getOrDefault("moboil_change", 0d)
+                        + todayTotals.getOrDefault("vehicle_maintenance", 0d)
                         + todayTotals.getOrDefault("mechanic", 0d)
                         + todayTotals.getOrDefault("medical", 0d)
                         + todayTotals.getOrDefault("food", 0d)
@@ -321,6 +337,10 @@ public class DailyExpensesActivity extends AppCompatActivity {
         Map<String, String> fields = new LinkedHashMap<>();
         fields.put("category", category);
         fields.put("amount", amount);
+        saveDailyExpense(fields);
+    }
+
+    private void saveDailyExpense(Map<String, String> fields) {
 
         setLoading(true);
 
@@ -391,6 +411,8 @@ public class DailyExpensesActivity extends AppCompatActivity {
                 return getString(R.string.mobile_cost);
             case "moboil_change":
                 return getString(R.string.moboil_change_cost);
+            case "vehicle_maintenance":
+                return getString(R.string.vehicle_maintenance_cost);
             case "mechanic":
                 return getString(R.string.mechanic_cost);
             case "medical":
@@ -412,6 +434,8 @@ public class DailyExpensesActivity extends AppCompatActivity {
                 return R.drawable.ic_cargo_mobile;
             case "moboil_change":
                 return R.drawable.ic_cargo_moboil;
+            case "vehicle_maintenance":
+                return R.drawable.ic_cargo_mechanic;
             case "mechanic":
                 return R.drawable.ic_cargo_mechanic;
             case "medical":
@@ -466,5 +490,45 @@ public class DailyExpensesActivity extends AppCompatActivity {
 
     private String getInput(com.google.android.material.textfield.TextInputEditText input) {
         return input.getText() != null ? input.getText().toString().trim() : "";
+    }
+
+    private void showMoboilDialog() {
+        View view = LayoutInflater.from(this).inflate(R.layout.dialog_moboil_entry, null, false);
+        TextInputEditText amountInput = view.findViewById(R.id.dialogAmountInput);
+        TextInputEditText meterInput = view.findViewById(R.id.dialogMeterInput);
+
+        Dialog dialog = new MaterialAlertDialogBuilder(this)
+                .setTitle(R.string.moboil_change_cost)
+                .setView(view)
+                .setNegativeButton(R.string.close, null)
+                .setPositiveButton(R.string.save_moboil_expense, null)
+                .create();
+
+        dialog.setOnShowListener(ignored -> {
+            android.widget.Button positiveButton = dialog.findViewById(android.R.id.button1);
+            if (positiveButton != null) {
+                positiveButton.setOnClickListener(v -> {
+                    String amount = getInput(amountInput);
+                    String meterReading = getInput(meterInput);
+                    if (TextUtils.isEmpty(amount)) {
+                        amountInput.setError(getString(R.string.enter_expense_amount));
+                        return;
+                    }
+                    if (TextUtils.isEmpty(meterReading)) {
+                        meterInput.setError(getString(R.string.moboil_meter_required));
+                        return;
+                    }
+
+                    Map<String, String> fields = new LinkedHashMap<>();
+                    fields.put("category", "moboil_change");
+                    fields.put("amount", amount);
+                    fields.put("meter_reading", meterReading);
+                    saveDailyExpense(fields);
+                    dialog.dismiss();
+                });
+            }
+        });
+
+        dialog.show();
     }
 }
