@@ -24,10 +24,7 @@ router.post(
     '/trips/start',
     authMiddleware,
     driverOnly,
-    upload.fields([
-        { name: 'meter_image', maxCount: 1 },
-        { name: 'bilty_slip_image', maxCount: 1 }
-    ]),
+    upload.any(),
     startTrip
 );
 router.post(

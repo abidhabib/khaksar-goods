@@ -72,12 +72,14 @@ public class ApiClient {
             Map<String, String> fields,
             Uri meterImageUri,
             Uri biltySlipImageUri,
+            Uri loadPhotoUri,
             ContentResolver contentResolver,
             Callback callback
     ) {
         Map<String, Uri> fileUris = new LinkedHashMap<>();
         fileUris.put("meter_image", meterImageUri);
         fileUris.put("bilty_slip_image", biltySlipImageUri);
+        fileUris.put("load_photo", loadPhotoUri);
         RequestBody requestBody = buildFormRequestBody(fields, fileUris, contentResolver);
 
         Request request = new Request.Builder()

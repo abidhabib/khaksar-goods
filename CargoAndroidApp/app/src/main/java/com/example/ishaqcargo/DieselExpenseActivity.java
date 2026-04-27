@@ -117,15 +117,23 @@ public class DieselExpenseActivity extends AppCompatActivity {
             return;
         }
 
+        String liters = getInput(binding.litersInput);
+        if (TextUtils.isEmpty(liters)) {
+            binding.litersInput.setError(getString(R.string.diesel_liters_required));
+            return;
+        }
+
+        if (meterPhotoUri == null) {
+            Toast.makeText(this, R.string.diesel_meter_photo_required, Toast.LENGTH_SHORT).show();
+            return;
+        }
+
         Map<String, String> fields = new LinkedHashMap<>();
         fields.put("category", "diesel");
         fields.put("amount", amount);
 
-        String liters = getInput(binding.litersInput);
         String location = getInput(binding.locationInput);
-        if (!TextUtils.isEmpty(liters)) {
-            fields.put("liters", liters);
-        }
+        fields.put("liters", liters);
         if (!TextUtils.isEmpty(location)) {
             fields.put("location", location);
         }

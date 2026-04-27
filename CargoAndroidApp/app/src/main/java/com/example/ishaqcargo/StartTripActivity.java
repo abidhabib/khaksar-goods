@@ -2,7 +2,6 @@ package com.example.ishaqcargo;
 
 import android.Manifest;
 import android.content.Intent;
-import android.content.SharedPreferences;
 import android.content.pm.PackageManager;
 import android.location.Address;
 import android.location.Geocoder;
@@ -56,15 +55,16 @@ import okhttp3.Response;
 public class StartTripActivity extends AppCompatActivity {
 
     private static final String TAG = "StartTripActivity";
-    private static final String PREF_NAME = "start_trip_draft";
     public static final String EXTRA_INITIAL_METER = "initial_meter";
 
     private ActivityStartTripBinding binding;
     private SessionManager sessionManager;
     private Uri meterImageUri;
     private Uri biltySlipImageUri;
+    private Uri loadPhotoUri;
     private Uri pendingMeterCameraUri;
     private Uri pendingBiltyCameraUri;
+    private Uri pendingLoadCameraUri;
     private String baseUrl;
     private String fetchedStartLocation;
     private Runnable startLocationTimeoutRunnable;
@@ -78,7 +78,6 @@ public class StartTripActivity extends AppCompatActivity {
                 if (success && pendingMeterCameraUri != null) {
                     meterImageUri = pendingMeterCameraUri;
                     bindMeterImagePreview();
-                    saveDraft();
                 } else {
                     pendingMeterCameraUri = null;
                 }
@@ -91,9 +90,20 @@ public class StartTripActivity extends AppCompatActivity {
                 if (success && pendingBiltyCameraUri != null) {
                     biltySlipImageUri = pendingBiltyCameraUri;
                     bindBiltyImagePreview();
-                    saveDraft();
                 } else {
                     pendingBiltyCameraUri = null;
+                }
+            }
+    );
+
+    private final ActivityResultLauncher<Uri> takeLoadPhotoLauncher = registerForActivityResult(
+            new ActivityResultContracts.TakePicture(),
+            success -> {
+                if (success && pendingLoadCameraUri != null) {
+                    loadPhotoUri = pendingLoadCameraUri;
+                    bindLoadImagePreview();
+                } else {
+                    pendingLoadCameraUri = null;
                 }
             }
     );
@@ -124,24 +134,19 @@ public class StartTripActivity extends AppCompatActivity {
 
         applyWindowInsets();
         setupAmountWidgets();
-        prefillStartMeterReading();
-        restoreDraft();
+        clearDraftState();
 
         binding.backButton.setOnClickListener(v -> finish());
         binding.startMeterImagePreview.setOnClickListener(v -> openCameraForMeterPhoto());
         binding.startUploadHint.setOnClickListener(v -> openCameraForMeterPhoto());
         binding.biltyImagePreview.setOnClickListener(v -> openCameraForBiltyPhoto());
         binding.biltyUploadHint.setOnClickListener(v -> openCameraForBiltyPhoto());
+        binding.loadPhotoPreview.setOnClickListener(v -> openCameraForLoadPhoto());
+        binding.loadUploadHint.setOnClickListener(v -> openCameraForLoadPhoto());
         binding.fetchStartLocationButton.setOnClickListener(v -> ensureLocationPermissionAndFetch());
         binding.submitTripButton.setOnClickListener(v -> submitTrip());
         ((View) binding.startToInput.getParent().getParent()).setVisibility(View.GONE);
         binding.amountEditorCard.setVisibility(View.GONE);
-    }
-
-    @Override
-    protected void onPause() {
-        super.onPause();
-        saveDraft();
     }
 
     private void applyWindowInsets() {
@@ -189,19 +194,9 @@ public class StartTripActivity extends AppCompatActivity {
                             biltyCommissionAmount = amount;
                         }
                         updateAmountCards();
-                        saveDraft();
                     }
             );
         });
-    }
-
-    private void prefillStartMeterReading() {
-        double initialMeter = getIntent().getDoubleExtra(EXTRA_INITIAL_METER, 0);
-        if (initialMeter > 0 && TextUtils.isEmpty(getInput(binding.startMeterInput))) {
-            String meterText = String.format(Locale.US, "%.0f", initialMeter);
-            binding.startMeterInput.setText(meterText);
-            binding.startMeterInput.setSelection(meterText.length());
-        }
     }
 
     private void ensureLocationPermissionAndFetch() {
@@ -322,7 +317,6 @@ public class StartTripActivity extends AppCompatActivity {
         fetchedStartLocation = resolvedLocation;
         binding.startFromInput.setText(resolvedLocation);
         binding.startFromInput.setSelection(resolvedLocation.length());
-        saveDraft();
         Toast.makeText(this, R.string.location_fetched_success, Toast.LENGTH_SHORT).show();
     }
 
@@ -339,9 +333,12 @@ public class StartTripActivity extends AppCompatActivity {
             List<Address> addresses = geocoder.getFromLocation(location.getLatitude(), location.getLongitude(), 1);
             if (addresses != null && !addresses.isEmpty()) {
                 Address address = addresses.get(0);
-                String locality = firstNonEmpty(address.getSubLocality(), address.getLocality(), address.getSubAdminArea());
-                String region = firstNonEmpty(address.getAdminArea(), address.getCountryName());
-                String label = locality != null && region != null ? locality + ", " + region : firstNonEmpty(locality, region);
+                String label = joinLocationParts(
+                        address.getSubLocality(),
+                        address.getLocality(),
+                        address.getAdminArea(),
+                        address.getCountryName()
+                );
                 if (!TextUtils.isEmpty(label)) {
                     return label;
                 }
@@ -359,6 +356,31 @@ public class StartTripActivity extends AppCompatActivity {
             }
         }
         return null;
+    }
+
+    private String joinLocationParts(String... values) {
+        StringBuilder builder = new StringBuilder();
+        for (String value : values) {
+            if (TextUtils.isEmpty(value)) {
+                continue;
+            }
+
+            String trimmed = value.trim();
+            if (trimmed.isEmpty()) {
+                continue;
+            }
+
+            String current = builder.toString();
+            if (current.contains(trimmed)) {
+                continue;
+            }
+
+            if (builder.length() > 0) {
+                builder.append(", ");
+            }
+            builder.append(trimmed);
+        }
+        return builder.toString();
     }
 
     private void updateAmountCards() {
@@ -379,6 +401,15 @@ public class StartTripActivity extends AppCompatActivity {
         try {
             pendingBiltyCameraUri = createTempImageUri("bilty_slip_");
             takeBiltyPhotoLauncher.launch(pendingBiltyCameraUri);
+        } catch (Exception exception) {
+            Toast.makeText(this, R.string.unable_to_open_camera, Toast.LENGTH_SHORT).show();
+        }
+    }
+
+    private void openCameraForLoadPhoto() {
+        try {
+            pendingLoadCameraUri = createTempImageUri("load_photo_");
+            takeLoadPhotoLauncher.launch(pendingLoadCameraUri);
         } catch (Exception exception) {
             Toast.makeText(this, R.string.unable_to_open_camera, Toast.LENGTH_SHORT).show();
         }
@@ -412,17 +443,32 @@ public class StartTripActivity extends AppCompatActivity {
         binding.biltyUploadHint.setText(R.string.bilty_change_photo);
     }
 
+    private void bindLoadImagePreview() {
+        if (loadPhotoUri == null) {
+            return;
+        }
+        binding.loadPhotoPreview.setImageURI(loadPhotoUri);
+        binding.loadPhotoPreview.setVisibility(View.VISIBLE);
+        binding.loadUploadHint.setText(R.string.load_change_photo);
+    }
+
     private void submitTrip() {
         String from = getInput(binding.startFromInput);
         String meter = getInput(binding.startMeterInput);
+        String loadName = getInput(binding.loadNameInput);
+        String loadWeight = getInput(binding.loadWeightInput);
         String token = sessionManager.getToken();
 
-        if (TextUtils.isEmpty(from) || TextUtils.isEmpty(meter) || TextUtils.isEmpty(freightAmount)) {
+        if (TextUtils.isEmpty(from)
+                || TextUtils.isEmpty(meter)
+                || TextUtils.isEmpty(freightAmount)
+                || TextUtils.isEmpty(loadName)
+                || TextUtils.isEmpty(loadWeight)) {
             Toast.makeText(this, R.string.fill_required_trip_fields, Toast.LENGTH_SHORT).show();
             return;
         }
 
-        if (meterImageUri == null || biltySlipImageUri == null) {
+        if (meterImageUri == null || biltySlipImageUri == null || loadPhotoUri == null) {
             Toast.makeText(this, R.string.trip_required_images, Toast.LENGTH_SHORT).show();
             return;
         }
@@ -431,12 +477,14 @@ public class StartTripActivity extends AppCompatActivity {
         fields.put("from_location", from);
         fields.put("freight_charge", freightAmount);
         fields.put("meter_reading", meter);
+        fields.put("load_name", loadName);
+        fields.put("load_weight", loadWeight);
         fields.put("bilty_commission_amount", TextUtils.isEmpty(biltyCommissionAmount) ? "0" : biltyCommissionAmount);
         fields.put("start_live_location", TextUtils.isEmpty(fetchedStartLocation) ? from : fetchedStartLocation);
 
         setSubmitting(true);
 
-        ApiClient.startTrip(baseUrl, token, fields, meterImageUri, biltySlipImageUri, getContentResolver(), new Callback() {
+        ApiClient.startTrip(baseUrl, token, fields, meterImageUri, biltySlipImageUri, loadPhotoUri, getContentResolver(), new Callback() {
             @Override
             public void onFailure(Call call, IOException e) {
                 Log.e(TAG, "Start trip request failed", e);
@@ -481,7 +529,7 @@ public class StartTripActivity extends AppCompatActivity {
     }
 
     private void showSuccess(String routeText, String tripId, String startMeterValue, String destination) {
-        clearDraft();
+        clearDraftState();
         setSubmitting(false);
         binding.successRouteText.setText(routeText);
         binding.successState.setVisibility(View.VISIBLE);
@@ -510,54 +558,17 @@ public class StartTripActivity extends AppCompatActivity {
         binding.fetchStartLocationButton.setEnabled(!submitting);
     }
 
-    private void saveDraft() {
-        SharedPreferences preferences = getSharedPreferences(PREF_NAME, MODE_PRIVATE);
-        preferences.edit()
-                .putString("from_location", getInput(binding.startFromInput))
-                .putString("start_meter", getInput(binding.startMeterInput))
-                .putString("freight_amount", freightAmount)
-                .putString("bilty_commission_amount", biltyCommissionAmount)
-                .putString("start_live_location", fetchedStartLocation)
-                .putString("meter_image_uri", meterImageUri != null ? meterImageUri.toString() : null)
-                .putString("bilty_image_uri", biltySlipImageUri != null ? biltySlipImageUri.toString() : null)
-                .apply();
-    }
-
-    private void restoreDraft() {
-        SharedPreferences preferences = getSharedPreferences(PREF_NAME, MODE_PRIVATE);
-
-        String from = preferences.getString("from_location", "");
-        String startMeter = preferences.getString("start_meter", "");
-        freightAmount = preferences.getString("freight_amount", freightAmount);
-        biltyCommissionAmount = preferences.getString("bilty_commission_amount", biltyCommissionAmount);
-        fetchedStartLocation = preferences.getString("start_live_location", null);
-        String meterImage = preferences.getString("meter_image_uri", null);
-        String biltyImage = preferences.getString("bilty_image_uri", null);
-
-        if (!TextUtils.isEmpty(from)) {
-            binding.startFromInput.setText(from);
-        }
-        if (!TextUtils.isEmpty(startMeter)) {
-            binding.startMeterInput.setText(startMeter);
-        }
-        if (!TextUtils.isEmpty(meterImage)) {
-            meterImageUri = Uri.parse(meterImage);
-            bindMeterImagePreview();
-        }
-        if (!TextUtils.isEmpty(biltyImage)) {
-            biltySlipImageUri = Uri.parse(biltyImage);
-            bindBiltyImagePreview();
-        }
-
+    private void clearDraftState() {
+        freightAmount = "";
+        biltyCommissionAmount = "";
+        fetchedStartLocation = null;
+        meterImageUri = null;
+        biltySlipImageUri = null;
+        loadPhotoUri = null;
+        pendingMeterCameraUri = null;
+        pendingBiltyCameraUri = null;
+        pendingLoadCameraUri = null;
         updateAmountCards();
-
-    }
-
-    private void clearDraft() {
-        getSharedPreferences(PREF_NAME, MODE_PRIVATE)
-                .edit()
-                .clear()
-                .apply();
     }
 
     private void styleWidgetCard(MaterialCardView card, int colorRes, int iconRes) {

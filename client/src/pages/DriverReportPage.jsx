@@ -40,6 +40,11 @@ const formatDate = (value, pattern = 'PPP p') => {
   return format(date, pattern);
 };
 
+const formatCategoryLabel = (value) =>
+  String(value || '')
+    .replace(/_/g, ' ')
+    .replace(/\b\w/g, (char) => char.toUpperCase());
+
 /* ─── Image Modal ─── */
 const ImageModal = ({ src, alt, isOpen, onClose }) => {
   useEffect(() => {
@@ -151,9 +156,14 @@ const ExpenseBreakdown = ({ trip }) => {
               <div className="flex items-center justify-between gap-3">
                 <div className="flex items-center gap-2">
                   <div className="w-2 h-2 rounded-full bg-cargo-accent/60" />
-                  <p className="text-sm text-cargo-text capitalize font-medium">{expense.category}</p>
+                  <p className="text-sm text-cargo-text font-medium">{formatCategoryLabel(expense.category)}</p>
                 </div>
                 <p className="text-sm text-cargo-text font-semibold">{formatCurrency(expense.amount)}</p>
+              </div>
+              <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs text-cargo-muted">
+                <span>{formatDate(expense.created_at)}</span>
+                {expense.liters ? <span>Liters: {Number(expense.liters).toLocaleString()}</span> : null}
+                {expense.location ? <span>Location: {expense.location}</span> : null}
               </div>
               {expense.receipt_image ? (
                 <div className="mt-3">
@@ -193,6 +203,7 @@ const TripCard = ({ trip, status = 'completed' }) => {
   const totalExpenses = Number(trip.total_expenses ?? trip.current_expenses ?? 0);
   const net = Number(trip.net_profit ?? (Number(trip.freight_charge || 0) - totalExpenses));
   const actualEndLocation = trip.end_location || trip.end_live_location;
+  const loadSummary = [trip.load_name, trip.load_weight].filter(Boolean).join(' • ');
 
   return (
     <article className="rounded-xl border border-cargo-border bg-cargo-card/50 p-5 space-y-5 hover:border-cargo-border/80 transition-all duration-200 shadow-sm">
@@ -272,11 +283,25 @@ const TripCard = ({ trip, status = 'completed' }) => {
         </div>
       </div>
 
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+        <div className="rounded-lg border border-cargo-border bg-cargo-dark/20 p-3">
+          <p className="text-[11px] text-cargo-muted uppercase tracking-wider font-medium">Load Details</p>
+          <p className="text-sm text-cargo-text font-semibold mt-1.5">{loadSummary || 'N/A'}</p>
+        </div>
+        <div className="rounded-lg border border-cargo-border bg-cargo-dark/20 p-3">
+          <p className="text-[11px] text-cargo-muted uppercase tracking-wider font-medium">Load Photo</p>
+          <div className="mt-2">
+            <ClickableImage src={trip.load_photo} alt="Load photo" className="h-28" />
+          </div>
+        </div>
+      </div>
+
       {/* Images */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
         <MeterImageCard label="Start Meter Photo" src={trip.start_meter_image} alt="Start meter" />
         <MeterImageCard label="End Meter Photo" src={trip.end_meter_image} alt="End meter" />
         <MeterImageCard label="Bilty Slip" src={trip.bilty_slip_image} alt="Bilty slip" />
+        <MeterImageCard label="Load Photo" src={trip.load_photo} alt="Load photo" />
       </div>
 
       {/* Cost Breakdown */}

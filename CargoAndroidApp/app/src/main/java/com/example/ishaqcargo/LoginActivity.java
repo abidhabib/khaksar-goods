@@ -29,6 +29,7 @@ public class LoginActivity extends AppCompatActivity {
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+        ensureDefaultUrduLocale();
         binding = ActivityLoginBinding.inflate(getLayoutInflater());
         setContentView(binding.getRoot());
 
@@ -36,6 +37,13 @@ public class LoginActivity extends AppCompatActivity {
 
         setupLanguageSwitcher();
         binding.loginButton.setOnClickListener(v -> attemptLogin());
+    }
+
+    private void ensureDefaultUrduLocale() {
+        String currentLanguage = AppCompatDelegate.getApplicationLocales().toLanguageTags();
+        if (currentLanguage == null || currentLanguage.trim().isEmpty()) {
+            AppCompatDelegate.setApplicationLocales(LocaleListCompat.forLanguageTags("ur"));
+        }
     }
 
     private void setupLanguageSwitcher() {

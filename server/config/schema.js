@@ -20,6 +20,18 @@ const TRIP_COLUMNS = [
     {
         name: 'bilty_commission_amount',
         definition: 'DECIMAL(10,2) NOT NULL DEFAULT 0.00 AFTER bilty_slip_image'
+    },
+    {
+        name: 'load_name',
+        definition: 'VARCHAR(255) NULL AFTER bilty_commission_amount'
+    },
+    {
+        name: 'load_weight',
+        definition: 'VARCHAR(255) NULL AFTER load_name'
+    },
+    {
+        name: 'load_photo',
+        definition: 'VARCHAR(500) NULL AFTER load_weight'
     }
 ];
 

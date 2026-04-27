@@ -76,8 +76,12 @@ Chalaan %5$s • Reward %6$s • Bilty %7$s • Tyre %8$s</string>
     <string name="meter_photo_optional">Meter photo (optional)</string>
     <string name="meter_photo_required">Meter photo (required)</string>
     <string name="bilty_photo_required">Bilty slip photo (required)</string>
+    <string name="load_name">Load name</string>
+    <string name="load_weight">Load weight</string>
+    <string name="load_photo_required">Load photo (required)</string>
     <string name="bilty_add_photo">Tap to open camera for bilty slip photo</string>
     <string name="bilty_change_photo">Tap to change bilty slip photo</string>
+    <string name="load_change_photo">Tap to change load photo</string>
     <string name="bilty_commission_amount">Commission amount</string>
     <string name="manual_or_fetch_location">You can type manually or tap the location icon to auto-fill.</string>
     <string name="fetch_current_location">Fetch current location</string>
@@ -86,7 +90,7 @@ Chalaan %5$s • Reward %6$s • Bilty %7$s • Tyre %8$s</string>
     <string name="enable_location_services">Enable phone location services first</string>
     <string name="location_fetched_success">Current location fetched successfully</string>
     <string name="fill_required_trip_fields">Please fill all required trip fields</string>
-    <string name="trip_required_images">Start meter photo and bilty slip photo are required</string>
+    <string name="trip_required_images">Start meter photo, bilty slip photo, and load photo are required</string>
     <string name="start_trip_screen_subtitle">Fill the trip details below and submit when you are ready to move.</string>
     <string name="start_trip_add_photo">Tap to open camera for start meter photo</string>
     <string name="start_trip_change_photo">Tap to change selected photo</string>
@@ -137,8 +141,11 @@ Food %6$s • Guard %7$s • Other %8$s</string>
     <string name="trip_expense_history">Trip expense history</string>
     <string name="no_trip_expenses_yet">No expenses added yet.</string>
     <string name="diesel_liters_optional">Liters (optional)</string>
+    <string name="diesel_liters_required_label">Liters (required)</string>
+    <string name="diesel_liters_required">Liters are required</string>
     <string name="diesel_location_optional">Location (optional)</string>
     <string name="diesel_meter_photo_optional">Meter photo (optional)</string>
+    <string name="diesel_meter_photo_required">Meter photo (required)</string>
     <string name="save_diesel_expense">Save diesel expense</string>
     <string name="open_camera_for_diesel_meter">Tap to open camera for diesel meter photo</string>
     <string name="change_diesel_meter_photo">Tap to change diesel meter photo</string>
@@ -147,6 +154,7 @@ Food %6$s • Guard %7$s • Other %8$s</string>
     <string name="open_camera_for_end_meter">Tap to open camera for end meter photo</string>
     <string name="open_camera_for_start_meter">Tap to open camera for start meter photo</string>
     <string name="open_camera_for_bilty">Tap to open camera for bilty slip photo</string>
+    <string name="open_camera_for_load">Tap to open camera for load photo</string>
     <string name="unable_to_open_camera">Unable to open camera</string>
     <string name="unable_to_end_trip">Unable to complete trip</string>
     <string name="unable_to_load_trip_expenses">Unable to load trip expenses</string>

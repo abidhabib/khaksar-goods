@@ -104,7 +104,7 @@
                             android:layout_width="match_parent"
                             android:layout_height="wrap_content"
                             android:layout_marginTop="14dp"
-                            android:hint="@string/diesel_liters_optional"
+                            android:hint="@string/diesel_liters_required_label"
                             app:boxCornerRadiusBottomEnd="18dp"
                             app:boxCornerRadiusBottomStart="18dp"
                             app:boxCornerRadiusTopEnd="18dp"
@@ -138,7 +138,7 @@
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
                             android:layout_marginTop="16dp"
-                            android:text="@string/diesel_meter_photo_optional"
+                            android:text="@string/diesel_meter_photo_required"
                             android:textColor="@color/section_label"
                             android:textSize="14sp" />
 

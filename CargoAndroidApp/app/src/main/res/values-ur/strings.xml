@@ -77,8 +77,12 @@
     <string name="meter_photo_optional">میٹر کی تصویر (اختیاری)</string>
     <string name="meter_photo_required">میٹر کی تصویر (لازمی)</string>
     <string name="bilty_photo_required">بلٹی سلپ کی تصویر (لازمی)</string>
+    <string name="load_name">لوڈ کا نام</string>
+    <string name="load_weight">لوڈ کا وزن</string>
+    <string name="load_photo_required">لوڈ کی تصویر (لازمی)</string>
     <string name="bilty_add_photo">بلٹی سلپ کی تصویر کے لیے کیمرا کھولنے کو دبائیں</string>
     <string name="bilty_change_photo">منتخب بلٹی سلپ کی تصویر بدلنے کے لیے دبائیں</string>
+    <string name="load_change_photo">لوڈ کی تصویر بدلنے کے لیے دبائیں</string>
     <string name="bilty_commission_amount">بلٹی کمیشن رقم</string>
     <string name="manual_or_fetch_location">آپ خود ٹائپ کر سکتے ہیں یا لوکیشن آئیکن دبا کر خودکار طور پر بھر سکتے ہیں۔</string>
     <string name="fetch_current_location">موجودہ لوکیشن حاصل کریں</string>
@@ -87,7 +91,7 @@
     <string name="enable_location_services">پہلے فون کی لوکیشن سروس آن کریں</string>
     <string name="location_fetched_success">موجودہ لوکیشن کامیابی سے لے لی گئی</string>
     <string name="fill_required_trip_fields">تمام لازمی ٹرپ فیلڈز بھریں</string>
-    <string name="trip_required_images">شروع کے میٹر اور بلٹی سلپ دونوں تصاویر لازمی ہیں</string>
+    <string name="trip_required_images">شروع کے میٹر، بلٹی سلپ، اور لوڈ کی تصویر لازمی ہیں</string>
     <string name="start_trip_screen_subtitle">نیچے ٹرپ کی تفصیل بھریں اور تیار ہونے پر جمع کریں۔</string>
     <string name="start_trip_add_photo">شروع کے میٹر کی تصویر کے لیے کیمرا کھولنے کو دبائیں</string>
     <string name="start_trip_change_photo">منتخب تصویر بدلنے کے لیے دبائیں</string>
@@ -136,8 +140,11 @@
     <string name="trip_expense_history">ٹرپ خرچہ ہسٹری</string>
     <string name="no_trip_expenses_yet">ابھی کوئی خرچہ شامل نہیں ہوا۔</string>
     <string name="diesel_liters_optional">لیٹر (اختیاری)</string>
+    <string name="diesel_liters_required_label">لیٹر (لازمی)</string>
+    <string name="diesel_liters_required">لیٹر درج کریں</string>
     <string name="diesel_location_optional">مقام (اختیاری)</string>
     <string name="diesel_meter_photo_optional">میٹر تصویر (اختیاری)</string>
+    <string name="diesel_meter_photo_required">میٹر تصویر (لازمی)</string>
     <string name="save_diesel_expense">ڈیزل خرچ محفوظ کریں</string>
     <string name="open_camera_for_diesel_meter">ڈیزل میٹر تصویر کے لیے کیمرا کھولیں</string>
     <string name="change_diesel_meter_photo">ڈیزل میٹر تصویر تبدیل کریں</string>
@@ -146,6 +153,7 @@
     <string name="open_camera_for_end_meter">اختتامی میٹر کی تصویر کے لیے کیمرا کھولنے کو دبائیں</string>
     <string name="open_camera_for_start_meter">شروع کے میٹر کی تصویر کے لیے کیمرا کھولنے کو دبائیں</string>
     <string name="open_camera_for_bilty">بلٹی سلپ کی تصویر کے لیے کیمرا کھولنے کو دبائیں</string>
+    <string name="open_camera_for_load">لوڈ کی تصویر کے لیے کیمرا کھولنے کو دبائیں</string>
     <string name="unable_to_open_camera">کیمرا نہیں کھل سکا</string>
     <string name="unable_to_end_trip">ٹرپ مکمل نہیں ہو سکا</string>
     <string name="unable_to_load_trip_expenses">ٹرپ خرچے لوڈ نہیں ہو سکے</string>

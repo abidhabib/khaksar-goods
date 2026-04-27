@@ -12,13 +12,16 @@ const uploadStorage = new CloudinaryStorage({
     params: async (req, file) => {
         const isBilty = file?.fieldname === 'bilty_slip_image';
         const isReceipt = file?.fieldname === 'receipt_image';
+        const isLoadPhoto = file?.fieldname === 'load_photo' || file?.fieldname === 'loadPhoto' || file?.fieldname === 'load_image';
 
         return {
             folder: isBilty
                 ? 'cargo-tracker/bilty-slips'
                 : isReceipt
                     ? 'cargo-tracker/receipts'
-                    : 'cargo-tracker/meter-readings',
+                    : isLoadPhoto
+                        ? 'cargo-tracker/load-photos'
+                        : 'cargo-tracker/meter-readings',
             allowed_formats: ['jpg', 'jpeg', 'png', 'webp'],
             transformation: [{ width: 1200, height: 1200, crop: 'limit' }]
         };

@@ -149,11 +149,6 @@ public class EndTripDetailsActivity extends AppCompatActivity {
 
         String startMeterText = tripStartMeter > 0 ? String.format(Locale.US, "%.0f", tripStartMeter) : "-";
         binding.tripStartMeterValue.setText(getString(R.string.started_meter_value, startMeterText));
-
-        if (tripStartMeter > 0 && TextUtils.isEmpty(getInput(binding.endMeterInput))) {
-            binding.endMeterInput.setText(startMeterText);
-            binding.endMeterInput.setSelection(startMeterText.length());
-        }
     }
 
     private void loadTripDetails() {
@@ -199,9 +194,6 @@ public class EndTripDetailsActivity extends AppCompatActivity {
             tripStartMeter = startMeter;
             String startMeterText = String.format(Locale.US, "%.0f", startMeter);
             binding.tripStartMeterValue.setText(getString(R.string.started_meter_value, startMeterText));
-            if (TextUtils.isEmpty(getInput(binding.endMeterInput))) {
-                binding.endMeterInput.setText(startMeterText);
-            }
         }
     }
 
@@ -352,9 +344,12 @@ public class EndTripDetailsActivity extends AppCompatActivity {
             List<Address> addresses = geocoder.getFromLocation(location.getLatitude(), location.getLongitude(), 1);
             if (addresses != null && !addresses.isEmpty()) {
                 Address address = addresses.get(0);
-                String locality = firstNonEmpty(address.getSubLocality(), address.getLocality(), address.getSubAdminArea());
-                String region = firstNonEmpty(address.getAdminArea(), address.getCountryName());
-                String label = locality != null && region != null ? locality + ", " + region : firstNonEmpty(locality, region);
+                String label = joinLocationParts(
+                        address.getSubLocality(),
+                        address.getLocality(),
+                        address.getAdminArea(),
+                        address.getCountryName()
+                );
                 if (!TextUtils.isEmpty(label)) {
                     return label;
                 }
@@ -372,6 +367,31 @@ public class EndTripDetailsActivity extends AppCompatActivity {
             }
         }
         return null;
+    }
+
+    private String joinLocationParts(String... values) {
+        StringBuilder builder = new StringBuilder();
+        for (String value : values) {
+            if (TextUtils.isEmpty(value)) {
+                continue;
+            }
+
+            String trimmed = value.trim();
+            if (trimmed.isEmpty()) {
+                continue;
+            }
+
+            String current = builder.toString();
+            if (current.contains(trimmed)) {
+                continue;
+            }
+
+            if (builder.length() > 0) {
+                builder.append(", ");
+            }
+            builder.append(trimmed);
+        }
+        return builder.toString();
     }
 
     private void submitTrip() {

@@ -65,6 +65,32 @@ const toOptionalDecimal = (value) => {
     return parsed;
 };
 
+const getUploadedFilePath = (req, ...fieldNames) => {
+    const normalizedFieldNames = fieldNames.filter(Boolean);
+
+    if (req?.files) {
+        if (Array.isArray(req.files)) {
+            const match = req.files.find((file) => normalizedFieldNames.includes(file?.fieldname));
+            if (match?.path) {
+                return match.path;
+            }
+        } else {
+            for (const fieldName of normalizedFieldNames) {
+                const match = req.files?.[fieldName]?.[0];
+                if (match?.path) {
+                    return match.path;
+                }
+            }
+        }
+    }
+
+    if (req?.file?.path && normalizedFieldNames.includes(req.file.fieldname)) {
+        return req.file.path;
+    }
+
+    return null;
+};
+
 const TRIP_EXPENSE_CATEGORIES = new Set([
     'diesel',
     'toll',
@@ -209,22 +235,30 @@ const startTrip = async (req, res) => {
             freight_charge,
             meter_reading,
             start_live_location,
-            bilty_commission_amount = 0
+            bilty_commission_amount = 0,
+            load_name,
+            load_weight
         } = req.body;
-        const meter_image = req.files?.meter_image?.[0]?.path || req.file?.path || null;
-        const bilty_slip_image = req.files?.bilty_slip_image?.[0]?.path || null;
+        const meter_image = getUploadedFilePath(req, 'meter_image', 'start_meter_image');
+        const bilty_slip_image = getUploadedFilePath(req, 'bilty_slip_image', 'bilty_image');
+        const load_photo = getUploadedFilePath(req, 'load_photo', 'loadPhoto', 'load_image');
         const meterReadingValue = toNumberOrDefault(meter_reading, NaN);
         const freightValue = toNumberOrDefault(freight_charge, NaN);
         const biltyCommissionValue = toExpenseNumber(bilty_commission_amount);
         const startLiveLocation = toNullableString(start_live_location);
         const resolvedToLocation = toNullableString(to_location) || 'Pending end location';
+        const loadName = toNullableString(load_name);
+        const loadWeight = toNullableString(load_weight);
 
         const missingFields = [];
         if (!from_location) missingFields.push('from_location');
         if (!Number.isFinite(meterReadingValue)) missingFields.push('meter_reading');
         if (!Number.isFinite(freightValue)) missingFields.push('freight_charge');
+        if (!loadName) missingFields.push('load_name');
+        if (!loadWeight) missingFields.push('load_weight');
         if (!meter_image) missingFields.push('meter_image');
         if (!bilty_slip_image) missingFields.push('bilty_slip_image');
+        if (!load_photo) missingFields.push('load_photo');
 
         if (missingFields.length) {
             return res.status(400).json({
@@ -270,8 +304,8 @@ const startTrip = async (req, res) => {
         const [tripResult] = await connection.execute(
             `INSERT INTO trips 
              (driver_id, car_id, start_meter_reading, from_location, start_live_location, to_location,
-              freight_charge, start_meter_image, bilty_slip_image, bilty_commission_amount, status) 
-             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'ongoing')`,
+              freight_charge, start_meter_image, bilty_slip_image, bilty_commission_amount, load_name, load_weight, load_photo, status) 
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'ongoing')`,
             [
                 driver_id,
                 car_id,
@@ -282,7 +316,10 @@ const startTrip = async (req, res) => {
                 freightValue,
                 meter_image,
                 bilty_slip_image,
-                biltyCommissionValue
+                biltyCommissionValue,
+                loadName,
+                loadWeight,
+                load_photo
             ]
         );
 
@@ -309,6 +346,9 @@ const startTrip = async (req, res) => {
                 start_meter_image: meter_image,
                 bilty_slip_image,
                 bilty_commission_amount: biltyCommissionValue,
+                load_name: loadName,
+                load_weight: loadWeight,
+                load_photo,
                 status: 'ongoing'
             }
         });
@@ -457,7 +497,7 @@ const addTripExpense = async (req, res) => {
 
         const { trip_id } = req.params;
         const { category, amount, liters, location } = req.body;
-        const receiptImage = req.files?.receipt_image?.[0]?.path || null;
+        const receiptImage = getUploadedFilePath(req, 'receipt_image');
         const normalizedCategory = toNullableString(category);
         const amountValue = toExpenseNumber(amount);
         const litersValue = toOptionalDecimal(liters);
@@ -469,6 +509,16 @@ const addTripExpense = async (req, res) => {
 
         if (!(amountValue > 0)) {
             return res.status(400).json({ message: 'Expense amount must be greater than zero' });
+        }
+
+        if (normalizedCategory === 'diesel') {
+            if (litersValue === null) {
+                return res.status(400).json({ message: 'Liters are required for diesel expense' });
+            }
+
+            if (!receiptImage) {
+                return res.status(400).json({ message: 'Meter photo is required for diesel expense' });
+            }
         }
 
         const [trip] = await pool.execute(
