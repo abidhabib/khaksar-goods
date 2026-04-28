@@ -129,7 +129,7 @@ public class DailyExpensesActivity extends AppCompatActivity {
             AmountEntryDialogHelper.show(
                     this,
                     getDialogIconRes(category),
-                    getString(R.string.add_expense_for, getString(titleRes)),
+                    getString(titleRes),
                     "",
                     amount -> {
                         saveDailyExpense(category, amount);
@@ -321,16 +321,7 @@ public class DailyExpensesActivity extends AppCompatActivity {
             todayTotals.put("cargo_security_guard", todayExpense.optDouble("cargo_security_guard_fee", 0));
         }
 
-        binding.totalExpenseValue.setText(formatCurrency(
-                todayTotals.getOrDefault("cargo_service", 0d)
-                        + todayTotals.getOrDefault("mobile", 0d)
-                        + todayTotals.getOrDefault("moboil_change", 0d)
-                        + todayTotals.getOrDefault("vehicle_maintenance", 0d)
-                        + todayTotals.getOrDefault("mechanic", 0d)
-                        + todayTotals.getOrDefault("medical", 0d)
-                        + todayTotals.getOrDefault("food", 0d)
-                        + todayTotals.getOrDefault("cargo_security_guard", 0d)
-        ));
+        
     }
 
     private void saveDailyExpense(String category, String amount) {

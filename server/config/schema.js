@@ -40,6 +40,14 @@ const TRIP_COLUMNS = [
     {
         name: 'load_photo',
         definition: 'VARCHAR(500) NULL AFTER load_weight'
+    },
+    {
+        name: 'load_live_location',
+        definition: 'VARCHAR(255) NULL AFTER load_photo'
+    },
+    {
+        name: 'load_coordinates',
+        definition: 'VARCHAR(64) NULL AFTER load_live_location'
     }
 ];
 

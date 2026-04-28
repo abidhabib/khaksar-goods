@@ -19,42 +19,7 @@
             android:paddingLeft="16dp"
             android:paddingTop="16dp"
             android:paddingRight="16dp"
-            android:paddingBottom="8dp">
-
-            <ImageView
-                android:id="@+id/backButton"
-                android:layout_width="42dp"
-                android:layout_height="42dp"
-                android:background="@drawable/bg_icon_button"
-                android:contentDescription="@string/back"
-                android:padding="10dp"
-                android:src="@android:drawable/ic_media_previous"
-                app:tint="@color/section_title" />
-
-            <LinearLayout
-                android:layout_width="0dp"
-                android:layout_height="wrap_content"
-                android:layout_marginStart="14dp"
-                android:layout_weight="1"
-                android:orientation="vertical">
-
-                <TextView
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="@string/end_trip"
-                    android:textColor="@color/section_title"
-                    android:textSize="24sp"
-                    android:textStyle="bold" />
-
-                <TextView
-                    android:id="@+id/routeSummary"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:layout_marginTop="4dp"
-                    android:textColor="@color/section_hint"
-                    android:textSize="14sp" />
-            </LinearLayout>
-        </LinearLayout>
+            android:paddingBottom="8dp"/>
 
         <ScrollView
             android:id="@+id/formScroll"
@@ -90,13 +55,7 @@
                             android:textSize="18sp"
                             android:textStyle="bold" />
 
-                        <TextView
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:layout_marginTop="6dp"
-                            android:text="@string/end_trip_expenses_subtitle"
-                            android:textColor="@color/section_hint"
-                            android:textSize="13sp" />
+
 
                         <com.google.android.material.card.MaterialCardView
                             android:id="@+id/dieselExpenseCard"
@@ -135,14 +94,6 @@
                                         android:textSize="14sp"
                                         android:textStyle="bold" />
 
-                                    <TextView
-                                        android:id="@+id/dieselExpenseValue"
-                                        android:layout_width="wrap_content"
-                                        android:layout_height="wrap_content"
-                                        android:layout_marginTop="4dp"
-                                        android:text="0"
-                                        android:textColor="@color/section_body"
-                                        android:textSize="12sp" />
                                 </LinearLayout>
                             </LinearLayout>
                         </com.google.android.material.card.MaterialCardView>
@@ -184,14 +135,6 @@
                                         android:textSize="14sp"
                                         android:textStyle="bold" />
 
-                                    <TextView
-                                        android:id="@+id/tollExpenseValue"
-                                        android:layout_width="wrap_content"
-                                        android:layout_height="wrap_content"
-                                        android:layout_marginTop="4dp"
-                                        android:text="0"
-                                        android:textColor="@color/section_body"
-                                        android:textSize="12sp" />
                                 </LinearLayout>
                             </LinearLayout>
                         </com.google.android.material.card.MaterialCardView>
@@ -233,14 +176,6 @@
                                         android:textSize="14sp"
                                         android:textStyle="bold" />
 
-                                    <TextView
-                                        android:id="@+id/foodExpenseValue"
-                                        android:layout_width="wrap_content"
-                                        android:layout_height="wrap_content"
-                                        android:layout_marginTop="4dp"
-                                        android:text="0"
-                                        android:textColor="@color/section_body"
-                                        android:textSize="12sp" />
                                 </LinearLayout>
                             </LinearLayout>
                         </com.google.android.material.card.MaterialCardView>
@@ -282,14 +217,6 @@
                                         android:textSize="14sp"
                                         android:textStyle="bold" />
 
-                                    <TextView
-                                        android:id="@+id/policeExpenseValue"
-                                        android:layout_width="wrap_content"
-                                        android:layout_height="wrap_content"
-                                        android:layout_marginTop="4dp"
-                                        android:text="0"
-                                        android:textColor="@color/section_body"
-                                        android:textSize="12sp" />
                                 </LinearLayout>
                             </LinearLayout>
                         </com.google.android.material.card.MaterialCardView>
@@ -331,14 +258,6 @@
                                         android:textSize="14sp"
                                         android:textStyle="bold" />
 
-                                    <TextView
-                                        android:id="@+id/chalaanExpenseValue"
-                                        android:layout_width="wrap_content"
-                                        android:layout_height="wrap_content"
-                                        android:layout_marginTop="4dp"
-                                        android:text="0"
-                                        android:textColor="@color/section_body"
-                                        android:textSize="12sp" />
                                 </LinearLayout>
                             </LinearLayout>
                         </com.google.android.material.card.MaterialCardView>
@@ -380,14 +299,6 @@
                                         android:textSize="14sp"
                                         android:textStyle="bold" />
 
-                                    <TextView
-                                        android:id="@+id/mandiKaatExpenseValue"
-                                        android:layout_width="wrap_content"
-                                        android:layout_height="wrap_content"
-                                        android:layout_marginTop="4dp"
-                                        android:text="0"
-                                        android:textColor="@color/section_body"
-                                        android:textSize="12sp" />
                                 </LinearLayout>
                             </LinearLayout>
                         </com.google.android.material.card.MaterialCardView>
@@ -429,14 +340,6 @@
                                         android:textSize="14sp"
                                         android:textStyle="bold" />
 
-                                    <TextView
-                                        android:id="@+id/rewardExpenseValue"
-                                        android:layout_width="wrap_content"
-                                        android:layout_height="wrap_content"
-                                        android:layout_marginTop="4dp"
-                                        android:text="0"
-                                        android:textColor="@color/section_body"
-                                        android:textSize="12sp" />
                                 </LinearLayout>
                             </LinearLayout>
                         </com.google.android.material.card.MaterialCardView>
@@ -478,14 +381,6 @@
                                         android:textSize="14sp"
                                         android:textStyle="bold" />
 
-                                    <TextView
-                                        android:id="@+id/tyrePunctureExpenseValue"
-                                        android:layout_width="wrap_content"
-                                        android:layout_height="wrap_content"
-                                        android:layout_marginTop="4dp"
-                                        android:text="0"
-                                        android:textColor="@color/section_body"
-                                        android:textSize="12sp" />
                                 </LinearLayout>
                             </LinearLayout>
                         </com.google.android.material.card.MaterialCardView>

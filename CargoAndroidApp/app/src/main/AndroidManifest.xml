@@ -69,6 +69,12 @@
             android:theme="@style/Theme.IshaqCargo" />
 
         <activity
+            android:name=".LoadDetailsActivity"
+            android:exported="false"
+            android:windowSoftInputMode="adjustResize"
+            android:theme="@style/Theme.IshaqCargo" />
+
+        <activity
             android:name=".TripHistoryActivity"
             android:exported="false"
             android:windowSoftInputMode="adjustResize"

@@ -310,30 +310,25 @@ const startTrip = async (req, res) => {
             start_live_location,
             start_coordinates,
             bilty_commission_amount = 0,
-            load_name,
             load_weight
         } = req.body;
         const meter_image = getUploadedFilePath(req, 'meter_image', 'start_meter_image');
         const bilty_slip_image = getUploadedFilePath(req, 'bilty_slip_image', 'bilty_image');
-        const load_photo = getUploadedFilePath(req, 'load_photo', 'loadPhoto', 'load_image');
         const meterReadingValue = toNumberOrDefault(meter_reading, NaN);
         const freightValue = toNumberOrDefault(freight_charge, NaN);
         const biltyCommissionValue = toExpenseNumber(bilty_commission_amount);
         const startLiveLocation = toNullableString(start_live_location);
         const startCoordinates = toNullableString(start_coordinates);
         const resolvedToLocation = toNullableString(to_location) || 'Pending end location';
-        const loadName = toNullableString(load_name);
         const loadWeight = toNullableString(load_weight);
 
         const missingFields = [];
         if (!from_location) missingFields.push('from_location');
         if (!Number.isFinite(meterReadingValue)) missingFields.push('meter_reading');
         if (!Number.isFinite(freightValue)) missingFields.push('freight_charge');
-        if (!loadName) missingFields.push('load_name');
         if (!loadWeight) missingFields.push('load_weight');
         if (!meter_image) missingFields.push('meter_image');
         if (!bilty_slip_image) missingFields.push('bilty_slip_image');
-        if (!load_photo) missingFields.push('load_photo');
 
         if (missingFields.length) {
             return res.status(400).json({
@@ -379,8 +374,9 @@ const startTrip = async (req, res) => {
         const [tripResult] = await connection.execute(
             `INSERT INTO trips 
              (driver_id, car_id, start_meter_reading, from_location, start_live_location, start_coordinates, to_location,
-              freight_charge, start_meter_image, bilty_slip_image, bilty_commission_amount, load_name, load_weight, load_photo, status) 
-             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'ongoing')`,
+              freight_charge, start_meter_image, bilty_slip_image, bilty_commission_amount, load_name, load_weight, load_photo,
+              load_live_location, load_coordinates, status) 
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'ongoing')`,
             [
                 driver_id,
                 car_id,
@@ -393,9 +389,11 @@ const startTrip = async (req, res) => {
                 meter_image,
                 bilty_slip_image,
                 biltyCommissionValue,
-                loadName,
+                null,
                 loadWeight,
-                load_photo
+                null,
+                null,
+                null
             ]
         );
 
@@ -423,15 +421,94 @@ const startTrip = async (req, res) => {
                 start_meter_image: meter_image,
                 bilty_slip_image,
                 bilty_commission_amount: biltyCommissionValue,
-                load_name: loadName,
+                load_name: null,
                 load_weight: loadWeight,
-                load_photo,
+                load_photo: null,
+                load_live_location: null,
+                load_coordinates: null,
                 status: 'ongoing'
             }
         });
     } catch (error) {
         await connection.rollback();
         console.error('Start trip error:', error);
+        res.status(500).json({ message: 'Server error', error: error.message });
+    } finally {
+        connection.release();
+    }
+};
+
+const saveTripLoadDetails = async (req, res) => {
+    const connection = await pool.getConnection();
+
+    try {
+        await connection.beginTransaction();
+
+        const driver_id = await resolveDriverId(req);
+        if (!driver_id) {
+            return res.status(403).json({ message: 'Driver account required' });
+        }
+
+        const { trip_id } = req.params;
+        const { load_live_location, load_coordinates } = req.body;
+        const loadPhoto = getUploadedFilePath(req, 'load_photo', 'loadPhoto', 'load_image');
+        const loadLiveLocation = toNullableString(load_live_location);
+        const loadCoordinates = toNullableString(load_coordinates);
+
+        const missingFields = [];
+        if (!loadPhoto) missingFields.push('load_photo');
+        if (!loadLiveLocation) missingFields.push('load_live_location');
+        if (!loadCoordinates) missingFields.push('load_coordinates');
+
+        if (missingFields.length) {
+            return res.status(400).json({
+                message: `Invalid load details payload: missing ${missingFields.join(', ')}`
+            });
+        }
+
+        const [tripRows] = await connection.execute(
+            `SELECT id, driver_id, status, load_weight
+             FROM trips
+             WHERE id = ? AND driver_id = ?
+             LIMIT 1`,
+            [trip_id, driver_id]
+        );
+
+        if (!tripRows.length) {
+            return res.status(404).json({ message: 'Trip not found' });
+        }
+
+        const trip = tripRows[0];
+        if (trip.status !== 'ongoing') {
+            return res.status(400).json({ message: 'Load details can only be updated for an ongoing trip' });
+        }
+
+        await connection.execute(
+            `UPDATE trips
+             SET load_photo = ?,
+                 load_live_location = ?,
+                 load_coordinates = ?
+             WHERE id = ? AND driver_id = ?`,
+            [loadPhoto, loadLiveLocation, loadCoordinates, trip_id, driver_id]
+        );
+
+        await connection.commit();
+
+        res.json({
+            success: true,
+            message: 'Load details saved successfully',
+            trip: {
+                id: Number(trip_id),
+                load_weight: trip.load_weight,
+                load_photo: loadPhoto,
+                load_live_location: loadLiveLocation,
+                load_coordinates: loadCoordinates,
+                status: trip.status
+            }
+        });
+    } catch (error) {
+        await connection.rollback();
+        console.error('Save trip load details error:', error);
         res.status(500).json({ message: 'Server error', error: error.message });
     } finally {
         connection.release();
@@ -1074,6 +1151,7 @@ const submitCompanyPayment = async (req, res) => {
 module.exports = {
     getDashboard,
     startTrip,
+    saveTripLoadDetails,
     endTrip,
     addTripExpense,
     getTripHistory,

@@ -455,16 +455,16 @@ public class EndTripDetailsActivity extends AppCompatActivity {
                     return;
                 }
 
-                runOnUiThread(EndTripDetailsActivity.this::showSuccess);
+                runOnUiThread(EndTripDetailsActivity.this::completeTripFlow);
             }
         });
     }
 
-    private void showSuccess() {
+    private void completeTripFlow() {
         clearDraft();
         setSubmitting(false);
-        binding.successState.setVisibility(View.VISIBLE);
-        binding.formCard.setVisibility(View.GONE);
+        setResult(RESULT_OK);
+        finish();
     }
 
     private void setSubmitting(boolean submitting) {

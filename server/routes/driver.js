@@ -6,6 +6,7 @@ const { authMiddleware, driverOnly } = require('../middleware/auth');
 const {
     getDashboard,
     startTrip,
+    saveTripLoadDetails,
     endTrip,
     addTripExpense,
     getTripHistory,
@@ -26,8 +27,18 @@ router.post(
     '/trips/start',
     authMiddleware,
     driverOnly,
-    upload.any(),
+    upload.fields([
+        { name: 'meter_image', maxCount: 1 },
+        { name: 'bilty_slip_image', maxCount: 1 }
+    ]),
     startTrip
+);
+router.post(
+    '/trips/:trip_id/load-details',
+    authMiddleware,
+    driverOnly,
+    upload.fields([{ name: 'load_photo', maxCount: 1 }]),
+    saveTripLoadDetails
 );
 router.post(
     '/trips/:trip_id/end',

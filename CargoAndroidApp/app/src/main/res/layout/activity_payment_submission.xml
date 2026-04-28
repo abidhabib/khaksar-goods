@@ -50,7 +50,7 @@
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:layout_marginTop="4dp"
-                    android:text="@string/send_payment_subtitle"
+                    android:text="@string/send_payment_new_subtitle"
                     android:textColor="@color/section_hint"
                     android:textSize="14sp" />
             </LinearLayout>

@@ -2,7 +2,7 @@
     <string name="language_english_short">EN</string>
     <string name="language_urdu_short">UR</string>
     <string name="login_title">ڈرائیور لاگ اِن</string>
-    <string name="login_subtitle">اپنی ڈرائیور آئی ڈی اور پاس ورڈ سے سائن اِن کریں</string>
+    <string name="login_subtitle"> ڈرائیور آئی ڈی / پاس ورڈ    </string>
     <string name="login_username_hint">ڈرائیور آئی ڈی / یوزرنیم</string>
     <string name="login_password_hint">پاس ورڈ</string>
     <string name="login_button">سائن اِن</string>
@@ -19,8 +19,7 @@
     <string name="dashboard_recent_activity">حالیہ سرگرمی</string>
     <string name="app_name">خاکسار گڈز</string>
     <string name="back">واپس</string>
-    <string name="dashboard_label">ڈرائیور ڈیش بورڈ</string>
-    <string name="dashboard_average_value">گاڑی کی اوسط: %1$s</string>
+    <string name="dashboard_average_value">  اوسط: %1$s</string>
     <string name="dashboard_welcome_placeholder">muhammad adbilal_9989</string>
     <string name="dashboard_welcome">%1$s</string>
     <string name="logout">لاگ آؤٹ</string>
@@ -43,9 +42,7 @@
     <string name="history_arrow">→</string>
     <string name="start_trip">ٹرپ شروع کریں</string>
     <string name="end_trip">ٹرپ ختم کریں</string>
-    <string name="end_trip_expenses_subtitle">ٹرپ مکمل کرنے سے پہلے اخراجات شامل کریں۔</string>
     <string name="end_trip_details">ٹرپ ختم کرنے کی تفصیل</string>
-    <string name="end_trip_details_subtitle">ٹرپ مکمل کرنے کے لیے آخری میٹر اور مقام درج کریں۔</string>
     <string name="loading_dashboard">ڈیش بورڈ لوڈ ہو رہا ہے...</string>
     <string name="trip_history">ٹرپ ہسٹری</string>
     <string name="trip_history_subtitle"> ٹرپس میٹر، مالیات اور تصاویر کی تفصیل </string>
@@ -58,11 +55,14 @@
     <string name="trip_history_finance">کرایہ: %1$s • خرچ: %2$s • خالص: %3$s</string>
     <string name="trip_notes_empty">نوٹس: کوئی نوٹ شامل نہیں</string>
     <string name="trip_notes_value">نوٹس: %1$s</string>
+
     <string name="daily_expenses"> اخراجات</string>
     <string name="daily_expenses_subtitle">   ڈرائیور کے روزانہ خرچے  محفوظ کریں۔</string>
-    <string name="daily_expense_history_subtitle"> اخراجات شامل کریں اور دیکھیں</string>
+    <string name="daily_expense_history_subtitle"> اخراجات شامل کریں </string>
+
     <string name="trip_expense_breakdown">ڈیزل %1$s • ٹول %2$s • کھانا %3$s • پولیس %4$s
 چالان %5$s • منڈی کاٹ %6$s • انعام %7$s • بلٹی %8$s • پنکچر %9$s</string>
+
     <string name="trip_image_preview">ٹرپ تصویر پیش منظر</string>
     <string name="trip_start_image">شروع کے میٹر کی تصویر</string>
     <string name="trip_end_image">اختتامی میٹر کی تصویر</string>
@@ -70,144 +70,233 @@
     <string name="tap_to_view">مکمل سائز دیکھنے کے لیے دبائیں</string>
     <string name="no_trip_image">کوئی تصویر اپ لوڈ نہیں ہوئی</string>
     <string name="close">بند کریں</string>
+
     <string name="from_location">روانگی کی جگہ</string>
     <string name="to_location">منزل</string>
-    <string name="freight_charge">کرایہ وصول</string>
+
+    <string name="freight_charge">کرایہ </string>
+
     <string name="start_meter_reading">شروع کا میٹر ریڈنگ</string>
     <string name="end_meter_reading">اختتامی میٹر ریڈنگ</string>
+
     <string name="meter_photo_optional">میٹر کی تصویر (اختیاری)</string>
-    <string name="meter_photo_required">میٹر کی تصویر (لازمی)</string>
-    <string name="bilty_photo_required">بلٹی سلپ کی تصویر (لازمی)</string>
+    <string name="meter_photo_required">میٹر کی تصویر </string>
+
+    <string name="bilty_photo_required">بلٹی سلپ کی تصویر </string>
     <string name="load_name">لوڈ کا نام</string>
-    <string name="load_weight">لوڈ کا وزن</string>
-    <string name="load_photo_required">لوڈ کی تصویر (لازمی)</string>
+
+    <string name="load_weight">لوڈ ٹن </string>
+    <string name="load_photo_required">لوڈ کی تصویر </string>
+
     <string name="bilty_add_photo">بلٹی سلپ کی تصویر کے لیے کیمرا کھولنے کو دبائیں</string>
     <string name="bilty_change_photo">منتخب بلٹی سلپ کی تصویر بدلنے کے لیے دبائیں</string>
     <string name="load_change_photo">لوڈ کی تصویر بدلنے کے لیے دبائیں</string>
-    <string name="bilty_commission_amount">بلٹی کمیشن رقم</string>
+
+    <string name="bilty_commission_amount">بلٹی کمیشن</string>
+
     <string name="manual_or_fetch_location">.</string>
     <string name="fetch_current_location">موجودہ لوکیشن حاصل کریں</string>
+
     <string name="location_permission_required">موجودہ لوکیشن لینے کے لیے اجازت ضروری ہے</string>
     <string name="location_unavailable">اس وقت موجودہ لوکیشن دستیاب نہیں ہے</string>
     <string name="enable_location_services">پہلے فون کی لوکیشن سروس آن کریں</string>
-    <string name="location_fetched_success">موجودہ لوکیشن کامیابی سے لے لی گئی</string>
-    <string name="fill_required_trip_fields">تمام لازمی ٹرپ فیلڈز بھریں</string>
-    <string name="trip_required_images">شروع کے میٹر، بلٹی سلپ، اور لوڈ کی تصویر لازمی ہیں</string>
-    <string name="start_trip_screen_subtitle">نیچے ٹرپ کی تفصیل بھریں اور تیار ہونے پر جمع کریں۔</string>
+    <string name="location_fetched_success">موجودہ لوکیشن   لے لی گئی</string>
+
+    <string name="fill_required_trip_fields">تمام  ٹرپ فیلڈز بھریں</string>
+    <string name="trip_required_images">شروع کے میٹر، بلٹی سلپ، اور لوڈ کی تصویر  ہیں</string>
+    <string name="start_trip_required_images">شروع کے میٹر اور بلٹی سلپ کی تصویر ضروری ہیں</string>
+
     <string name="start_trip_add_photo">شروع کے میٹر کی تصویر کے لیے کیمرا کھولنے کو دبائیں</string>
     <string name="start_trip_change_photo">منتخب تصویر بدلنے کے لیے دبائیں</string>
     <string name="start_trip_loading">ٹرپ شروع ہو رہا ہے...</string>
-    <string name="trip_started_success">ٹرپ کامیابی سے شروع ہو گیا</string>
-    <string name="trip_completed_success">ٹرپ کامیابی سے مکمل ہو گیا</string>
+    <string name="trip_started_success">ٹرپ   شروع ہو گیا</string>
+
+    <string name="trip_completed_success">ٹرپ   مکمل ہو گیا</string>
     <string name="end_trip_loading">ٹرپ مکمل ہو رہا ہے...</string>
+
     <string name="end_trip_add_photo">اختتامی میٹر کی تصویر اپ لوڈ کرنے کے لیے دبائیں</string>
     <string name="end_trip_change_photo">منتخب تصویر بدلنے کے لیے دبائیں</string>
+
     <string name="complete_trip">ٹرپ مکمل کریں</string>
+
     <string name="diesel_cost">ڈیزل خرچ</string>
     <string name="toll_cost">ٹول خرچ</string>
     <string name="food_cost">کھانے کا خرچ</string>
     <string name="other_cost">دیگر خرچ</string>
+
     <string name="end_location">اختتامی لوکیشن</string>
-    <string name="end_trip_required_fields">اختتامی لوکیشن اور میٹر ریڈنگ لازمی ہیں</string>
+
+    <string name="end_trip_required_fields">اختتامی لوکیشن اور میٹر ریڈنگ  </string>
+
     <string name="add_trip_expenses">ٹرپ اخراجات شامل کریں</string>
+
     <string name="police_cost">پولیس خرچہ</string>
     <string name="chalaan_cost">چالان خرچہ</string>
     <string name="mandi_kaat_cost">منڈی کاٹ</string>
-    <string name="reward_cost">انعام دیا</string>
+    <string name="reward_cost">انعام </string>
     <string name="tyre_puncture_cost">ٹائر پنکچر خرچہ</string>
+
     <string name="filter_month">ماہ فلٹر کریں (YYYY-MM)</string>
     <string name="load_history">ہسٹری لوڈ کریں</string>
+
     <string name="total_days">کل دن</string>
+
     <string name="add_update_daily_expense"> خرچہ شامل  کریں</string>
+
     <string name="expense_date">خرچے کی تاریخ (YYYY-MM-DD)</string>
+
     <string name="cargo_service_cost">سروس کروانے کا خرچہ</string>
     <string name="mobile_cost">موبائل خرچہ</string>
-    <string name="moboil_change_cost">موب آئل چیینج خرچہ</string>
+
+    <string name="moboil_change_cost">موبل آئل چینج خرچہ</string>
+
     <string name="vehicle_maintenance_cost">گاڑی کی مرمت</string>
     <string name="mechanic_cost">مکینک کا خرچہ</string>
     <string name="medical_cost">میڈیکل خرچہ</string>
     <string name="security_guard_fee">چوکیدارا</string>
-    <string name="save_daily_expense">روزانہ خرچہ محفوظ کریں</string>
+
+    <string name="save_daily_expense"> خرچہ محفوظ کریں</string>
+
     <string name="daily_expense_history"> اخراجات</string>
-    <string name="no_daily_expenses">اس مہینے کے لیے کوئی روزانہ خرچہ نہیں ملا۔</string>
-    <string name="daily_expense_saved">روزانہ خرچہ کامیابی سے محفوظ ہو گیا</string>
+    <string name="no_daily_expenses">اس مہینے کے لیے کوئی  خرچہ نہیں ملا۔</string>
+    <string name="daily_expense_saved"> خرچہ   محفوظ ہو گیا</string>
+
     <string name="daily_expense_breakdown">سروس %1$s • موبائل %2$s
-موب آئل %3$s • مرمت %4$s • مکینک %5$s
+موبل آئل %3$s • مرمت %4$s • مکینک %5$s
 میڈیکل %6$s • کھانا %7$s • چوکیدارا %8$s</string>
+
     <string name="notes">نوٹس</string>
+
     <string name="finish_trip_first">پہلے موجودہ ٹرپ مکمل کریں</string>
     <string name="back_to_dashboard">ڈیش بورڈ پر واپس جائیں</string>
-    <string name="submit_trip">ٹرپ جمع کریں</string>
+
+    <string name="submit_trip">ٹرپ شروع کریں</string>
+
     <string name="expense_amount">رقم</string>
+
     <string name="save_expense_entry">خرچہ محفوظ کریں</string>
+
     <string name="trip_expense_history">ٹرپ خرچہ ہسٹری</string>
+
     <string name="no_trip_expenses_yet">ابھی کوئی خرچہ شامل نہیں ہوا۔</string>
+
     <string name="diesel_liters_optional">لیٹر </string>
-    <string name="diesel_liters_required_label">لیٹر (لازمی)</string>
+    <string name="diesel_liters_required_label">لیٹر </string>
     <string name="diesel_liters_required">لیٹر درج کریں</string>
+
     <string name="diesel_location_optional">مقام </string>
-    <string name="diesel_location_required">لوکیشن درج کریں</string>
+    <string name="diesel_location_required">لوکیشن  </string>
+
     <string name="diesel_meter_photo_optional">ڈیزل مشین تصویر </string>
-    <string name="diesel_meter_photo_required">ڈیزل مشین تصویر (لازمی)</string>
+    <string name="diesel_meter_photo_required">ڈیزل مشین تصویر </string>
+
     <string name="save_diesel_expense">ڈیزل خرچ محفوظ کریں</string>
+
     <string name="open_camera_for_diesel_meter">ڈیزل مشین تصویر کے لیے کیمرا کھولیں</string>
     <string name="change_diesel_meter_photo">ڈیزل مشین تصویر تبدیل کریں</string>
-    <string name="license_number_value">لائسنس: %1$s</string>
-    <string name="end_meter_photo_required">اختتامی میٹر کی تصویر لازمی ہے</string>
+
+    <string name="license_number_value">%1$s</string>
+
+    <string name="end_meter_photo_required">اختتامی میٹر کی تصویر  ہے</string>
+
     <string name="open_camera_for_end_meter">اختتامی میٹر کی تصویر کے لیے کیمرا کھولنے کو دبائیں</string>
     <string name="open_camera_for_start_meter">شروع کے میٹر کی تصویر کے لیے کیمرا کھولنے کو دبائیں</string>
     <string name="open_camera_for_bilty">بلٹی سلپ کی تصویر کے لیے کیمرا کھولنے کو دبائیں</string>
     <string name="open_camera_for_load">لوڈ کی تصویر کے لیے کیمرا کھولنے کو دبائیں</string>
+    <string name="load_details_title">لوڈ تفصیل</string>
+    <string name="load_location">لوڈ لوکیشن</string>
+    <string name="load_location_help">لوڈ کی تصویر محفوظ کرنے سے پہلے موجودہ ایریا، شہر اور صوبہ حاصل کریں۔</string>
+    <string name="load_coordinates_pending">کوآرڈینیٹس: موجودہ لوکیشن باقی ہے</string>
+    <string name="load_coordinates_value">کوآرڈینیٹس: %1$s</string>
+    <string name="load_weight_value">لوڈ ٹن: %1$s</string>
+    <string name="load_weight_pending">لوڈ ٹن: -</string>
+    <string name="save_load_details">لوڈ تفصیل محفوظ کریں</string>
+    <string name="load_details_loading">لوڈ تفصیل محفوظ ہو رہی ہے...</string>
+    <string name="load_location_required">لوڈ لوکیشن ضروری ہے</string>
+    <string name="load_coordinates_required">محفوظ کرنے سے پہلے موجودہ لوکیشن لیں</string>
+    <string name="load_photo_only_required">لوڈ کی تصویر ضروری ہے</string>
+    <string name="unable_to_save_load_details">لوڈ تفصیل محفوظ نہیں ہو سکی</string>
+
     <string name="unable_to_open_camera">کیمرا نہیں کھل سکا</string>
     <string name="unable_to_end_trip">ٹرپ مکمل نہیں ہو سکا</string>
     <string name="unable_to_load_trip_expenses">ٹرپ خرچے لوڈ نہیں ہو سکے</string>
     <string name="unable_to_save_expense">خرچہ محفوظ نہیں ہو سکا</string>
-    <string name="expense_saved_successfully">خرچہ کامیابی سے محفوظ ہو گیا</string>
+    <string name="expense_saved_successfully">خرچہ   محفوظ ہو گیا</string>
+
     <string name="select_expense_type_first">پہلے خرچے کی قسم منتخب کریں</string>
     <string name="enter_expense_amount">خرچے کی رقم درج کریں</string>
-    <string name="add_expense_for">%1$s کے لیے رقم درج کریں</string>
-    <string name="tap_amount_widget">کسی ویجٹ پر دبائیں اور رقم درج کریں۔</string>
+
     <string name="tap_expense_widget">کسی ویجٹ پر دبائیں، رقم درج کریں، اور فوراً محفوظ کریں۔</string>
+
     <string name="save_amount">رقم محفوظ کریں</string>
     <string name="amount_saved">رقم محفوظ ہو گئی</string>
-    <string name="today_total">آج کا کل خرچہ</string>
+
     <string name="daily_expenses_help">۔</string>
+
     <string name="unable_to_load_daily_expenses">روزانہ خرچے لوڈ نہیں ہو سکے</string>
     <string name="unable_to_save_daily_expense">روزانہ خرچہ محفوظ نہیں ہو سکا</string>
     <string name="invalid_daily_expense_response">روزانہ خرچے کا جواب درست نہیں تھا</string>
-    <string name="moboil_meter_reading">موآئل میٹر ریڈنگ</string>
-    <string name="moboil_meter_required">میٹر ریڈنگ لازمی ہے</string>
-    <string name="save_moboil_expense">موآئل چینج محفوظ کریں</string>
-    <string name="moboil_alert_title">موآئل الرٹ</string>
-    <string name="moboil_alert_empty">ابھی موآئل چینج محفوظ نہیں ہوا</string>
+
+    <string name="moboil_meter_reading">موبل آئل میٹر ریڈنگ</string>
+    <string name="moboil_meter_required">میٹر ریڈنگ  ہے</string>
+
+    <string name="save_moboil_expense">موبل آئل چینج محفوظ کریں</string>
+
+    <string name="moboil_alert_title"> موبل آئل چینج</string>
+    <string name="moboil_alert_empty">ابھی موبل آئل چینج محفوظ نہیں ہوا</string>
     <string name="moboil_alert_value">آخری بار %1$s پر • %2$s کلومیٹر پہلے</string>
+
     <string name="send_payment_to_company">کمپنی کو ادائیگی بھیجیں</string>
-    <string name="send_payment_subtitle">رقم اور اسکرین شاٹ جمع کریں</string>
+    <string name="driver_account_khata">ڈرائیور کھاتہ</string>
+    <string name="driver_account_subtitle">اپنا بیلنس اور لیجر دیکھیں</string>
+    <string name="helper_account_khata">ہیلپر کھاتہ</string>
+    <string name="helper_account_subtitle">ہیلپر کا بیلنس اور لیجر دیکھیں</string>
+    <string name="leave_to_home">گھر چھٹی</string>
+    <string name="leave_to_home_subtitle">چھٹی کی درخواست کریں</string>
+    <string name="send_payment_new_subtitle">کمپنی کو ادائیگی جمع کروائیں</string>
+
     <string name="payment_submissions">ادائیگی جمع کروائیاں</string>
+
     <string name="payment_amount">ادائیگی رقم</string>
-    <string name="payment_screenshot_required">ادائیگی اسکرین شاٹ لازمی ہے</string>
-    <string name="payment_amount_required">ادائیگی رقم لازمی ہے</string>
+
+    <string name="payment_screenshot_required">ادائیگی اسکرین شاٹ  ہے</string>
+    <string name="payment_amount_required">ادائیگی رقم  ہے</string>
+
     <string name="payment_add_screenshot">ادائیگی اسکرین شاٹ کے لیے کیمرا کھولیں</string>
     <string name="payment_change_screenshot">ادائیگی اسکرین شاٹ تبدیل کریں</string>
+
     <string name="submit_payment">ادائیگی جمع کریں</string>
+
     <string name="payment_submit_history">ہسٹری</string>
     <string name="payment_submit_new">نئی جمع کروائی</string>
+
     <string name="payment_total_submissions">کل جمع کروائیاں: %1$s</string>
     <string name="payment_total_amount">کل رقم: %1$s</string>
-    <string name="payment_saved_successfully">ادائیگی کامیابی سے جمع ہو گئی</string>
+
+    <string name="payment_saved_successfully">ادائیگی   جمع ہو گئی</string>
+
     <string name="payment_history_empty">کوئی ادائیگی جمع کروائی نہیں ملی۔</string>
+
     <string name="payment_filter_month_hint">مہینہ (YYYY-MM)</string>
+
     <string name="apply_filter">فلٹر لگائیں</string>
-    <string name="chalaan_photo_required">چالان تصویر لازمی ہے</string>
+
+    <string name="chalaan_photo_required">چالان تصویر  ہے</string>
     <string name="chalaan_photo">چالان تصویر</string>
+
     <string name="open_camera_for_chalaan">چالان تصویر کے لیے کیمرا کھولیں</string>
     <string name="change_chalaan_photo">چالان تصویر تبدیل کریں</string>
+
     <string name="save_chalaan_expense">چالان خرچ محفوظ کریں</string>
+
     <string name="success_check">✓</string>
+
     <string name="action_settings">ترتیبات</string>
     <string name="first_fragment_label">پہلا فریگمنٹ</string>
     <string name="second_fragment_label">دوسرا فریگمنٹ</string>
     <string name="next">اگلا</string>
     <string name="previous">پچھلا</string>
     <string name="lorem_ipsum">عارضی متن</string>
+    <string name="driver_name_value">%1$s</string>
+    <string name="car_number_value">%1$s</string>
 </resources>

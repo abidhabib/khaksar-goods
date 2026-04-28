@@ -15,10 +15,6 @@ import android.os.Looper;
 import android.text.TextUtils;
 import android.util.Log;
 import android.view.View;
-import android.view.ViewGroup;
-import android.widget.ImageView;
-import android.widget.LinearLayout;
-import android.widget.TextView;
 import android.widget.Toast;
 
 import androidx.activity.result.ActivityResultLauncher;
@@ -26,18 +22,14 @@ import androidx.activity.result.contract.ActivityResultContracts;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.core.app.ActivityCompat;
 import androidx.core.content.FileProvider;
-import androidx.core.content.ContextCompat;
 import androidx.core.graphics.Insets;
 import androidx.core.view.ViewCompat;
 import androidx.core.view.WindowCompat;
 import androidx.core.view.WindowInsetsCompat;
-import androidx.core.widget.ImageViewCompat;
 
 import com.example.ishaqcargo.databinding.ActivityStartTripBinding;
 import com.example.ishaqcargo.network.ApiClient;
-import com.example.ishaqcargo.util.AmountEntryDialogHelper;
 import com.example.ishaqcargo.util.SessionManager;
-import com.google.android.material.card.MaterialCardView;
 
 import org.json.JSONObject;
 
@@ -58,7 +50,6 @@ public class StartTripActivity extends AppCompatActivity {
     public static final String EXTRA_INITIAL_METER = "initial_meter";
     private static final String STATE_FROM = "state_from";
     private static final String STATE_METER = "state_meter";
-    private static final String STATE_LOAD_NAME = "state_load_name";
     private static final String STATE_LOAD_WEIGHT = "state_load_weight";
     private static final String STATE_FREIGHT = "state_freight";
     private static final String STATE_BILTY_COMMISSION = "state_bilty_commission";
@@ -66,26 +57,20 @@ public class StartTripActivity extends AppCompatActivity {
     private static final String STATE_START_LOCATION_COORDS = "state_start_location_coords";
     private static final String STATE_METER_URI = "state_meter_uri";
     private static final String STATE_BILTY_URI = "state_bilty_uri";
-    private static final String STATE_LOAD_URI = "state_load_uri";
     private static final String STATE_PENDING_METER_URI = "state_pending_meter_uri";
     private static final String STATE_PENDING_BILTY_URI = "state_pending_bilty_uri";
-    private static final String STATE_PENDING_LOAD_URI = "state_pending_load_uri";
 
     private ActivityStartTripBinding binding;
     private SessionManager sessionManager;
     private Uri meterImageUri;
     private Uri biltySlipImageUri;
-    private Uri loadPhotoUri;
     private Uri pendingMeterCameraUri;
     private Uri pendingBiltyCameraUri;
-    private Uri pendingLoadCameraUri;
     private String baseUrl;
     private String fetchedStartLocation;
     private String fetchedStartCoordinates;
     private Runnable startLocationTimeoutRunnable;
-    private String selectedAmountField;
-    private String freightAmount = "";
-    private String biltyCommissionAmount = "";
+    private double initialMeterReading;
 
     private final ActivityResultLauncher<Uri> takeMeterPhotoLauncher = registerForActivityResult(
             new ActivityResultContracts.TakePicture(),
@@ -107,18 +92,6 @@ public class StartTripActivity extends AppCompatActivity {
                     bindBiltyImagePreview();
                 } else {
                     pendingBiltyCameraUri = null;
-                }
-            }
-    );
-
-    private final ActivityResultLauncher<Uri> takeLoadPhotoLauncher = registerForActivityResult(
-            new ActivityResultContracts.TakePicture(),
-            success -> {
-                if (success && pendingLoadCameraUri != null) {
-                    loadPhotoUri = pendingLoadCameraUri;
-                    bindLoadImagePreview();
-                } else {
-                    pendingLoadCameraUri = null;
                 }
             }
     );
@@ -146,23 +119,21 @@ public class StartTripActivity extends AppCompatActivity {
 
         sessionManager = new SessionManager(this);
         baseUrl = sessionManager.getBaseUrl();
+        initialMeterReading = getIntent().getDoubleExtra(EXTRA_INITIAL_METER, 0);
 
         applyWindowInsets();
-        setupAmountWidgets();
         clearDraftState();
         restoreTransientState(savedInstanceState);
+        // bindInitialMeterIfNeeded(); // Removed: don't fill previous reading in start meter reading
 
         binding.backButton.setOnClickListener(v -> finish());
         binding.startMeterImagePreview.setOnClickListener(v -> openCameraForMeterPhoto());
         binding.startUploadHint.setOnClickListener(v -> openCameraForMeterPhoto());
         binding.biltyImagePreview.setOnClickListener(v -> openCameraForBiltyPhoto());
         binding.biltyUploadHint.setOnClickListener(v -> openCameraForBiltyPhoto());
-        binding.loadPhotoPreview.setOnClickListener(v -> openCameraForLoadPhoto());
-        binding.loadUploadHint.setOnClickListener(v -> openCameraForLoadPhoto());
         binding.fetchStartLocationButton.setOnClickListener(v -> ensureLocationPermissionAndFetch());
         binding.submitTripButton.setOnClickListener(v -> submitTrip());
         ((View) binding.startToInput.getParent().getParent()).setVisibility(View.GONE);
-        binding.amountEditorCard.setVisibility(View.GONE);
     }
 
     @Override
@@ -170,18 +141,15 @@ public class StartTripActivity extends AppCompatActivity {
         super.onSaveInstanceState(outState);
         outState.putString(STATE_FROM, getInput(binding.startFromInput));
         outState.putString(STATE_METER, getInput(binding.startMeterInput));
-        outState.putString(STATE_LOAD_NAME, getInput(binding.loadNameInput));
         outState.putString(STATE_LOAD_WEIGHT, getInput(binding.loadWeightInput));
-        outState.putString(STATE_FREIGHT, freightAmount);
-        outState.putString(STATE_BILTY_COMMISSION, biltyCommissionAmount);
+        outState.putString(STATE_FREIGHT, getInput(binding.freightChargeInput));
+        outState.putString(STATE_BILTY_COMMISSION, getInput(binding.biltyCommissionInput));
         outState.putString(STATE_START_LOCATION_LABEL, fetchedStartLocation);
         outState.putString(STATE_START_LOCATION_COORDS, fetchedStartCoordinates);
         outState.putString(STATE_METER_URI, meterImageUri != null ? meterImageUri.toString() : null);
         outState.putString(STATE_BILTY_URI, biltySlipImageUri != null ? biltySlipImageUri.toString() : null);
-        outState.putString(STATE_LOAD_URI, loadPhotoUri != null ? loadPhotoUri.toString() : null);
         outState.putString(STATE_PENDING_METER_URI, pendingMeterCameraUri != null ? pendingMeterCameraUri.toString() : null);
         outState.putString(STATE_PENDING_BILTY_URI, pendingBiltyCameraUri != null ? pendingBiltyCameraUri.toString() : null);
-        outState.putString(STATE_PENDING_LOAD_URI, pendingLoadCameraUri != null ? pendingLoadCameraUri.toString() : null);
     }
 
     private void applyWindowInsets() {
@@ -205,33 +173,10 @@ public class StartTripActivity extends AppCompatActivity {
         });
     }
 
-    private void setupAmountWidgets() {
-        bindAmountCard(binding.freightChargeCard, "freight", R.string.freight_charge);
-        bindAmountCard(binding.biltyCommissionCard, "bilty_commission", R.string.bilty_commission_amount);
-        styleWidgetCard(binding.freightChargeCard, R.color.trips_widget_bg, R.drawable.ic_cargo_service);
-        styleWidgetCard(binding.biltyCommissionCard, R.color.expenses_widget_bg, R.drawable.ic_cargo_toll);
-        updateAmountCards();
-    }
-
-    private void bindAmountCard(View card, String field, int titleRes) {
-        card.setOnClickListener(v -> {
-            int iconRes = "freight".equals(field) ? R.drawable.ic_cargo_service : R.drawable.ic_cargo_toll;
-            String initialAmount = "freight".equals(field) ? freightAmount : biltyCommissionAmount;
-            AmountEntryDialogHelper.show(
-                    this,
-                    iconRes,
-                    getString(R.string.add_expense_for, getString(titleRes)),
-                    initialAmount,
-                    amount -> {
-                        if ("freight".equals(field)) {
-                            freightAmount = amount;
-                        } else {
-                            biltyCommissionAmount = amount;
-                        }
-                        updateAmountCards();
-                    }
-            );
-        });
+    private void bindInitialMeterIfNeeded() {
+        if (initialMeterReading > 0 && TextUtils.isEmpty(getInput(binding.startMeterInput))) {
+            binding.startMeterInput.setText(String.format(Locale.US, "%.0f", initialMeterReading));
+        }
     }
 
     private void ensureLocationPermissionAndFetch() {
@@ -389,15 +334,6 @@ public class StartTripActivity extends AppCompatActivity {
         return String.format(Locale.US, "%.6f,%.6f", location.getLatitude(), location.getLongitude());
     }
 
-    private String firstNonEmpty(String... values) {
-        for (String value : values) {
-            if (!TextUtils.isEmpty(value)) {
-                return value;
-            }
-        }
-        return null;
-    }
-
     private String joinLocationParts(String... values) {
         StringBuilder builder = new StringBuilder();
         for (String value : values) {
@@ -423,11 +359,6 @@ public class StartTripActivity extends AppCompatActivity {
         return builder.toString();
     }
 
-    private void updateAmountCards() {
-        binding.freightChargeValue.setText(formatCurrency(parseDouble(freightAmount)));
-        binding.biltyCommissionValue.setText(formatCurrency(parseDouble(biltyCommissionAmount)));
-    }
-
     private void openCameraForMeterPhoto() {
         try {
             pendingMeterCameraUri = createTempImageUri("start_meter_");
@@ -441,15 +372,6 @@ public class StartTripActivity extends AppCompatActivity {
         try {
             pendingBiltyCameraUri = createTempImageUri("bilty_slip_");
             takeBiltyPhotoLauncher.launch(pendingBiltyCameraUri);
-        } catch (Exception exception) {
-            Toast.makeText(this, R.string.unable_to_open_camera, Toast.LENGTH_SHORT).show();
-        }
-    }
-
-    private void openCameraForLoadPhoto() {
-        try {
-            pendingLoadCameraUri = createTempImageUri("load_photo_");
-            takeLoadPhotoLauncher.launch(pendingLoadCameraUri);
         } catch (Exception exception) {
             Toast.makeText(this, R.string.unable_to_open_camera, Toast.LENGTH_SHORT).show();
         }
@@ -483,33 +405,24 @@ public class StartTripActivity extends AppCompatActivity {
         binding.biltyUploadHint.setText(R.string.bilty_change_photo);
     }
 
-    private void bindLoadImagePreview() {
-        if (loadPhotoUri == null) {
-            return;
-        }
-        binding.loadPhotoPreview.setImageURI(loadPhotoUri);
-        binding.loadPhotoPreview.setVisibility(View.VISIBLE);
-        binding.loadUploadHint.setText(R.string.load_change_photo);
-    }
-
     private void submitTrip() {
         String from = getInput(binding.startFromInput);
         String meter = getInput(binding.startMeterInput);
-        String loadName = getInput(binding.loadNameInput);
         String loadWeight = getInput(binding.loadWeightInput);
+        String freightAmount = getInput(binding.freightChargeInput);
+        String biltyCommissionAmount = getInput(binding.biltyCommissionInput);
         String token = sessionManager.getToken();
 
         if (TextUtils.isEmpty(from)
                 || TextUtils.isEmpty(meter)
                 || TextUtils.isEmpty(freightAmount)
-                || TextUtils.isEmpty(loadName)
                 || TextUtils.isEmpty(loadWeight)) {
             Toast.makeText(this, R.string.fill_required_trip_fields, Toast.LENGTH_SHORT).show();
             return;
         }
 
-        if (meterImageUri == null || biltySlipImageUri == null || loadPhotoUri == null) {
-            Toast.makeText(this, R.string.trip_required_images, Toast.LENGTH_SHORT).show();
+        if (meterImageUri == null || biltySlipImageUri == null) {
+            Toast.makeText(this, R.string.start_trip_required_images, Toast.LENGTH_SHORT).show();
             return;
         }
 
@@ -517,7 +430,6 @@ public class StartTripActivity extends AppCompatActivity {
         fields.put("from_location", from);
         fields.put("freight_charge", freightAmount);
         fields.put("meter_reading", meter);
-        fields.put("load_name", loadName);
         fields.put("load_weight", loadWeight);
         fields.put("bilty_commission_amount", TextUtils.isEmpty(biltyCommissionAmount) ? "0" : biltyCommissionAmount);
         fields.put("start_live_location", TextUtils.isEmpty(fetchedStartLocation) ? from : fetchedStartLocation);
@@ -527,7 +439,7 @@ public class StartTripActivity extends AppCompatActivity {
 
         setSubmitting(true);
 
-        ApiClient.startTrip(baseUrl, token, fields, meterImageUri, biltySlipImageUri, loadPhotoUri, getContentResolver(), new Callback() {
+        ApiClient.startTrip(baseUrl, token, fields, meterImageUri, biltySlipImageUri, getContentResolver(), new Callback() {
             @Override
             public void onFailure(Call call, IOException e) {
                 Log.e(TAG, "Start trip request failed", e);
@@ -566,53 +478,47 @@ public class StartTripActivity extends AppCompatActivity {
 
                 String finalCreatedTripId = createdTripId;
                 String startMeterValue = meter;
-                runOnUiThread(() -> showSuccess(routeText, finalCreatedTripId, startMeterValue, from));
+                String finalLoadWeight = loadWeight;
+                runOnUiThread(() -> openLoadDetailsScreen(routeText, finalCreatedTripId, startMeterValue, from, finalLoadWeight));
             }
         });
     }
 
-    private void showSuccess(String routeText, String tripId, String startMeterValue, String destination) {
+    private void openLoadDetailsScreen(String routeText, String tripId, String startMeterValue, String destination, String loadWeight) {
         clearDraftState();
         setSubmitting(false);
-        binding.successRouteText.setText(routeText);
-        binding.successState.setVisibility(View.VISIBLE);
-        binding.submitTripButton.setVisibility(View.GONE);
-        binding.formCard.setVisibility(View.GONE);
-        binding.successCloseButton.setOnClickListener(v -> {
-            setResult(RESULT_OK);
-            if (!TextUtils.isEmpty(tripId)) {
-                Intent intent = new Intent(StartTripActivity.this, EndTripActivity.class);
-                intent.putExtra(EndTripActivity.EXTRA_TRIP_ID, tripId);
-                intent.putExtra(EndTripActivity.EXTRA_ROUTE, routeText);
-                intent.putExtra(EndTripActivity.EXTRA_START_METER, parseDouble(startMeterValue));
-                intent.putExtra(EndTripActivity.EXTRA_DESTINATION, destination);
-                intent.putExtra(EndTripActivity.EXTRA_LOCKED_MODE, true);
-                startActivity(intent);
-            }
+
+        if (TextUtils.isEmpty(tripId)) {
             finish();
-        });
+            return;
+        }
+
+        Intent intent = new Intent(this, LoadDetailsActivity.class);
+        intent.putExtra(EndTripActivity.EXTRA_TRIP_ID, tripId);
+        intent.putExtra(EndTripActivity.EXTRA_ROUTE, routeText);
+        intent.putExtra(EndTripActivity.EXTRA_START_METER, parseDouble(startMeterValue));
+        intent.putExtra(EndTripActivity.EXTRA_DESTINATION, destination);
+        intent.putExtra(EndTripActivity.EXTRA_LOCKED_MODE, true);
+        intent.putExtra(LoadDetailsActivity.EXTRA_LOAD_WEIGHT, loadWeight);
+        intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TASK);
+        startActivity(intent);
+        finish();
     }
 
     private void setSubmitting(boolean submitting) {
         binding.loadingOverlay.setVisibility(submitting ? View.VISIBLE : View.GONE);
         binding.submitTripButton.setEnabled(!submitting);
-        binding.saveAmountButton.setEnabled(!submitting);
         binding.backButton.setEnabled(!submitting);
         binding.fetchStartLocationButton.setEnabled(!submitting);
     }
 
     private void clearDraftState() {
-        freightAmount = "";
-        biltyCommissionAmount = "";
         fetchedStartLocation = null;
         fetchedStartCoordinates = null;
         meterImageUri = null;
         biltySlipImageUri = null;
-        loadPhotoUri = null;
         pendingMeterCameraUri = null;
         pendingBiltyCameraUri = null;
-        pendingLoadCameraUri = null;
-        updateAmountCards();
     }
 
     private void restoreTransientState(Bundle savedInstanceState) {
@@ -622,19 +528,15 @@ public class StartTripActivity extends AppCompatActivity {
 
         binding.startFromInput.setText(savedInstanceState.getString(STATE_FROM, ""));
         binding.startMeterInput.setText(savedInstanceState.getString(STATE_METER, ""));
-        binding.loadNameInput.setText(savedInstanceState.getString(STATE_LOAD_NAME, ""));
         binding.loadWeightInput.setText(savedInstanceState.getString(STATE_LOAD_WEIGHT, ""));
-
-        freightAmount = savedInstanceState.getString(STATE_FREIGHT, "");
-        biltyCommissionAmount = savedInstanceState.getString(STATE_BILTY_COMMISSION, "");
+        binding.freightChargeInput.setText(savedInstanceState.getString(STATE_FREIGHT, ""));
+        binding.biltyCommissionInput.setText(savedInstanceState.getString(STATE_BILTY_COMMISSION, ""));
         fetchedStartLocation = savedInstanceState.getString(STATE_START_LOCATION_LABEL);
         fetchedStartCoordinates = savedInstanceState.getString(STATE_START_LOCATION_COORDS);
         meterImageUri = parseUri(savedInstanceState.getString(STATE_METER_URI));
         biltySlipImageUri = parseUri(savedInstanceState.getString(STATE_BILTY_URI));
-        loadPhotoUri = parseUri(savedInstanceState.getString(STATE_LOAD_URI));
         pendingMeterCameraUri = parseUri(savedInstanceState.getString(STATE_PENDING_METER_URI));
         pendingBiltyCameraUri = parseUri(savedInstanceState.getString(STATE_PENDING_BILTY_URI));
-        pendingLoadCameraUri = parseUri(savedInstanceState.getString(STATE_PENDING_LOAD_URI));
 
         if (meterImageUri != null) {
             bindMeterImagePreview();
@@ -642,54 +544,10 @@ public class StartTripActivity extends AppCompatActivity {
         if (biltySlipImageUri != null) {
             bindBiltyImagePreview();
         }
-        if (loadPhotoUri != null) {
-            bindLoadImagePreview();
-        }
-
-        updateAmountCards();
     }
 
     private Uri parseUri(String value) {
         return TextUtils.isEmpty(value) ? null : Uri.parse(value);
-    }
-
-    private void styleWidgetCard(MaterialCardView card, int colorRes, int iconRes) {
-        int backgroundColor = ContextCompat.getColor(this, colorRes);
-        int foregroundColor = ContextCompat.getColor(this, R.color.white);
-        card.setCardBackgroundColor(backgroundColor);
-        card.setStrokeColor(backgroundColor);
-        card.setRadius(dpToPx(24));
-
-        View child = card.getChildAt(0);
-        if (child instanceof LinearLayout) {
-            LinearLayout layout = (LinearLayout) child;
-            for (int i = 0; i < layout.getChildCount(); i++) {
-                View item = layout.getChildAt(i);
-                if (item instanceof TextView) {
-                    ((TextView) item).setTextColor(foregroundColor);
-                } else if (item instanceof ImageView) {
-                    ImageView imageView = (ImageView) item;
-                    imageView.setImageResource(iconRes);
-                    ImageViewCompat.setImageTintList(imageView, null);
-                    imageView.setBackgroundResource(R.drawable.bg_widget_logo_badge);
-                    imageView.setPadding(dpToPx(9), dpToPx(9), dpToPx(9), dpToPx(9));
-                    imageView.setScaleType(ImageView.ScaleType.CENTER_INSIDE);
-
-                    ViewGroup.LayoutParams params = imageView.getLayoutParams();
-                    params.width = dpToPx(42);
-                    params.height = dpToPx(42);
-                    imageView.setLayoutParams(params);
-                }
-            }
-        }
-    }
-
-    private int dpToPx(int dp) {
-        return Math.round(dp * getResources().getDisplayMetrics().density);
-    }
-
-    private String formatCurrency(double amount) {
-        return String.format(Locale.US, "Rs %.0f", amount);
     }
 
     private String getInput(com.google.android.material.textfield.TextInputEditText input) {

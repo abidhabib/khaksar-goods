@@ -72,18 +72,38 @@ public class ApiClient {
             Map<String, String> fields,
             Uri meterImageUri,
             Uri biltySlipImageUri,
-            Uri loadPhotoUri,
             ContentResolver contentResolver,
             Callback callback
     ) {
         Map<String, Uri> fileUris = new LinkedHashMap<>();
         fileUris.put("meter_image", meterImageUri);
         fileUris.put("bilty_slip_image", biltySlipImageUri);
-        fileUris.put("load_photo", loadPhotoUri);
         RequestBody requestBody = buildFormRequestBody(fields, fileUris, contentResolver);
 
         Request request = new Request.Builder()
                 .url(baseUrl + "/driver/trips/start")
+                .post(requestBody)
+                .header("Authorization", "Bearer " + token)
+                .build();
+
+        CLIENT.newCall(request).enqueue(callback);
+    }
+
+    public static void saveTripLoadDetails(
+            String baseUrl,
+            String token,
+            String tripId,
+            Map<String, String> fields,
+            Uri loadPhotoUri,
+            ContentResolver contentResolver,
+            Callback callback
+    ) {
+        Map<String, Uri> fileUris = new LinkedHashMap<>();
+        fileUris.put("load_photo", loadPhotoUri);
+        RequestBody requestBody = buildFormRequestBody(fields, fileUris, contentResolver);
+
+        Request request = new Request.Builder()
+                .url(baseUrl + "/driver/trips/" + tripId + "/load-details")
                 .post(requestBody)
                 .header("Authorization", "Bearer " + token)
                 .build();

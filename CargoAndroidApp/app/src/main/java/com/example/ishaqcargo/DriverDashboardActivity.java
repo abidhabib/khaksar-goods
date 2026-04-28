@@ -34,7 +34,8 @@ public class DriverDashboardActivity extends AppCompatActivity {
     private String baseUrl;
     private boolean redirectingToEndTrip;
     private double currentCarMeterReading;
-    private String currentLicenseNumber;
+    private String currentCarNumber;
+    private String currentDriverName;
     private double currentVehicleAverage;
 
     private final ActivityResultLauncher<Intent> startTripLauncher = registerForActivityResult(
@@ -57,7 +58,7 @@ public class DriverDashboardActivity extends AppCompatActivity {
         baseUrl = sessionManager.getBaseUrl();
 
         applyWindowInsets();
-        binding.welcomeText.setText(getString(R.string.license_number_value, "-"));
+        // Removed initial welcomeText setting as IDs changed
 
         binding.logoutButton.setOnClickListener(v -> {
             sessionManager.clearSession();
@@ -69,12 +70,21 @@ public class DriverDashboardActivity extends AppCompatActivity {
         binding.tripHistoryCard.setOnClickListener(v ->
                 startActivity(new Intent(this, TripHistoryActivity.class))
         );
-        binding.dailyExpenseCard.setOnClickListener(v ->
+        binding.dailyExpenseWidget.setOnClickListener(v ->
                 startActivity(new Intent(this, DailyExpensesActivity.class))
         );
-        binding.paymentCard.setOnClickListener(v ->
+        binding.submitPaymentWidget.setOnClickListener(v ->
                 startActivity(new Intent(this, PaymentSubmissionActivity.class))
         );
+        binding.driverAccountWidget.setOnClickListener(v -> {
+            // TODO: Navigate to Driver Account
+        });
+        binding.helperAccountWidget.setOnClickListener(v -> {
+            // TODO: Navigate to Helper Account
+        });
+        binding.leaveToHomeCard.setOnClickListener(v -> {
+            // TODO: Navigate to Leave To Home
+        });
         binding.dashboardSwipeRefresh.setOnRefreshListener(this::fetchDashboard);
 
         fetchDashboard();
@@ -183,7 +193,16 @@ public class DriverDashboardActivity extends AppCompatActivity {
         }
 
         redirectingToEndTrip = true;
-        Intent intent = new Intent(this, EndTripActivity.class);
+        Intent intent;
+        if (hasPendingLoadDetails(ongoingTripJson)) {
+            intent = new Intent(this, LoadDetailsActivity.class);
+            intent.putExtra(LoadDetailsActivity.EXTRA_LOAD_WEIGHT, ongoingTripJson.optString("load_weight", ""));
+        } else {
+            intent = new Intent(this, EndTripActivity.class);
+            intent.putExtra(EndTripActivity.EXTRA_START_METER, ongoingTripJson.optDouble("start_meter_reading", 0));
+            intent.putExtra(EndTripActivity.EXTRA_DESTINATION, ongoingTripJson.optString("to_location", "-"));
+        }
+
         intent.putExtra(EndTripActivity.EXTRA_TRIP_ID, tripId);
         intent.putExtra(
                 EndTripActivity.EXTRA_ROUTE,
@@ -193,11 +212,22 @@ public class DriverDashboardActivity extends AppCompatActivity {
                         ongoingTripJson.optString("to_location", "-")
                 )
         );
-        intent.putExtra(EndTripActivity.EXTRA_START_METER, ongoingTripJson.optDouble("start_meter_reading", 0));
-        intent.putExtra(EndTripActivity.EXTRA_DESTINATION, ongoingTripJson.optString("to_location", "-"));
         intent.putExtra(EndTripActivity.EXTRA_LOCKED_MODE, true);
         startActivity(intent);
         finish();
+    }
+
+    private boolean hasPendingLoadDetails(JSONObject ongoingTripJson) {
+        String loadPhoto = ongoingTripJson.optString("load_photo", "");
+        String loadLocation = ongoingTripJson.optString("load_live_location", "");
+        String loadCoordinates = ongoingTripJson.optString("load_coordinates", "");
+
+        // Treat "null" string from API as empty
+        if ("null".equalsIgnoreCase(loadPhoto)) loadPhoto = "";
+        if ("null".equalsIgnoreCase(loadLocation)) loadLocation = "";
+        if ("null".equalsIgnoreCase(loadCoordinates)) loadCoordinates = "";
+
+        return TextUtils.isEmpty(loadPhoto) || TextUtils.isEmpty(loadLocation) || TextUtils.isEmpty(loadCoordinates);
     }
 
     private void bindDashboard(
@@ -206,41 +236,36 @@ public class DriverDashboardActivity extends AppCompatActivity {
             JSONObject profile
     ) {
         int totalTrips = lifetime != null ? lifetime.optInt("total_trips", 0) : 0;
-        double totalDistance = lifetime != null ? lifetime.optDouble("total_distance", 0) : 0;
-        double totalExpenses = lifetime != null ? lifetime.optDouble("total_expenses", 0) : 0;
-        double todayRevenue = todayStats != null ? todayStats.optDouble("revenue_today", 0) : 0;
-        currentLicenseNumber = profile != null ? profile.optString("license_number", "") : "";
+        currentCarNumber = profile != null ? profile.optString("car_number", "") : "";
+        currentDriverName = profile != null ? profile.optString("username", "") : "";
 
         binding.totalTripsValue.setText(String.valueOf(totalTrips));
-        binding.totalKmValue.setText(formatKm(totalDistance));
-        binding.totalExpensesValue.setText(formatCurrency(totalExpenses));
-        binding.todayRevenueValue.setText(formatCurrency(todayRevenue));
-        binding.welcomeText.setText(getString(
-                R.string.license_number_value,
-                TextUtils.isEmpty(currentLicenseNumber) ? "-" : currentLicenseNumber
+        binding.driverNameLabel.setText(getString(
+                R.string.driver_name_value,
+                TextUtils.isEmpty(currentDriverName) ? "Driver" : currentDriverName
         ));
-        binding.headerSubtitleText.setText(getString(
-                R.string.dashboard_average_value,
-                formatAverage(currentVehicleAverage)
+        binding.carNumberText.setText(getString(
+                R.string.car_number_value,
+                TextUtils.isEmpty(currentCarNumber) ? "-" : currentCarNumber
         ));
 
         JSONObject lastMoboilChange = profile != null ? profile.optJSONObject("last_moboil_change") : null;
         if (lastMoboilChange != null && !lastMoboilChange.isNull("meter_reading")) {
-            binding.moboilAlertValue.setText(getString(
+            binding.moboilAlertValueWidget.setText(getString(
                     R.string.moboil_alert_value,
                     formatPlainNumber(lastMoboilChange.optDouble("meter_reading", 0)),
                     formatPlainNumber(lastMoboilChange.optDouble("km_since_change", 0))
             ));
         } else {
-            binding.moboilAlertValue.setText(R.string.moboil_alert_empty);
+            binding.moboilAlertValueWidget.setText(R.string.moboil_alert_empty);
         }
     }
 
     private void setLoading(boolean loading) {
         binding.dashboardLoadingOverlay.setVisibility(loading ? android.view.View.VISIBLE : android.view.View.GONE);
         binding.tripHistoryCard.setEnabled(!loading);
-        binding.dailyExpenseCard.setEnabled(!loading);
-        binding.paymentCard.setEnabled(!loading);
+        binding.dailyExpenseWidget.setEnabled(!loading);
+        binding.submitPaymentWidget.setEnabled(!loading);
         binding.dashboardSwipeRefresh.setEnabled(!loading);
         binding.startTripButton.setEnabled(!loading && (ongoingTrip == null || ongoingTrip.length() == 0));
     }

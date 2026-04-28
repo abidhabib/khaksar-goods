@@ -101,31 +101,19 @@ public class EndTripActivity extends AppCompatActivity {
         tripDestination = getIntent().getStringExtra(EXTRA_DESTINATION);
 
         applyWindowInsets();
-        bindStaticTripDetails();
         setupExpenseWidgets();
 
-        binding.backButton.setVisibility(lockedMode ? View.GONE : View.VISIBLE);
-        binding.backButton.setOnClickListener(v -> {
-            if (!lockedMode) {
-                finish();
-            }
-        });
+
         binding.submitTripButton.setOnClickListener(v -> openEndTripDetails());
 
         loadTripExpenseHistory();
     }
 
     private void applyWindowInsets() {
-        final int topBarTopPadding = binding.topBar.getPaddingTop();
         final int formBottomPadding = binding.formScroll.getPaddingBottom();
         ViewCompat.setOnApplyWindowInsetsListener(binding.getRoot(), (view, windowInsets) -> {
             Insets insets = windowInsets.getInsets(WindowInsetsCompat.Type.systemBars());
-            binding.topBar.setPadding(
-                    binding.topBar.getPaddingLeft(),
-                    topBarTopPadding + insets.top,
-                    binding.topBar.getPaddingRight(),
-                    binding.topBar.getPaddingBottom()
-            );
+
             binding.formScroll.setPadding(
                     binding.formScroll.getPaddingLeft(),
                     binding.formScroll.getPaddingTop(),
@@ -136,9 +124,7 @@ public class EndTripActivity extends AppCompatActivity {
         });
     }
 
-    private void bindStaticTripDetails() {
-        binding.routeSummary.setText(getIntent().getStringExtra(EXTRA_ROUTE));
-    }
+
 
     private void setupExpenseWidgets() {
         binding.dieselExpenseCard.setOnClickListener(v -> openDieselExpenseScreen());
@@ -151,20 +137,20 @@ public class EndTripActivity extends AppCompatActivity {
         bindSimpleExpenseCard(binding.tyrePunctureExpenseCard, "tyre_puncture", R.string.tyre_puncture_cost);
 
         styleWidgetCard(binding.dieselExpenseCard, R.color.trips_widget_bg, R.drawable.ic_cargo_diesel);
-        styleWidgetCard(binding.tollExpenseCard, R.color.km_widget_bg, R.drawable.ic_cargo_toll);
-        styleWidgetCard(binding.foodExpenseCard, R.color.expenses_widget_bg, R.drawable.ic_cargo_food);
-        styleWidgetCard(binding.policeExpenseCard, R.color.revenue_widget_bg, R.drawable.ic_cargo_guard);
-        styleWidgetCard(binding.chalaanExpenseCard, R.color.button_primary, R.drawable.ic_cargo_service);
-        styleWidgetCard(binding.mandiKaatExpenseCard, R.color.button_primary, R.drawable.ic_cargo_service);
-        styleWidgetCard(binding.rewardExpenseCard, R.color.button_emerald_active, R.drawable.ic_cargo_mobile);
-        styleWidgetCard(binding.tyrePunctureExpenseCard, R.color.button_amber, R.drawable.ic_cargo_mechanic);
+        styleWidgetCard(binding.tollExpenseCard, R.color.trips_widget_bg, R.drawable.ic_cargo_toll);
+        styleWidgetCard(binding.foodExpenseCard, R.color.trips_widget_bg, R.drawable.ic_cargo_food);
+        styleWidgetCard(binding.policeExpenseCard, R.color.trips_widget_bg, R.drawable.ic_cargo_guard);
+        styleWidgetCard(binding.chalaanExpenseCard, R.color.trips_widget_bg, R.drawable.ic_cargo_service);
+        styleWidgetCard(binding.mandiKaatExpenseCard, R.color.trips_widget_bg, R.drawable.ic_cargo_service);
+        styleWidgetCard(binding.rewardExpenseCard, R.color.trips_widget_bg, R.drawable.ic_cargo_mobile);
+        styleWidgetCard(binding.tyrePunctureExpenseCard, R.color.trips_widget_bg, R.drawable.ic_cargo_mechanic);
     }
 
     private void bindSimpleExpenseCard(View card, String category, int titleRes) {
         card.setOnClickListener(v -> AmountEntryDialogHelper.show(
                 this,
                 getDialogIconRes(category),
-                getString(R.string.add_expense_for, getString(titleRes)),
+                getString(titleRes),
                 "",
                 amount -> saveExpenseEntry(category, amount)
         ));
@@ -228,7 +214,6 @@ public class EndTripActivity extends AppCompatActivity {
                     JSONObject trip = root.optJSONObject("trip");
                     runOnUiThread(() -> {
                         bindTripFromApi(trip);
-                        renderExpenseTotals(expenses);
                         setSubmitting(false);
                     });
                 } catch (Exception ignored) {
@@ -254,31 +239,6 @@ public class EndTripActivity extends AppCompatActivity {
         }
     }
 
-    private void renderExpenseTotals(JSONArray expenses) {
-        expenseTotals.clear();
-
-        if (expenses != null) {
-            for (int index = 0; index < expenses.length(); index++) {
-                JSONObject expense = expenses.optJSONObject(index);
-                if (expense == null) {
-                    continue;
-                }
-
-                String category = expense.optString("category", "");
-                double amount = expense.optDouble("amount", 0);
-                expenseTotals.put(category, expenseTotals.getOrDefault(category, 0d) + amount);
-            }
-        }
-
-        setExpenseValue(binding.dieselExpenseValue, "diesel");
-        setExpenseValue(binding.tollExpenseValue, "toll");
-        setExpenseValue(binding.foodExpenseValue, "food");
-        setExpenseValue(binding.policeExpenseValue, "police");
-        setExpenseValue(binding.chalaanExpenseValue, "chalaan");
-        setExpenseValue(binding.mandiKaatExpenseValue, "mandi_kaat");
-        setExpenseValue(binding.rewardExpenseValue, "reward");
-        setExpenseValue(binding.tyrePunctureExpenseValue, "tyre_puncture");
-    }
 
     private void setExpenseValue(TextView textView, String category) {
         textView.setText(formatCurrency(expenseTotals.getOrDefault(category, 0d)));
