@@ -104,6 +104,7 @@ Chalaan %5$s • Mandi Kaat %6$s • Reward %7$s • Bilty %8$s • Tyre %9$s</s
     <string name="complete_trip">Complete Trip</string>
     <string name="diesel_cost">Diesel cost</string>
     <string name="toll_cost">Toll Plaza Cost</string>
+    <string name="toll_location_hint">Toll Plaza Location</string>
     <string name="food_cost">Food cost</string>
     <string name="other_cost">Other cost</string>
     <string name="end_location">End location</string>

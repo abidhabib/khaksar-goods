@@ -71,6 +71,15 @@ public class EndTripActivity extends AppCompatActivity {
             }
     );
 
+    private final ActivityResultLauncher<Intent> tollExpenseLauncher = registerForActivityResult(
+            new ActivityResultContracts.StartActivityForResult(),
+            result -> {
+                if (result.getResultCode() == RESULT_OK) {
+                    loadTripExpenseHistory();
+                }
+            }
+    );
+
     private final ActivityResultLauncher<Intent> endTripDetailsLauncher = registerForActivityResult(
             new ActivityResultContracts.StartActivityForResult(),
             result -> {
@@ -128,7 +137,7 @@ public class EndTripActivity extends AppCompatActivity {
 
     private void setupExpenseWidgets() {
         binding.dieselExpenseCard.setOnClickListener(v -> openDieselExpenseScreen());
-        bindSimpleExpenseCard(binding.tollExpenseCard, "toll", R.string.toll_cost);
+        binding.tollExpenseCard.setOnClickListener(v -> openTollExpenseScreen());
         bindSimpleExpenseCard(binding.foodExpenseCard, "food", R.string.food_cost);
         bindSimpleExpenseCard(binding.policeExpenseCard, "police", R.string.police_cost);
         binding.chalaanExpenseCard.setOnClickListener(v -> openReceiptExpenseScreen("chalaan", getString(R.string.chalaan_cost)));
@@ -160,6 +169,12 @@ public class EndTripActivity extends AppCompatActivity {
         Intent intent = new Intent(this, DieselExpenseActivity.class);
         intent.putExtra(EXTRA_TRIP_ID, tripId);
         dieselExpenseLauncher.launch(intent);
+    }
+
+    private void openTollExpenseScreen() {
+        Intent intent = new Intent(this, TollExpenseActivity.class);
+        intent.putExtra(EXTRA_TRIP_ID, tripId);
+        tollExpenseLauncher.launch(intent);
     }
 
     private void openReceiptExpenseScreen(String expenseCategory, String title) {

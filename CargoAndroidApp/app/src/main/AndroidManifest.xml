@@ -65,6 +65,12 @@
             android:theme="@style/Theme.IshaqCargo" />
 
         <activity
+            android:name=".TollExpenseActivity"
+            android:exported="false"
+            android:windowSoftInputMode="adjustResize"
+            android:theme="@style/Theme.IshaqCargo" />
+
+        <activity
             android:name=".EndTripActivity"
             android:exported="false"
             android:windowSoftInputMode="adjustResize"
