@@ -24,10 +24,9 @@ import org.json.JSONArray;
 import org.json.JSONObject;
 
 import java.io.IOException;
-import java.time.LocalDateTime;
+import java.time.OffsetDateTime;
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
-import java.time.format.DateTimeParseException;
 import java.util.Locale;
 
 import okhttp3.Call;
@@ -36,8 +35,8 @@ import okhttp3.Response;
 
 public class TripHistoryActivity extends AppCompatActivity {
 
-    private static final DateTimeFormatter SERVER_DATE_TIME = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
-    private static final DateTimeFormatter DISPLAY_DATE_TIME = DateTimeFormatter.ofPattern("EEE, dd MMM yyyy • hh:mm a", Locale.US);
+    private static final DateTimeFormatter DISPLAY_DATE_TIME =
+            DateTimeFormatter.ofPattern("EEE, dd MMM yyyy • hh:mm a", Locale.US);
 
     private ActivityTripHistoryBinding binding;
     private SessionManager sessionManager;
@@ -48,7 +47,8 @@ public class TripHistoryActivity extends AppCompatActivity {
         super.onCreate(savedInstanceState);
         binding = ActivityTripHistoryBinding.inflate(getLayoutInflater());
         setContentView(binding.getRoot());
-        WindowCompat.getInsetsController(getWindow(), binding.getRoot()).setAppearanceLightStatusBars(true);
+        WindowCompat.getInsetsController(getWindow(), binding.getRoot())
+                .setAppearanceLightStatusBars(true);
 
         sessionManager = new SessionManager(this);
         baseUrl = sessionManager.getBaseUrl();
@@ -75,7 +75,8 @@ public class TripHistoryActivity extends AppCompatActivity {
                     binding.historyScroll.getPaddingLeft(),
                     binding.historyScroll.getPaddingTop(),
                     binding.historyScroll.getPaddingRight(),
-                    historyBottomPadding + insets.bottom + getResources().getDimensionPixelSize(R.dimen.dashboard_bottom_padding)
+                    historyBottomPadding + insets.bottom +
+                            getResources().getDimensionPixelSize(R.dimen.dashboard_bottom_padding)
             );
             return windowInsets;
         });
@@ -83,9 +84,7 @@ public class TripHistoryActivity extends AppCompatActivity {
 
     private void loadTripHistory() {
         String token = sessionManager.getToken();
-        if (token == null) {
-            return;
-        }
+        if (token == null) return;
 
         setLoading(true);
 
@@ -94,7 +93,8 @@ public class TripHistoryActivity extends AppCompatActivity {
             public void onFailure(Call call, IOException e) {
                 runOnUiThread(() -> {
                     setLoading(false);
-                    Toast.makeText(TripHistoryActivity.this, "Unable to load trip history", Toast.LENGTH_LONG).show();
+                    Toast.makeText(TripHistoryActivity.this,
+                            "Unable to load trip history", Toast.LENGTH_LONG).show();
                 });
             }
 
@@ -121,7 +121,8 @@ public class TripHistoryActivity extends AppCompatActivity {
                 } catch (Exception e) {
                     runOnUiThread(() -> {
                         setLoading(false);
-                        Toast.makeText(TripHistoryActivity.this, "Invalid trip history response", Toast.LENGTH_LONG).show();
+                        Toast.makeText(TripHistoryActivity.this,
+                                "Invalid trip history response", Toast.LENGTH_LONG).show();
                     });
                 }
             }
@@ -143,17 +144,22 @@ public class TripHistoryActivity extends AppCompatActivity {
 
         for (int i = 0; i < trips.length(); i++) {
             JSONObject trip = trips.optJSONObject(i);
-            if (trip == null) {
-                continue;
-            }
+            if (trip == null) continue;
 
-            View tripCard = inflater.inflate(R.layout.item_trip_history, binding.tripListContainer, false);
-            bindTripCard(tripCard, trip);
+            View tripCard = inflater.inflate(R.layout.item_trip_history,
+                    binding.tripListContainer, false);
+            // Pass (i + 1) as the count badge number
+            bindTripCard(tripCard, trip, i + 1);
             binding.tripListContainer.addView(tripCard);
         }
     }
 
-    private void bindTripCard(View tripCard, JSONObject trip) {
+    private void bindTripCard(View tripCard, JSONObject trip, int countNumber) {
+        // Count Badge
+        TextView countBadge = tripCard.findViewById(R.id.tripCountBadge);
+        countBadge.setText(String.valueOf(countNumber));
+
+        // Route & Status
         TextView routeText = tripCard.findViewById(R.id.tripRouteText);
         TextView statusText = tripCard.findViewById(R.id.tripStatusText);
         TextView tripMetaText = tripCard.findViewById(R.id.tripMetaText);
@@ -161,28 +167,24 @@ public class TripHistoryActivity extends AppCompatActivity {
         TextView tripFinanceText = tripCard.findViewById(R.id.tripFinanceText);
         TextView tripExpenseBreakdownText = tripCard.findViewById(R.id.tripExpenseBreakdownText);
         TextView tripNotesText = tripCard.findViewById(R.id.tripNotesText);
-        ImageView startMeterImage = tripCard.findViewById(R.id.startMeterImage);
-        ImageView endMeterImage = tripCard.findViewById(R.id.endMeterImage);
-        ImageView biltySlipImage = tripCard.findViewById(R.id.biltySlipImage);
-        TextView startImageHint = tripCard.findViewById(R.id.startImageHint);
-        TextView endImageHint = tripCard.findViewById(R.id.endImageHint);
-        TextView biltyImageHint = tripCard.findViewById(R.id.biltyImageHint);
 
+       
+
+
+        // Data extraction
         String from = trip.optString("from_location", "-");
         String to = trip.optString("to_location", "-");
         String status = trip.optString("status", "unknown");
         double startMeter = trip.optDouble("start_meter_reading", 0);
         double endMeter = trip.isNull("end_meter_reading")
-                ? startMeter
-                : trip.optDouble("end_meter_reading", startMeter);
+                ? startMeter : trip.optDouble("end_meter_reading", startMeter);
         double distance = trip.optDouble("distance_km", endMeter - startMeter);
         double freight = trip.optDouble("freight_charge", 0);
         double totalExpense = trip.optDouble("total_expenses", 0);
         double dieselExpense = trip.optDouble("diesel_expense", 0);
         double totalDieselLiters = trip.optDouble("total_diesel_liters", 0);
         double tripAverage = trip.isNull("trip_average_km_per_liter")
-                ? 0
-                : trip.optDouble("trip_average_km_per_liter", 0);
+                ? 0 : trip.optDouble("trip_average_km_per_liter", 0);
         double tollExpense = trip.optDouble("toll_expense", 0);
         double foodExpense = trip.optDouble("food_expense", 0);
         double policeExpense = trip.optDouble("police_expense", 0);
@@ -197,10 +199,12 @@ public class TripHistoryActivity extends AppCompatActivity {
         String startImageUrl = trip.optString("start_meter_image", "");
         String endImageUrl = trip.optString("end_meter_image", "");
         String biltyImageUrl = trip.optString("bilty_slip_image", "");
+        String loadPhotoUrl = trip.optString("load_photo", "");
         String liveStartLocation = trip.optString("start_live_location", "");
         String endLocation = trip.optString("end_location", "");
         String liveEndLocation = trip.optString("end_live_location", "");
 
+        // Bind text
         routeText.setText(getString(R.string.trip_route_format, from, to));
         statusText.setText(capitalize(status));
         tripMetaText.setText(getString(R.string.trip_history_meta, startedAt, endedAt));
@@ -224,41 +228,36 @@ public class TripHistoryActivity extends AppCompatActivity {
                 formatCurrency(tyrePunctureExpense)
         ));
 
+        // Notes builder
         StringBuilder notesBuilder = new StringBuilder();
         if (!TextUtils.isEmpty(liveStartLocation)) {
             notesBuilder.append("Live start: ").append(liveStartLocation);
         }
         String finalEndLocation = !TextUtils.isEmpty(endLocation) ? endLocation : liveEndLocation;
         if (!TextUtils.isEmpty(finalEndLocation)) {
-            if (notesBuilder.length() > 0) {
-                notesBuilder.append('\n');
-            }
+            if (notesBuilder.length() > 0) notesBuilder.append('\n');
             notesBuilder.append("Actual end: ").append(finalEndLocation);
         }
         if (totalDieselLiters > 0) {
-            if (notesBuilder.length() > 0) {
-                notesBuilder.append('\n');
-            }
+            if (notesBuilder.length() > 0) notesBuilder.append('\n');
             notesBuilder.append("Diesel: ")
                     .append(String.format(Locale.US, "%.2f L", totalDieselLiters))
                     .append(" • Avg: ")
                     .append(formatAverage(tripAverage));
         }
         if (!TextUtils.isEmpty(notes)) {
-            if (notesBuilder.length() > 0) {
-                notesBuilder.append('\n');
-            }
+            if (notesBuilder.length() > 0) notesBuilder.append('\n');
             notesBuilder.append("Notes: ").append(notes);
         }
-        tripNotesText.setText(notesBuilder.length() == 0 ? getString(R.string.trip_notes_empty) : notesBuilder.toString());
+        tripNotesText.setText(notesBuilder.length() == 0
+                ? getString(R.string.trip_notes_empty) : notesBuilder.toString());
 
-        bindImage(startMeterImage, startImageHint, startImageUrl, getString(R.string.trip_start_image));
-        bindImage(endMeterImage, endImageHint, endImageUrl, getString(R.string.trip_end_image));
-        bindImage(biltySlipImage, biltyImageHint, biltyImageUrl, getString(R.string.trip_bilty_image));
+
     }
 
     private void bindImage(ImageView imageView, TextView hintView, String imageUrl, String title) {
-        boolean hasImage = imageUrl != null && !imageUrl.trim().isEmpty() && !"null".equalsIgnoreCase(imageUrl);
+        boolean hasImage = imageUrl != null && !imageUrl.trim().isEmpty()
+                && !"null".equalsIgnoreCase(imageUrl);
 
         if (!hasImage) {
             imageView.setImageResource(R.drawable.bg_image_placeholder);
@@ -298,29 +297,25 @@ public class TripHistoryActivity extends AppCompatActivity {
     }
 
     private String formatTimestamp(String rawValue) {
-        if (rawValue == null || rawValue.trim().isEmpty() || "null".equalsIgnoreCase(rawValue)) {
+        if (rawValue == null || rawValue.trim().isEmpty()
+                || "null".equalsIgnoreCase(rawValue)) {
             return "-";
         }
-
         try {
-            LocalDateTime dateTime = LocalDateTime.parse(rawValue, SERVER_DATE_TIME);
-            return dateTime.atZone(ZoneId.systemDefault()).format(DISPLAY_DATE_TIME);
-        } catch (DateTimeParseException ignored) {
+            OffsetDateTime dateTime = OffsetDateTime.parse(rawValue);
+            return dateTime.atZoneSameInstant(ZoneId.systemDefault()).format(DISPLAY_DATE_TIME);
+        } catch (Exception e) {
             return rawValue;
         }
     }
 
     private String capitalize(String value) {
-        if (value == null || value.isEmpty()) {
-            return "";
-        }
+        if (value == null || value.isEmpty()) return "";
         return Character.toUpperCase(value.charAt(0)) + value.substring(1);
     }
 
     private String formatAverage(double value) {
-        if (!(value > 0)) {
-            return "N/A";
-        }
+        if (!(value > 0)) return "N/A";
         return String.format(Locale.US, "%.2f km/L", value);
     }
 }

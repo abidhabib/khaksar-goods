@@ -407,4 +407,28 @@ public class ApiClient {
             return fallback;
         }
     }
+
+    // In ApiClient.java - ADD THIS PUBLIC STATIC METHOD
+    public static void saveDailyExpenseWithImage(
+            String baseUrl,
+            String token,
+            Map<String, String> fields,
+            Uri imageUri,
+            ContentResolver contentResolver,
+            Callback callback
+    ) {
+        Map<String, Uri> fileUris = new LinkedHashMap<>();
+        if (imageUri != null) {
+            fileUris.put("expense_image", imageUri);
+        }
+        RequestBody requestBody = buildFormRequestBody(fields, fileUris, contentResolver);
+
+        Request request = new Request.Builder()
+                .url(baseUrl + "/driver/daily-expenses")
+                .post(requestBody)
+                .header("Authorization", "Bearer " + token)
+                .build();
+
+        CLIENT.newCall(request).enqueue(callback);
+    }
 }

@@ -1,8 +1,12 @@
 package com.example.ishaqcargo;
 
 import android.app.Dialog;
+import android.content.Intent;
 import android.content.SharedPreferences;
+import android.graphics.Bitmap;
+import android.net.Uri;
 import android.os.Bundle;
+import android.provider.MediaStore;
 import android.text.TextUtils;
 import android.view.LayoutInflater;
 import android.view.View;
@@ -12,6 +16,8 @@ import android.widget.LinearLayout;
 import android.widget.TextView;
 import android.widget.Toast;
 
+import androidx.activity.result.ActivityResultLauncher;
+import androidx.activity.result.contract.ActivityResultContracts;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.core.content.ContextCompat;
 import androidx.core.graphics.Insets;
@@ -31,6 +37,8 @@ import com.google.android.material.textfield.TextInputEditText;
 import org.json.JSONArray;
 import org.json.JSONObject;
 
+import java.io.File;
+import java.io.FileOutputStream;
 import java.io.IOException;
 import java.text.SimpleDateFormat;
 import java.util.Date;
@@ -51,7 +59,12 @@ public class DailyExpensesActivity extends AppCompatActivity {
     private SessionManager sessionManager;
     private String baseUrl;
     private String selectedCategory;
-    private final Map<String, Double> todayTotals = new HashMap<>();
+    private Uri selectedImageUri;
+    private String pendingAmount;
+    private String pendingNote;
+
+    private ActivityResultLauncher<Intent> imagePickerLauncher;
+    private Dialog pendingDialog;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -62,6 +75,29 @@ public class DailyExpensesActivity extends AppCompatActivity {
 
         sessionManager = new SessionManager(this);
         baseUrl = sessionManager.getBaseUrl();
+
+       imagePickerLauncher = registerForActivityResult(
+        new ActivityResultContracts.StartActivityForResult(),
+        result -> {
+            if (result.getResultCode() == RESULT_OK) {
+                Intent data = result.getData();
+                if (data != null && data.getData() != null) {
+                    selectedImageUri = data.getData();
+                } else if (data != null && data.getExtras() != null && data.getExtras().get("data") instanceof Bitmap) {
+                    Bitmap thumbnail = (Bitmap) data.getExtras().get("data");
+                    selectedImageUri = saveBitmapToCache(thumbnail);
+                }
+                
+                if (pendingDialog != null && pendingDialog.isShowing()) {
+                    updateImagePreviewInDialog(pendingDialog);
+                } else {
+                    updateImagePreviewInDialog(null);
+                }
+            } else if ("other".equals(selectedCategory) && (pendingDialog == null || !pendingDialog.isShowing())) {
+                showOtherExpenseDialog();
+            }
+        }
+);
 
         applyWindowInsets();
         setupExpenseWidgets();
@@ -101,14 +137,16 @@ public class DailyExpensesActivity extends AppCompatActivity {
     }
 
     private void setupExpenseWidgets() {
-        bindExpenseCard(binding.cargoServiceCard, "cargo_service", R.string.cargo_service_cost);
-        bindExpenseCard(binding.mobileCostCard, "mobile", R.string.mobile_cost);
+        bindExpenseCard(binding.cargoServiceCard, "cargo_service", R.string.cargo_service_cost, true);
+        bindExpenseCard(binding.mobileCostCard, "mobile", R.string.mobile_cost, false);
         bindMoboilExpenseCard();
-        bindExpenseCard(binding.vehicleMaintenanceCard, "vehicle_maintenance", R.string.vehicle_maintenance_cost);
-        bindExpenseCard(binding.mechanicCostCard, "mechanic", R.string.mechanic_cost);
-        bindExpenseCard(binding.medicalCostCard, "medical", R.string.medical_cost);
-        bindExpenseCard(binding.foodCostCard, "food", R.string.food_cost);
-        bindExpenseCard(binding.securityGuardFeeCard, "cargo_security_guard", R.string.security_guard_fee);
+        bindExpenseCard(binding.vehicleMaintenanceCard, "vehicle_maintenance", R.string.vehicle_maintenance_cost, true);
+        bindExpenseCard(binding.mechanicCostCard, "mechanic", R.string.mechanic_cost, false);
+        bindExpenseCard(binding.medicalCostCard, "medical", R.string.medical_cost, false);
+        bindExpenseCard(binding.foodCostCard, "food", R.string.food_cost, false);
+        bindExpenseCard(binding.securityGuardFeeCard, "cargo_security_guard", R.string.security_guard_fee, false);
+        bindOtherExpenseCard();
+
         styleWidgetCard(binding.cargoServiceCard, R.color.trips_widget_bg, R.drawable.ic_cargo_service);
         styleWidgetCard(binding.mobileCostCard, R.color.trips_widget_bg, R.drawable.ic_cargo_mobile);
         styleWidgetCard(binding.moboilChangeCard, R.color.trips_widget_bg, R.drawable.ic_cargo_moboil);
@@ -117,25 +155,224 @@ public class DailyExpensesActivity extends AppCompatActivity {
         styleWidgetCard(binding.medicalCostCard, R.color.trips_widget_bg, android.R.drawable.ic_menu_info_details);
         styleWidgetCard(binding.foodCostCard, R.color.trips_widget_bg, R.drawable.ic_cargo_food);
         styleWidgetCard(binding.securityGuardFeeCard, R.color.trips_widget_bg, R.drawable.ic_cargo_guard);
+        styleWidgetCard(binding.otherExpenseCard, R.color.trips_widget_bg, android.R.drawable.ic_menu_add);
+    }
+
+    private void resetSelection() {
+        selectedCategory = null;
+        selectedImageUri = null;
+        pendingAmount = null;
+        pendingNote = null;
+        pendingDialog = null;
+    }
+
+    private void bindExpenseCard(View card, String category, int titleRes, boolean supportsImage) {
+        card.setOnClickListener(v -> {
+            resetSelection();
+            selectedCategory = category;
+            if (supportsImage) {
+                showStandardExpenseDialog(getString(titleRes), getDialogIconRes(category));
+            } else {
+                AmountEntryDialogHelper.show(
+                        this,
+                        getDialogIconRes(category),
+                        getString(titleRes),
+                        "",
+                        amount -> saveDailyExpense(category, amount)
+                );
+            }
+        });
+    }
+
+    private void showStandardExpenseDialog(String title, int iconRes) {
+        View view = LayoutInflater.from(this).inflate(R.layout.dialog_standard_expense, null, false);
+        ImageView iconView = view.findViewById(R.id.dialogIcon);
+        TextView titleView = view.findViewById(R.id.dialogTitle);
+        TextInputEditText amountInput = view.findViewById(R.id.dialogAmountInput);
+        ImageView photoPreview = view.findViewById(R.id.dialogPhotoPreview);
+        View addPhotoButton = view.findViewById(R.id.dialogAddPhotoButton);
+
+        iconView.setImageResource(iconRes);
+        titleView.setText(title);
+
+        if (!TextUtils.isEmpty(pendingAmount)) {
+            amountInput.setText(pendingAmount);
+        }
+
+        if (selectedImageUri != null) {
+            photoPreview.setVisibility(View.VISIBLE);
+            photoPreview.setImageURI(selectedImageUri);
+        }
+
+        Dialog dialog = new MaterialAlertDialogBuilder(this)
+                .setView(view)
+                .setNegativeButton(R.string.close, null)
+                .setPositiveButton(R.string.save_amount, null)
+                .create();
+
+        dialog.setOnShowListener(ignored -> {
+            android.widget.Button positiveButton = dialog.findViewById(android.R.id.button1);
+            if (positiveButton != null) {
+                positiveButton.setOnClickListener(v -> {
+                    String amount = getInput(amountInput);
+                    if (TextUtils.isEmpty(amount)) {
+                        amountInput.setError(getString(R.string.enter_expense_amount));
+                        return;
+                    }
+
+                    Map<String, String> fields = new LinkedHashMap<>();
+                    fields.put("category", selectedCategory);
+                    fields.put("amount", amount);
+
+                    if (selectedImageUri != null) {
+                        saveDailyExpenseWithImage(fields, selectedImageUri);
+                    } else {
+                        saveDailyExpense(fields);
+                    }
+                    dialog.dismiss();
+                });
+            }
+
+            addPhotoButton.setOnClickListener(v -> {
+                pendingAmount = getInput(amountInput);
+                pendingDialog = dialog;
+                openCamera();
+            });
+        });
+
+        dialog.show();
+    }
+
+    private void bindOtherExpenseCard() {
+        binding.otherExpenseCard.setOnClickListener(v -> {
+            resetSelection();
+            showOtherExpenseDialog();
+        });
     }
 
     private void bindMoboilExpenseCard() {
-        binding.moboilChangeCard.setOnClickListener(v -> showMoboilDialog());
+        binding.moboilChangeCard.setOnClickListener(v -> {
+            resetSelection();
+            showMoboilDialog();
+        });
     }
 
-    private void bindExpenseCard(View card, String category, int titleRes) {
-        card.setOnClickListener(v -> {
-            selectedCategory = category;
-            AmountEntryDialogHelper.show(
-                    this,
-                    getDialogIconRes(category),
-                    getString(titleRes),
-                    "",
-                    amount -> {
-                        saveDailyExpense(category, amount);
+    private void showImagePickerDialog(String category, String amount) {
+        selectedImageUri = null;
+        new MaterialAlertDialogBuilder(this)
+                .setTitle(getExpenseLabel(category))
+                .setMessage(R.string.add_expense_photo_optional)
+                .setNegativeButton(R.string.skip, (dialog, which) -> {
+                    saveDailyExpense(category, amount);
+                })
+                .setPositiveButton(R.string.add_photo, (dialog, which) -> {
+                    pendingDialog = null;
+                    openCamera();
+                })
+                .setNeutralButton(R.string.save_without_photo, (dialog, which) -> {
+                    saveDailyExpense(category, amount);
+                })
+                .show();
+    }
+
+    private void openCamera() {
+        Intent cameraIntent = new Intent(MediaStore.ACTION_IMAGE_CAPTURE);
+        if (cameraIntent.resolveActivity(getPackageManager()) != null) {
+            imagePickerLauncher.launch(cameraIntent);
+        } else {
+            Toast.makeText(this, "Camera not available", Toast.LENGTH_SHORT).show();
+        }
+    }
+
+    private void openGallery() {
+        Intent galleryIntent = new Intent(Intent.ACTION_PICK, MediaStore.Images.Media.EXTERNAL_CONTENT_URI);
+        galleryIntent.setDataAndType(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, "image/*");
+        imagePickerLauncher.launch(galleryIntent);
+    }
+
+    private void updateImagePreviewInDialog(Dialog dialog) {
+        if (selectedCategory == null || selectedImageUri == null) return;
+
+        if (dialog != null && dialog.isShowing()) {
+            ImageView photoPreview = dialog.findViewById(R.id.dialogPhotoPreview);
+            if (photoPreview != null) {
+                photoPreview.setVisibility(View.VISIBLE);
+                photoPreview.setImageURI(selectedImageUri);
+            }
+        } else {
+            if ("other".equals(selectedCategory)) {
+                showOtherExpenseDialog();
+            } else if ("cargo_service".equals(selectedCategory) || "vehicle_maintenance".equals(selectedCategory)) {
+                showStandardExpenseDialog(getExpenseLabel(selectedCategory), getDialogIconRes(selectedCategory));
+            }
+        }
+    }
+
+    private void showOtherExpenseDialog() {
+        selectedCategory = "other";
+
+        View view = LayoutInflater.from(this).inflate(R.layout.dialog_other_expense, null, false);
+        TextInputEditText amountInput = view.findViewById(R.id.dialogAmountInput);
+        TextInputEditText noteInput = view.findViewById(R.id.dialogNoteInput);
+        ImageView photoPreview = view.findViewById(R.id.dialogPhotoPreview);
+        View addPhotoButton = view.findViewById(R.id.dialogAddPhotoButton);
+
+        if (!TextUtils.isEmpty(pendingAmount)) {
+            amountInput.setText(pendingAmount);
+        }
+        if (!TextUtils.isEmpty(pendingNote)) {
+            noteInput.setText(pendingNote);
+        }
+
+        if (selectedImageUri != null) {
+            photoPreview.setVisibility(View.VISIBLE);
+            photoPreview.setImageURI(selectedImageUri);
+        }
+
+        Dialog dialog = new MaterialAlertDialogBuilder(this)
+                .setTitle(R.string.other_cost)
+                .setView(view)
+                .setNegativeButton(R.string.close, null)
+                .setPositiveButton(R.string.save_expense_entry, null)
+                .create();
+
+        dialog.setOnShowListener(ignored -> {
+            android.widget.Button positiveButton = dialog.findViewById(android.R.id.button1);
+            if (positiveButton != null) {
+                positiveButton.setOnClickListener(v -> {
+                    String amount = getInput(amountInput);
+                    String note = getInput(noteInput);
+
+                    if (TextUtils.isEmpty(amount)) {
+                        amountInput.setError(getString(R.string.enter_expense_amount));
+                        return;
                     }
-            );
+
+                    Map<String, String> fields = new LinkedHashMap<>();
+                    fields.put("category", "other");
+                    fields.put("amount", amount);
+                    if (!TextUtils.isEmpty(note)) {
+                        fields.put("note", note);
+                    }
+
+                    if (selectedImageUri != null) {
+                        saveDailyExpenseWithImage(fields, selectedImageUri);
+                    } else {
+                        saveDailyExpense(fields);
+                    }
+                    dialog.dismiss();
+                });
+            }
+
+            addPhotoButton.setOnClickListener(v -> {
+                pendingAmount = getInput(amountInput);
+                pendingNote = getInput(noteInput);
+                pendingDialog = dialog;
+                openCamera();
+            });
         });
+
+        dialog.show();
     }
 
     private void loadTodaySummary() {
@@ -192,6 +429,7 @@ public class DailyExpensesActivity extends AppCompatActivity {
             totals.put("medical_cost", 0);
             totals.put("food_cost", 0);
             totals.put("cargo_security_guard_fee", 0);
+            totals.put("other_cost", 0);
             totals.put("total_amount", 0);
         } catch (Exception ignored) {
         }
@@ -205,24 +443,18 @@ public class DailyExpensesActivity extends AppCompatActivity {
 
         for (int i = 0; i < entries.length(); i++) {
             JSONObject entry = entries.optJSONObject(i);
-            if (entry == null) {
-                continue;
-            }
+            if (entry == null) continue;
 
             String entryDate = normalizeDate(entry.optString("expense_date", ""));
             if (TextUtils.isEmpty(entryDate)) {
                 entryDate = normalizeDate(entry.optString("created_at", ""));
             }
-
-            if (TextUtils.isEmpty(entryDate)) {
-                continue;
-            }
+            if (TextUtils.isEmpty(entryDate)) continue;
 
             if (localToday.equals(entryDate)) {
                 targetDate = localToday;
                 break;
             }
-
             if (targetDate == null || entryDate.compareTo(targetDate) > 0) {
                 targetDate = entryDate;
             }
@@ -235,18 +467,13 @@ public class DailyExpensesActivity extends AppCompatActivity {
         double totalAmount = 0;
         for (int i = 0; i < entries.length(); i++) {
             JSONObject entry = entries.optJSONObject(i);
-            if (entry == null) {
-                continue;
-            }
+            if (entry == null) continue;
 
             String entryDate = normalizeDate(entry.optString("expense_date", ""));
             if (TextUtils.isEmpty(entryDate)) {
                 entryDate = normalizeDate(entry.optString("created_at", ""));
             }
-
-            if (!targetDate.equals(entryDate)) {
-                continue;
-            }
+            if (!targetDate.equals(entryDate)) continue;
 
             String category = entry.optString("category", "");
             double amount = entry.optDouble("amount", 0);
@@ -278,6 +505,9 @@ public class DailyExpensesActivity extends AppCompatActivity {
                     case "cargo_security_guard":
                         totals.put("cargo_security_guard_fee", totals.optDouble("cargo_security_guard_fee", 0) + amount);
                         break;
+                    case "other":
+                        totals.put("other_cost", totals.optDouble("other_cost", 0) + amount);
+                        break;
                     default:
                         break;
                 }
@@ -295,33 +525,16 @@ public class DailyExpensesActivity extends AppCompatActivity {
     }
 
     private String normalizeDate(String value) {
-        if (TextUtils.isEmpty(value)) {
-            return "";
-        }
-
+        if (TextUtils.isEmpty(value)) return "";
         String trimmed = value.trim();
         if (trimmed.length() >= 10) {
             return trimmed.substring(0, 10);
         }
-
         return trimmed;
     }
 
     private void bindTodaySummary(JSONObject todayExpense) {
-        todayTotals.clear();
-
-        if (todayExpense != null) {
-            todayTotals.put("cargo_service", todayExpense.optDouble("cargo_service_cost", 0));
-            todayTotals.put("mobile", todayExpense.optDouble("mobile_cost", 0));
-            todayTotals.put("moboil_change", todayExpense.optDouble("moboil_change_cost", 0));
-            todayTotals.put("vehicle_maintenance", todayExpense.optDouble("vehicle_maintenance_cost", 0));
-            todayTotals.put("mechanic", todayExpense.optDouble("mechanic_cost", 0));
-            todayTotals.put("medical", todayExpense.optDouble("medical_cost", 0));
-            todayTotals.put("food", todayExpense.optDouble("food_cost", 0));
-            todayTotals.put("cargo_security_guard", todayExpense.optDouble("cargo_security_guard_fee", 0));
-        }
-
-        
+        // This method can be expanded to update UI with today's totals if needed
     }
 
     private void saveDailyExpense(String category, String amount) {
@@ -332,7 +545,6 @@ public class DailyExpensesActivity extends AppCompatActivity {
     }
 
     private void saveDailyExpense(Map<String, String> fields) {
-
         setLoading(true);
 
         ApiClient.saveDailyExpense(baseUrl, sessionManager.getToken(), fields, new Callback() {
@@ -358,12 +570,70 @@ public class DailyExpensesActivity extends AppCompatActivity {
 
                 runOnUiThread(() -> {
                     clearDraft();
+                    resetSelection();
                     setLoading(false);
                     loadTodaySummary();
                     Toast.makeText(DailyExpensesActivity.this, R.string.daily_expense_saved, Toast.LENGTH_SHORT).show();
                 });
             }
         });
+    }
+    private void saveDailyExpenseWithImage(Map<String, String> fields, Uri imageUri) {
+        setLoading(true);
+        ApiClient.saveDailyExpenseWithImage(
+                baseUrl,
+                sessionManager.getToken(),
+                fields,
+                imageUri,
+                getContentResolver(),
+                new Callback() {
+                    @Override
+                    public void onFailure(Call call, IOException e) {
+                        runOnUiThread(() -> {
+                            setLoading(false);
+                            Toast.makeText(DailyExpensesActivity.this, R.string.unable_to_save_daily_expense, Toast.LENGTH_LONG).show();
+                        });
+                    }
+
+                    @Override
+                    public void onResponse(Call call, Response response) throws IOException {
+                        String body = response.body() != null ? response.body().string() : "";
+                        if (!response.isSuccessful()) {
+                            final String message = ApiClient.parseErrorMessage(body, getString(R.string.unable_to_save_daily_expense));
+                            runOnUiThread(() -> {
+                                setLoading(false);
+                                Toast.makeText(DailyExpensesActivity.this, message, Toast.LENGTH_LONG).show();
+                            });
+                            return;
+                        }
+
+                        runOnUiThread(() -> {
+                            clearDraft();
+                            setLoading(false);
+                            loadTodaySummary();
+                            Toast.makeText(DailyExpensesActivity.this, R.string.daily_expense_saved, Toast.LENGTH_SHORT).show();
+                        });
+                    }
+                }
+        );
+    }
+
+    private Uri saveBitmapToCache(Bitmap bitmap) {
+        if (bitmap == null) return null;
+        try {
+            File cachePath = new File(getCacheDir(), "images");
+            if (!cachePath.exists() && !cachePath.mkdirs()) {
+                return null;
+            }
+            File file = new File(cachePath, "image_" + System.currentTimeMillis() + ".jpg");
+            FileOutputStream stream = new FileOutputStream(file);
+            bitmap.compress(Bitmap.CompressFormat.JPEG, 100, stream);
+            stream.close();
+            return Uri.fromFile(file);
+        } catch (IOException e) {
+            e.printStackTrace();
+            return null;
+        }
     }
 
     private void setLoading(boolean loading) {
@@ -396,47 +666,31 @@ public class DailyExpensesActivity extends AppCompatActivity {
 
     private String getExpenseLabel(String category) {
         switch (category) {
-            case "cargo_service":
-                return getString(R.string.cargo_service_cost);
-            case "mobile":
-                return getString(R.string.mobile_cost);
-            case "moboil_change":
-                return getString(R.string.moboil_change_cost);
-            case "vehicle_maintenance":
-                return getString(R.string.vehicle_maintenance_cost);
-            case "mechanic":
-                return getString(R.string.mechanic_cost);
-            case "medical":
-                return getString(R.string.medical_cost);
-            case "food":
-                return getString(R.string.food_cost);
-            case "cargo_security_guard":
-                return getString(R.string.security_guard_fee);
-            default:
-                return category;
+            case "cargo_service": return getString(R.string.cargo_service_cost);
+            case "mobile": return getString(R.string.mobile_cost);
+            case "moboil_change": return getString(R.string.moboil_change_cost);
+            case "vehicle_maintenance": return getString(R.string.vehicle_maintenance_cost);
+            case "mechanic": return getString(R.string.mechanic_cost);
+            case "medical": return getString(R.string.medical_cost);
+            case "food": return getString(R.string.food_cost);
+            case "cargo_security_guard": return getString(R.string.security_guard_fee);
+            case "other": return getString(R.string.other_cost);
+            default: return category;
         }
     }
 
     private int getDialogIconRes(String category) {
         switch (category) {
-            case "cargo_service":
-                return R.drawable.ic_cargo_service;
-            case "mobile":
-                return R.drawable.ic_cargo_mobile;
-            case "moboil_change":
-                return R.drawable.ic_cargo_moboil;
-            case "vehicle_maintenance":
-                return R.drawable.ic_cargo_mechanic;
-            case "mechanic":
-                return R.drawable.ic_cargo_mechanic;
-            case "medical":
-                return android.R.drawable.ic_menu_info_details;
-            case "food":
-                return R.drawable.ic_cargo_food;
-            case "cargo_security_guard":
-                return R.drawable.ic_cargo_guard;
-            default:
-                return R.drawable.ic_cargo_service;
+            case "cargo_service": return R.drawable.ic_cargo_service;
+            case "mobile": return R.drawable.ic_cargo_mobile;
+            case "moboil_change": return R.drawable.ic_cargo_moboil;
+            case "vehicle_maintenance": return R.drawable.ic_cargo_mechanic;
+            case "mechanic": return R.drawable.ic_cargo_mechanic;
+            case "medical": return android.R.drawable.ic_menu_info_details;
+            case "food": return R.drawable.ic_cargo_food;
+            case "cargo_security_guard": return R.drawable.ic_cargo_guard;
+            case "other": return android.R.drawable.ic_menu_add;
+            default: return R.drawable.ic_cargo_service;
         }
     }
 
@@ -473,10 +727,6 @@ public class DailyExpensesActivity extends AppCompatActivity {
 
     private int dpToPx(int dp) {
         return Math.round(dp * getResources().getDisplayMetrics().density);
-    }
-
-    private String formatCurrency(double amount) {
-        return String.format(Locale.US, "Rs %.0f", amount);
     }
 
     private String getInput(com.google.android.material.textfield.TextInputEditText input) {

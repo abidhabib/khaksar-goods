@@ -1,4 +1,6 @@
 const pool = require('../config/database');
+const MOBOIL_CHANGE_INTERVAL = 5000; // km
+
 const {
     ensureDriverDailyExpenseEntriesTable,
     ensureDriverDailyExpenseEntryColumns,
@@ -14,7 +16,7 @@ const resolveDriverId = async (req) => {
     if (fromToken) {
         return fromToken;
     }
-
+ 
     const userId = req?.user?.id;
     if (!userId) {
         return null;
@@ -115,7 +117,8 @@ const DAILY_EXPENSE_CATEGORY_MAP = {
     mechanic: 'mechanic',
     medical: 'medical',
     food: 'food',
-    cargo_security_guard: 'cargo_security_guard'
+    cargo_security_guard: 'cargo_security_guard',
+    other: 'other'
 };
 
 const buildMonthFilter = (monthValue, column = 'expense_date') => {
@@ -133,13 +136,12 @@ const buildMonthFilter = (monthValue, column = 'expense_date') => {
 };
 
 const computeAverageKmPerLiter = (distance, liters) => {
-    const distanceValue = Number(distance) || 0;
-    const litersValue = Number(liters) || 0;
-    if (!(litersValue > 0) || !(distanceValue > 0)) {
-        return null;
-    }
+    const d = Number(distance) || 0;
+    const l = Number(liters) || 0;
 
-    return Number((distanceValue / litersValue).toFixed(2));
+    if (d <= 0 || l <= 0) return null;
+
+    return +(d / l).toFixed(2);
 };
 
 // Get driver's dashboard data
@@ -211,14 +213,13 @@ const getDashboard = async (req, res) => {
                 AND DATE(t.started_at) = CURDATE()
                 AND t.status = 'completed'
         `, [driver_id]);
-
-        const [lastMoboilRows] = await pool.execute(`
-            SELECT id, amount, meter_reading, expense_date, created_at
-            FROM driver_daily_expense_entries
-            WHERE driver_id = ? AND category = 'moboil_change'
-            ORDER BY expense_date DESC, created_at DESC, id DESC
-            LIMIT 1
-        `, [driver_id]);
+const [lastMoboilRows] = await pool.execute(`
+    SELECT id, amount, meter_reading, expense_date, created_at
+    FROM driver_daily_expense_entries
+    WHERE driver_id = ? AND category = 'moboil_change'
+    ORDER BY expense_date DESC, created_at DESC, id DESC
+    LIMIT 1
+`, [driver_id]);
 
         // Recent completed trips (last 5)
         const [recentTrips] = await pool.execute(`
@@ -234,43 +235,70 @@ const getDashboard = async (req, res) => {
         // Lifetime stats
         const [[lifetimeStats]] = await pool.execute(`
             SELECT 
-                COUNT(*) as total_trips,
-                COALESCE(SUM(t.freight_charge), 0) as total_revenue,
-                COALESCE(SUM(exp.total_expenses), 0) as total_expenses,
-                COALESCE(SUM(t.freight_charge), 0) - COALESCE(SUM(exp.total_expenses), 0) as net_earnings,
-                COALESCE(SUM(t.end_meter_reading - t.start_meter_reading), 0) as total_distance,
-                COALESCE(SUM(exp.total_diesel_liters), 0) as total_diesel_liters
-            FROM trips t
-            LEFT JOIN (
-                SELECT
-                    trip_id,
-                    SUM(amount) as total_expenses,
-                    SUM(CASE WHEN category = 'diesel' THEN COALESCE(liters, 0) ELSE 0 END) as total_diesel_liters
-                FROM expenses
-                GROUP BY trip_id
-            ) exp ON t.id = exp.trip_id
-            WHERE t.driver_id = ? AND t.status = 'completed'
+    COUNT(CASE 
+        WHEN t.ended_at >= DATE_FORMAT(CURRENT_DATE(), '%Y-%m-01')
+         AND t.ended_at < DATE_FORMAT(CURRENT_DATE() + INTERVAL 1 MONTH, '%Y-%m-01')
+        THEN 1 
+    END) as total_trips,
+
+    COALESCE(SUM(t.freight_charge), 0) as total_revenue,
+    COALESCE(SUM(exp.total_expenses), 0) as total_expenses,
+    COALESCE(SUM(t.freight_charge), 0) - COALESCE(SUM(exp.total_expenses), 0) as net_earnings,
+    COALESCE(SUM(t.end_meter_reading - t.start_meter_reading), 0) as total_distance,
+    COALESCE(SUM(exp.total_diesel_liters), 0) as total_diesel_liters
+
+FROM trips t
+LEFT JOIN (
+    SELECT
+        trip_id,
+        SUM(amount) as total_expenses,
+        SUM(CASE WHEN category = 'diesel' THEN COALESCE(liters, 0) ELSE 0 END) as total_diesel_liters
+    FROM expenses
+    GROUP BY trip_id
+) exp ON t.id = exp.trip_id
+WHERE 
+    t.driver_id = ?
+    AND t.status = 'completed'
         `, [driver_id]);
 
         const profilePayload = profile[0];
-        const lastMoboilChange = lastMoboilRows[0] || null;
-        profilePayload.overall_average_km_per_liter = computeAverageKmPerLiter(
-            profilePayload.car_total_distance,
-            profilePayload.car_total_diesel_liters
-        );
-        if (lastMoboilChange) {
-            const currentMeter = Number(profilePayload.current_meter_reading) || 0;
-            const lastMoboilMeter = Number(lastMoboilChange.meter_reading) || 0;
-            profilePayload.last_moboil_change = {
-                ...lastMoboilChange,
-                meter_reading: lastMoboilChange.meter_reading !== null ? lastMoboilMeter : null,
-                km_since_change: lastMoboilMeter > 0 && currentMeter >= lastMoboilMeter
-                    ? Number((currentMeter - lastMoboilMeter).toFixed(2))
-                    : null
-            };
-        } else {
-            profilePayload.last_moboil_change = null;
-        }
+const lastMoboilChange = lastMoboilRows[0] || null;
+const currentMeter = Number(profilePayload.current_meter_reading) || 0;
+      // In backend controller
+profilePayload.overall_average_km_per_liter = computeAverageKmPerLiter(
+    profilePayload.car_total_distance,
+    profilePayload.car_total_diesel_liters
+) ?? 0;  // Return 0 if null
+      if (lastMoboilChange) {
+    const lastMoboilMeter = Number(lastMoboilChange.meter_reading) || 0;
+    const kmSinceChange = lastMoboilMeter > 0 && currentMeter >= lastMoboilMeter
+        ? Number((currentMeter - lastMoboilMeter).toFixed(2))
+        : 0;
+    
+    const remainingKm = Math.max(0, MOBOIL_CHANGE_INTERVAL - kmSinceChange);
+    const progressPercent = Math.min(100, (kmSinceChange / MOBOIL_CHANGE_INTERVAL) * 100);
+    
+    profilePayload.moboil_status = {
+        last_change_meter: lastMoboilMeter,
+        km_since_change: kmSinceChange,
+        remaining_km: Number(remainingKm.toFixed(2)),
+        progress_percent: Number(progressPercent.toFixed(1)),
+        needs_change: remainingKm <= 0
+    };
+} else {
+    // No moboil change recorded yet - assume full interval remaining from current meter
+    const kmSinceChange = currentMeter % MOBOIL_CHANGE_INTERVAL;
+    const remainingKm = MOBOIL_CHANGE_INTERVAL - kmSinceChange;
+    
+    profilePayload.moboil_status = {
+        last_change_meter: null,
+        km_since_change: Number(kmSinceChange.toFixed(2)),
+        remaining_km: Number(remainingKm.toFixed(2)),
+        progress_percent: Number(((kmSinceChange / MOBOIL_CHANGE_INTERVAL) * 100).toFixed(1)),
+        needs_change: false
+    };
+}
+
         lifetimeStats.overall_average_km_per_liter = computeAverageKmPerLiter(
             lifetimeStats.total_distance,
             lifetimeStats.total_diesel_liters
@@ -854,7 +882,7 @@ const getDailyExpenses = async (req, res) => {
         const monthFilter = buildMonthFilter(req.query.month, 'expense_date');
 
         const [entries] = await pool.execute(
-            `SELECT id, driver_id, category, amount, meter_reading, expense_date, created_at
+            `SELECT id, driver_id, category, amount, meter_reading, note, expense_image, expense_date, created_at
              FROM driver_daily_expense_entries
              WHERE driver_id = ? ${monthFilter.clause}
              ORDER BY created_at DESC, id DESC`,
@@ -890,6 +918,7 @@ const getDailyExpenses = async (req, res) => {
                     medical_cost: 0,
                     food_cost: 0,
                     cargo_security_guard_fee: 0,
+                    other_cost: 0,
                     total_amount: 0
                 };
             }
@@ -919,6 +948,9 @@ const getDailyExpenses = async (req, res) => {
                     break;
                 case 'cargo_security_guard':
                     expensesByDate[dateKey].cargo_security_guard_fee += amountValue;
+                    break;
+                case 'other':
+                    expensesByDate[dateKey].other_cost += amountValue;
                     break;
                 default:
                     break;
@@ -976,15 +1008,18 @@ const saveDailyExpense = async (req, res) => {
             medical_cost = 0,
             food_cost = 0,
             cargo_security_guard_fee = 0,
-            meter_reading
+            meter_reading,
+            note
         } = req.body;
 
+        const expense_image = getUploadedFilePath(req, 'expense_image');
         const normalizedCategory = toNullableString(category);
         if (normalizedCategory && amount !== undefined) {
             const amountValue = toExpenseNumber(amount);
             const meterReadingValue = toOptionalDecimal(meter_reading);
+            const noteValue = toNullableString(note);
 
-            if (!DAILY_EXPENSE_CATEGORY_MAP[normalizedCategory]) {
+            if (!DAILY_EXPENSE_CATEGORY_MAP[normalizedCategory] && normalizedCategory !== 'other') {
                 return res.status(400).json({ message: 'Invalid daily expense category' });
             }
 
@@ -996,15 +1031,16 @@ const saveDailyExpense = async (req, res) => {
                 return res.status(400).json({ message: 'Meter reading is required for moboil change' });
             }
 
+            const expenseDate = toNullableString(req.body.expense_date);
             const [result] = await pool.execute(
                 `INSERT INTO driver_daily_expense_entries
-                 (driver_id, category, amount, meter_reading, expense_date)
-                 VALUES (?, ?, ?, ?, CURDATE())`,
-                [driver_id, normalizedCategory, amountValue, meterReadingValue]
+                 (driver_id, category, amount, meter_reading, note, expense_image, expense_date)
+                 VALUES (?, ?, ?, ?, ?, ?, COALESCE(?, CURDATE()))`,
+                [driver_id, normalizedCategory, amountValue, meterReadingValue, noteValue, expense_image, expenseDate]
             );
 
             const [[entry]] = await pool.execute(
-                `SELECT id, driver_id, category, amount, meter_reading, expense_date, created_at
+                `SELECT id, driver_id, category, amount, meter_reading, note, expense_image, expense_date, created_at
                  FROM driver_daily_expense_entries
                  WHERE id = ? LIMIT 1`,
                 [result.insertId]
@@ -1038,12 +1074,13 @@ const saveDailyExpense = async (req, res) => {
                 ['cargo_security_guard', values[7]]
             ].filter(([, amountValue]) => amountValue > 0);
 
+            const expenseDate = req.body.expense_date || null;
             for (const [categoryName, amountValue] of rows) {
                 await pool.execute(
                     `INSERT INTO driver_daily_expense_entries
                      (driver_id, category, amount, expense_date)
-                     VALUES (?, ?, ?, CURDATE())`,
-                    [driver_id, categoryName, amountValue]
+                     VALUES (?, ?, ?, COALESCE(?, CURDATE()))`,
+                    [driver_id, categoryName, amountValue, expenseDate]
                 );
             }
         }

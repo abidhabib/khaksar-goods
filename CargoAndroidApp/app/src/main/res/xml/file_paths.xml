@@ -5,5 +5,8 @@
         path="trip-media/" />
     <cache-path
         name="trip_media_cache"
-        path="." />
+        path="."
+
+        />
+
 </paths>

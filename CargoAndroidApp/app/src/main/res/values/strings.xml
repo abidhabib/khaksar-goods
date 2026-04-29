@@ -44,7 +44,6 @@
     <string name="end_trip_details">End Trip Details</string>
     <string name="loading_dashboard">Loading dashboard...</string>
     <string name="trip_history">Trip History</string>
-    <string name="trip_history_subtitle">Review completed and ongoing trips details.</string>
     <string name="daily_expenses">Daily Expenses</string>
     <string name="daily_expenses_subtitle">Save your daily costs.</string>
     <string name="daily_expense_history_subtitle">Add and review daily spending</string>
@@ -53,6 +52,9 @@
     <string name="no_history_title">No trips found</string>
     <string name="no_history_subtitle">Once you start and complete trips, detailed history will appear here.</string>
     <string name="trip_history_meta">Started %1$s\nEnded %2$s</string>
+<!--    start_trip_subtitle-->
+    <string name="start_trip_subtitle">Start Your Trip</string>
+
     <string name="trip_history_meter">Meter: %1$.0f to %2$.0f • Distance: %3$.0f km</string>
     <string name="trip_history_finance">Freight: %1$s • Expense: %2$s • Net: %3$s</string>
     <string name="trip_notes_empty">Notes: No notes added</string>
@@ -63,6 +65,7 @@ Chalaan %5$s • Mandi Kaat %6$s • Reward %7$s • Bilty %8$s • Tyre %9$s</s
     <string name="trip_start_image">Start meter image</string>
     <string name="trip_end_image">End meter image</string>
     <string name="trip_bilty_image">Bilty slip image</string>
+    <string name="trip_load_image">Load image</string>
     <string name="tap_to_view">Tap to view full size</string>
     <string name="no_trip_image">No image uploaded</string>
     <string name="close">Close</string>
@@ -105,6 +108,10 @@ Chalaan %5$s • Mandi Kaat %6$s • Reward %7$s • Bilty %8$s • Tyre %9$s</s
     <string name="other_cost">Other cost</string>
     <string name="end_location">End location</string>
     <string name="end_trip_required_fields">End location and meter reading are required</string>
+    <string name="add_photo">Add Photo</string>
+    <string name="add_expense_photo_optional">Add an expense photo? (optional)</string>
+    <string name="save_without_photo">Save without photo</string>
+    <string name="skip">Skip</string>
     <string name="ongoing_trip_details">Ongoing trip details</string>
     <string name="started_meter_value">Started meter: %1$s</string>
     <string name="add_trip_expenses">Add trip expenses</string>
@@ -133,6 +140,10 @@ Chalaan %5$s • Mandi Kaat %6$s • Reward %7$s • Bilty %8$s • Tyre %9$s</s
 Moboil %3$s • Maintenance %4$s • Mechanic %5$s
 Medical %6$s • Food %7$s • Guard %8$s</string>
     <string name="notes">Notes</string>
+    <string name="save">Save</string>
+    <string name="cancel">Cancel</string>
+    <string name="photo_selected_save_now">Photo selected. Save now?</string>
+
     <string name="finish_trip_first">Finish the current trip first</string>
     <string name="back_to_dashboard">Back to Dashboard</string>
     <string name="submit_trip">Submit Trip</string>
@@ -186,9 +197,9 @@ Medical %6$s • Food %7$s • Guard %8$s</string>
     <string name="moboil_meter_reading">Moboil meter reading</string>
     <string name="moboil_meter_required">Meter reading is required</string>
     <string name="save_moboil_expense">Save moboil change</string>
-    <string name="moboil_alert_title">Moboil Change</string>
-    <string name="moboil_alert_empty">No moboil change saved yet</string>
-    <string name="moboil_alert_value">Last at %1$s • %2$s km ago</string>
+<string name="moboil_alert_title">Moboil Change</string>
+<string name="moboil_alert_empty">-- km</string>
+    <string name="moboil_alert_value">Moboil change: %1$s</string>
     <string name="send_payment_to_company">Send Payment to Company</string>
     <string name="driver_account_khata">Driver Account/Khata</string>
     <string name="driver_account_subtitle">View your balance and ledger</string>

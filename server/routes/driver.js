@@ -57,7 +57,13 @@ router.post(
 router.get('/trips', authMiddleware, driverOnly, getTripHistory);
 router.get('/trips/:trip_id', authMiddleware, driverOnly, getTripDetails);
 router.get('/daily-expenses', authMiddleware, driverOnly, getDailyExpenses);
-router.post('/daily-expenses', authMiddleware, driverOnly, saveDailyExpense);
+router.post(
+    '/daily-expenses',
+    authMiddleware,
+    driverOnly,
+    upload.fields([{ name: 'expense_image', maxCount: 1 }]),
+    saveDailyExpense
+);
 router.post(
     '/company-payments',
     authMiddleware,

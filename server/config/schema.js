@@ -129,17 +129,25 @@ const ensureDriverDailyExpenseEntriesTable = async (connection) => {
 };
 
 const ensureDriverDailyExpenseEntryColumns = async (connection, databaseName) => {
-    const [rows] = await connection.execute(
-        `SELECT COLUMN_NAME
-         FROM INFORMATION_SCHEMA.COLUMNS
-         WHERE TABLE_SCHEMA = ? AND TABLE_NAME = 'driver_daily_expense_entries' AND COLUMN_NAME = 'meter_reading'`,
-        [databaseName]
-    );
+    const columnsToEnsure = [
+        { name: 'meter_reading', definition: 'DECIMAL(10,2) NULL AFTER amount' },
+        { name: 'note', definition: 'TEXT NULL AFTER meter_reading' },
+        { name: 'expense_image', definition: 'VARCHAR(500) NULL AFTER note' }
+    ];
 
-    if (!rows.length) {
-        await connection.query(
-            'ALTER TABLE driver_daily_expense_entries ADD COLUMN meter_reading DECIMAL(10,2) NULL AFTER amount'
+    for (const column of columnsToEnsure) {
+        const [rows] = await connection.execute(
+            `SELECT COLUMN_NAME
+             FROM INFORMATION_SCHEMA.COLUMNS
+             WHERE TABLE_SCHEMA = ? AND TABLE_NAME = 'driver_daily_expense_entries' AND COLUMN_NAME = ?`,
+            [databaseName, column.name]
         );
+
+        if (!rows.length) {
+            await connection.query(
+                `ALTER TABLE driver_daily_expense_entries ADD COLUMN ${column.name} ${column.definition}`
+            );
+        }
     }
 };
 

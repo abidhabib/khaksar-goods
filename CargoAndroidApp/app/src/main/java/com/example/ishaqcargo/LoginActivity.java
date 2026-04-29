@@ -3,6 +3,7 @@ package com.example.ishaqcargo;
 import android.content.Intent;
 import android.os.Bundle;
 import android.text.TextUtils;
+import android.util.Log;
 import android.widget.Toast;
 
 import androidx.appcompat.app.AppCompatActivity;
@@ -69,13 +70,18 @@ public class LoginActivity extends AppCompatActivity {
     }
 
     private void attemptLogin() {
+        String baseUrl = sessionManager.getBaseUrl();
+
+        Log.d("API_DEBUG", "BASE URL: " + baseUrl);
+        Log.d("API_DEBUG", "FINAL URL: " + baseUrl + "/auth/login");
+        Toast.makeText(this, "BASE: " + baseUrl, Toast.LENGTH_LONG).show();
         String username = binding.usernameInput.getText() != null
                 ? binding.usernameInput.getText().toString().trim()
                 : "";
         String password = binding.passwordInput.getText() != null
                 ? binding.passwordInput.getText().toString().trim()
                 : "";
-        String baseUrl = sessionManager.getBaseUrl();
+        baseUrl = sessionManager.getBaseUrl();
 
         if (TextUtils.isEmpty(username) || TextUtils.isEmpty(password)) {
             Toast.makeText(this, R.string.login_error_empty_credentials, Toast.LENGTH_SHORT).show();

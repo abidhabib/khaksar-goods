@@ -131,10 +131,10 @@ public class EndTripActivity extends AppCompatActivity {
         bindSimpleExpenseCard(binding.tollExpenseCard, "toll", R.string.toll_cost);
         bindSimpleExpenseCard(binding.foodExpenseCard, "food", R.string.food_cost);
         bindSimpleExpenseCard(binding.policeExpenseCard, "police", R.string.police_cost);
-        binding.chalaanExpenseCard.setOnClickListener(v -> openReceiptExpenseScreen("chalaan"));
+        binding.chalaanExpenseCard.setOnClickListener(v -> openReceiptExpenseScreen("chalaan", getString(R.string.chalaan_cost)));
         bindSimpleExpenseCard(binding.mandiKaatExpenseCard, "mandi_kaat", R.string.mandi_kaat_cost);
         bindSimpleExpenseCard(binding.rewardExpenseCard, "reward", R.string.reward_cost);
-        bindSimpleExpenseCard(binding.tyrePunctureExpenseCard, "tyre_puncture", R.string.tyre_puncture_cost);
+        binding.tyrePunctureExpenseCard.setOnClickListener(v -> openReceiptExpenseScreen("tyre_puncture", getString(R.string.tyre_puncture_cost)));
 
         styleWidgetCard(binding.dieselExpenseCard, R.color.trips_widget_bg, R.drawable.ic_cargo_diesel);
         styleWidgetCard(binding.tollExpenseCard, R.color.trips_widget_bg, R.drawable.ic_cargo_toll);
@@ -162,15 +162,15 @@ public class EndTripActivity extends AppCompatActivity {
         dieselExpenseLauncher.launch(intent);
     }
 
-    private void openReceiptExpenseScreen(String expenseCategory) {
+    private void openReceiptExpenseScreen(String expenseCategory, String title) {
         Intent intent = new Intent(this, ReceiptExpenseActivity.class);
         intent.putExtra(ReceiptExpenseActivity.EXTRA_TRIP_ID, tripId);
         intent.putExtra(ReceiptExpenseActivity.EXTRA_CATEGORY, expenseCategory);
-        intent.putExtra(ReceiptExpenseActivity.EXTRA_TITLE, getString(R.string.chalaan_cost));
-        intent.putExtra(ReceiptExpenseActivity.EXTRA_SAVE_LABEL, getString(R.string.save_chalaan_expense));
-        intent.putExtra(ReceiptExpenseActivity.EXTRA_UPLOAD_LABEL, getString(R.string.open_camera_for_chalaan));
-        intent.putExtra(ReceiptExpenseActivity.EXTRA_CHANGE_LABEL, getString(R.string.change_chalaan_photo));
-        intent.putExtra(ReceiptExpenseActivity.EXTRA_PHOTO_REQUIRED_MESSAGE, getString(R.string.chalaan_photo_required));
+        intent.putExtra(ReceiptExpenseActivity.EXTRA_TITLE, title);
+        intent.putExtra(ReceiptExpenseActivity.EXTRA_SAVE_LABEL, getString(R.string.save_expense_entry));
+        intent.putExtra(ReceiptExpenseActivity.EXTRA_UPLOAD_LABEL, getString(R.string.add_photo));
+        intent.putExtra(ReceiptExpenseActivity.EXTRA_CHANGE_LABEL, getString(R.string.start_trip_change_photo));
+        intent.putExtra(ReceiptExpenseActivity.EXTRA_PHOTO_REQUIRED_MESSAGE, getString(R.string.load_photo_only_required));
         receiptExpenseLauncher.launch(intent);
     }
 

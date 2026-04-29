@@ -3,6 +3,7 @@ package com.example.ishaqcargo;
 import android.content.Intent;
 import android.os.Bundle;
 import android.text.TextUtils;
+import android.view.View;
 import android.widget.Toast;
 
 import androidx.activity.result.ActivityResultLauncher;
@@ -58,7 +59,6 @@ public class DriverDashboardActivity extends AppCompatActivity {
         baseUrl = sessionManager.getBaseUrl();
 
         applyWindowInsets();
-        // Removed initial welcomeText setting as IDs changed
 
         binding.logoutButton.setOnClickListener(v -> {
             sessionManager.clearSession();
@@ -70,16 +70,16 @@ public class DriverDashboardActivity extends AppCompatActivity {
         binding.tripHistoryCard.setOnClickListener(v ->
                 startActivity(new Intent(this, TripHistoryActivity.class))
         );
-        binding.dailyExpenseWidget.setOnClickListener(v ->
+        binding.dailyExpenseCard.setOnClickListener(v ->
                 startActivity(new Intent(this, DailyExpensesActivity.class))
         );
-        binding.submitPaymentWidget.setOnClickListener(v ->
+        binding.paymentCard.setOnClickListener(v ->
                 startActivity(new Intent(this, PaymentSubmissionActivity.class))
         );
-        binding.driverAccountWidget.setOnClickListener(v -> {
+        binding.driverAccount.setOnClickListener(v -> {
             // TODO: Navigate to Driver Account
         });
-        binding.helperAccountWidget.setOnClickListener(v -> {
+        binding.helperAccount.setOnClickListener(v -> {
             // TODO: Navigate to Helper Account
         });
         binding.leaveToHomeCard.setOnClickListener(v -> {
@@ -163,12 +163,15 @@ public class DriverDashboardActivity extends AppCompatActivity {
                     JSONObject profile = root.optJSONObject("profile");
                     ongoingTrip = root.optJSONObject("ongoingTrip");
                     currentCarMeterReading = profile != null ? profile.optDouble("current_meter_reading", 0) : 0;
+                    
+                    // FIXED: Use optDouble directly — backend now sends 0 instead of null
                     currentVehicleAverage = profile != null ? profile.optDouble("overall_average_km_per_liter", 0) : 0;
-
+                    
                     runOnUiThread(() -> {
                         maybeForceEndTrip(ongoingTrip);
                         bindDashboard(lifetime, todayStats, profile);
                         binding.dashboardSwipeRefresh.setRefreshing(false);
+                        binding.avgTextView.setText(formatAverage(currentVehicleAverage));
                         setLoading(false);
                     });
                 } catch (Exception e) {
@@ -222,7 +225,6 @@ public class DriverDashboardActivity extends AppCompatActivity {
         String loadLocation = ongoingTripJson.optString("load_live_location", "");
         String loadCoordinates = ongoingTripJson.optString("load_coordinates", "");
 
-        // Treat "null" string from API as empty
         if ("null".equalsIgnoreCase(loadPhoto)) loadPhoto = "";
         if ("null".equalsIgnoreCase(loadLocation)) loadLocation = "";
         if ("null".equalsIgnoreCase(loadCoordinates)) loadCoordinates = "";
@@ -240,32 +242,35 @@ public class DriverDashboardActivity extends AppCompatActivity {
         currentDriverName = profile != null ? profile.optString("username", "") : "";
 
         binding.totalTripsValue.setText(String.valueOf(totalTrips));
-        binding.driverNameLabel.setText(getString(
-                R.string.driver_name_value,
-                TextUtils.isEmpty(currentDriverName) ? "Driver" : currentDriverName
-        ));
         binding.carNumberText.setText(getString(
                 R.string.car_number_value,
                 TextUtils.isEmpty(currentCarNumber) ? "-" : currentCarNumber
         ));
+        binding.currentDriverName.setText(currentDriverName);
 
-        JSONObject lastMoboilChange = profile != null ? profile.optJSONObject("last_moboil_change") : null;
-        if (lastMoboilChange != null && !lastMoboilChange.isNull("meter_reading")) {
-            binding.moboilAlertValueWidget.setText(getString(
-                    R.string.moboil_alert_value,
-                    formatPlainNumber(lastMoboilChange.optDouble("meter_reading", 0)),
-                    formatPlainNumber(lastMoboilChange.optDouble("km_since_change", 0))
-            ));
+        // Moboil countdown widget
+        JSONObject moboilStatus = profile != null ? profile.optJSONObject("moboil_status") : null;
+        if (moboilStatus != null) {
+            double remainingKm = moboilStatus.optDouble("remaining_km", 0);
+            boolean needsChange = moboilStatus.optBoolean("needs_change", false);
+            
+            if (needsChange) {
+                binding.moboilAlertValueWidget.setText(formatPlainNumber(remainingKm) + " km");
+                binding.moboilAlertValueWidget.setTextColor(getColor(R.color.red));
+            } else {
+                binding.moboilAlertValueWidget.setText(formatPlainNumber(remainingKm) + " km");
+                binding.moboilAlertValueWidget.setTextColor(getColor(R.color.km_widget_text));
+            }
         } else {
-            binding.moboilAlertValueWidget.setText(R.string.moboil_alert_empty);
+            binding.moboilAlertValueWidget.setText("-- km");
         }
     }
 
     private void setLoading(boolean loading) {
-        binding.dashboardLoadingOverlay.setVisibility(loading ? android.view.View.VISIBLE : android.view.View.GONE);
+        binding.dashboardLoadingOverlay.setVisibility(loading ? View.VISIBLE : View.GONE);
         binding.tripHistoryCard.setEnabled(!loading);
-        binding.dailyExpenseWidget.setEnabled(!loading);
-        binding.submitPaymentWidget.setEnabled(!loading);
+        binding.dailyExpenseCard.setEnabled(!loading);
+        binding.paymentCard.setEnabled(!loading);
         binding.dashboardSwipeRefresh.setEnabled(!loading);
         binding.startTripButton.setEnabled(!loading && (ongoingTrip == null || ongoingTrip.length() == 0));
     }
@@ -282,10 +287,10 @@ public class DriverDashboardActivity extends AppCompatActivity {
         return String.format(Locale.US, "%.0f", value);
     }
 
+    // FIXED: Only show "--" for NaN/invalid, not for zero. Backend sends 0 when no data.
     private String formatAverage(double average) {
-        if (!(average > 0)) {
-            return "N/A";
+        if (Double.isNaN(average)) {
+            return "--";
         }
-        return String.format(Locale.US, "%.2f km/L", average);
-    }
+return "avg " + String.format(Locale.US, "%.3f", average);    }
 }

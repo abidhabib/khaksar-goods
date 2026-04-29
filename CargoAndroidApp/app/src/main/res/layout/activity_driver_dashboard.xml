@@ -29,7 +29,6 @@
                 android:layout_height="wrap_content"
                 android:orientation="vertical">
 
-                <!-- Header Card -->
                 <com.google.android.material.card.MaterialCardView
                     android:id="@+id/headerCard"
                     android:layout_width="match_parent"
@@ -68,31 +67,41 @@
                             android:orientation="vertical">
 
                             <TextView
-                                android:id="@+id/driverNameLabel"
-                                android:layout_width="wrap_content"
+                                android:id="@+id/currentDriverName"
+                                android:layout_width="203dp"
                                 android:layout_height="wrap_content"
+                                android:gravity="start"
                                 android:letterSpacing="0.08"
                                 android:text="@string/driver_name_value"
                                 android:textAllCaps="true"
                                 android:textColor="@color/header_label"
-                                android:textSize="11sp"
-                                android:textStyle="bold" />
+                                android:textSize="13sp"
+                                android:textStyle="bold"
+                                tools:text="amin534" />
 
                             <TextView
                                 android:id="@+id/carNumberText"
-                                android:layout_width="match_parent"
+                                android:layout_width="204dp"
                                 android:layout_height="wrap_content"
                                 android:layout_marginTop="2dp"
                                 android:ellipsize="end"
                                 android:gravity="start"
-                                android:textDirection="rtl"
                                 android:maxLines="1"
                                 android:text="@string/car_number_value"
                                 android:textColor="@color/white"
                                 android:textSize="18sp"
                                 android:textStyle="bold"
-                                tools:text="ABC-123" />
+                                tools:text="BKK-6776" />
 
+                            <TextView
+                                android:id="@+id/avgTextView"
+                                android:layout_width="203dp"
+                                android:layout_height="wrap_content"
+                                android:gravity="start"
+                                android:letterSpacing="0.08"
+                                android:textColor="@color/header_label"
+                                android:textSize="12sp"
+                                tools:text="12.45" />
                         </LinearLayout>
 
                         <com.google.android.material.button.MaterialButton
@@ -114,7 +123,6 @@
                     </LinearLayout>
                 </com.google.android.material.card.MaterialCardView>
 
-                <!-- 2x3 Stats Grid -->
                 <LinearLayout
                     android:id="@+id/statsGrid"
                     android:layout_width="match_parent"
@@ -122,15 +130,12 @@
                     android:layout_marginTop="12dp"
                     android:orientation="vertical">
 
-                    <!-- Row 1: Total Trips | Daily Expense -->
                     <LinearLayout
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
                         android:orientation="horizontal">
 
-                        <!-- 1st: Total Trips -->
                         <com.google.android.material.card.MaterialCardView
-                            android:id="@+id/totalTripsWidget"
                             android:layout_width="0dp"
                             android:layout_height="wrap_content"
                             android:layout_marginEnd="6dp"
@@ -173,9 +178,8 @@
                             </LinearLayout>
                         </com.google.android.material.card.MaterialCardView>
 
-                        <!-- 2nd: Daily Expense -->
                         <com.google.android.material.card.MaterialCardView
-                            android:id="@+id/dailyExpenseWidget"
+                            android:id="@+id/moboilAlertWidget"
                             android:layout_width="0dp"
                             android:layout_height="wrap_content"
                             android:layout_marginStart="6dp"
@@ -195,234 +199,37 @@
                                     android:layout_width="18dp"
                                     android:layout_height="18dp"
                                     android:src="@drawable/ic_dashboard_expenses"
-                                    app:tint="@color/trips_widget_text" />
+                                    app:tint="@color/km_widget_text" />
 
                                 <TextView
                                     android:layout_width="wrap_content"
                                     android:layout_height="wrap_content"
                                     android:layout_marginTop="10dp"
-                                    android:text="@string/daily_expense_history"
-                                    android:textColor="@color/trips_widget_text"
+                                    android:text="@string/moboil_alert_title"
+                                    android:textColor="@color/km_widget_text"
                                     android:textSize="11sp"
                                     android:textStyle="bold" />
 
                                 <TextView
-                                    android:id="@+id/dailyExpenseValue"
+                                    android:id="@+id/moboilAlertValueWidget"
                                     android:layout_width="wrap_content"
                                     android:layout_height="wrap_content"
                                     android:layout_marginTop="3dp"
-                                    android:text="-"
-                                    android:textColor="@color/trips_widget_text"
+                                    android:ellipsize="end"
+                                    android:maxLines="2"
+                                    android:text="@string/moboil_alert_empty"
+                                    android:textColor="@color/km_widget_text"
                                     android:textSize="22sp"
                                     android:textStyle="bold" />
                             </LinearLayout>
                         </com.google.android.material.card.MaterialCardView>
                     </LinearLayout>
 
-                    <!-- Row 2: Submit Payment | Moboil Change -->
-                    <LinearLayout
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:layout_marginTop="12dp"
-                        android:orientation="horizontal">
-
-                        <!-- 3rd: Submit Payment -->
-                        <com.google.android.material.card.MaterialCardView
-                            android:id="@+id/submitPaymentWidget"
-                            android:layout_width="0dp"
-                            android:layout_height="wrap_content"
-                            android:layout_marginEnd="6dp"
-                            android:layout_weight="1"
-                            app:cardBackgroundColor="@color/trips_widget_bg"
-                            app:cardCornerRadius="22dp"
-                            app:cardElevation="0dp">
-
-                            <LinearLayout
-                                android:layout_width="match_parent"
-                                android:layout_height="wrap_content"
-                                android:minHeight="92dp"
-                                android:orientation="vertical"
-                                android:padding="14dp">
-
-                                <ImageView
-                                    android:layout_width="18dp"
-                                    android:layout_height="18dp"
-                                    android:src="@drawable/bg_icon_button"
-                                    app:tint="@color/trips_widget_text" />
-
-                                <TextView
-                                    android:layout_width="wrap_content"
-                                    android:layout_height="wrap_content"
-                                    android:layout_marginTop="10dp"
-                                    android:text="@string/send_payment_to_company"
-                                    android:textColor="@color/trips_widget_text"
-                                    android:textSize="11sp"
-                                    android:textStyle="bold" />
-
-                                <TextView
-                                    android:id="@+id/submitPaymentValue"
-                                    android:layout_width="wrap_content"
-                                    android:layout_height="wrap_content"
-                                    android:layout_marginTop="3dp"
-                                    android:text="-"
-                                    android:textColor="@color/trips_widget_text"
-                                    android:textSize="22sp"
-                                    android:textStyle="bold" />
-                            </LinearLayout>
-                        </com.google.android.material.card.MaterialCardView>
-
-                     <!-- 4th: Moboil Change -->
-<com.google.android.material.card.MaterialCardView
-    android:id="@+id/moboilAlertWidget"
-    android:layout_width="0dp"
-    android:layout_height="wrap_content"
-    android:layout_marginStart="6dp"
-    android:layout_weight="1"
-    app:cardBackgroundColor="@color/trips_widget_bg"
-    app:cardCornerRadius="22dp"
-    app:cardElevation="0dp">
-
-    <LinearLayout
-        android:layout_width="match_parent"
-        android:layout_height="match_parent"
-        android:minHeight="92dp"
-        android:orientation="vertical"
-        android:padding="14dp">
-
-        <ImageView
-            android:layout_width="18dp"
-            android:layout_height="18dp"
-            android:src="@drawable/ic_dashboard_expenses"
-            app:tint="@color/trips_widget_text" />
-
-        <TextView
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="10dp"
-            android:text="@string/moboil_alert_title"
-            android:textColor="@color/trips_widget_text"
-            android:textSize="11sp"
-            android:textStyle="bold" />
-
-        <TextView
-            android:id="@+id/moboilAlertValueWidget"
-            android:layout_width="wrap_content"
-            android:layout_height="0dp"
-            android:layout_marginTop="3dp"
-            android:layout_weight="1"
-            android:ellipsize="end"
-            android:gravity="bottom"
-            android:maxLines="2"
-            android:text="@string/moboil_alert_empty"
-            android:textColor="@color/trips_widget_text"
-            android:textSize="12sp"
-            android:textStyle="bold" />
-    </LinearLayout>
-</com.google.android.material.card.MaterialCardView>
-                    </LinearLayout>
-
-                    <!-- Row 3: Driver Khata | Helper Khata (NO click listeners - under progress) -->
-                    <LinearLayout
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:layout_marginTop="12dp"
-                        android:orientation="horizontal">
-
-                        <!-- 5th: Driver Account Khata -->
-                        <com.google.android.material.card.MaterialCardView
-                            android:id="@+id/driverAccountWidget"
-                            android:layout_width="0dp"
-                            android:layout_height="wrap_content"
-                            android:layout_marginEnd="6dp"
-                            android:layout_weight="1"
-                            app:cardBackgroundColor="@color/trips_widget_bg"
-                            app:cardCornerRadius="22dp"
-                            app:cardElevation="0dp">
-
-                            <LinearLayout
-                                android:layout_width="match_parent"
-                                android:layout_height="wrap_content"
-                                android:minHeight="92dp"
-                                android:orientation="vertical"
-                                android:padding="14dp">
-
-                                <ImageView
-                                    android:layout_width="18dp"
-                                    android:layout_height="18dp"
-                                    android:src="@drawable/ic_person"
-                                    app:tint="@color/trips_widget_text" />
-
-                                <TextView
-                                    android:layout_width="wrap_content"
-                                    android:layout_height="wrap_content"
-                                    android:layout_marginTop="10dp"
-                                    android:text="@string/driver_account_khata"
-                                    android:textColor="@color/trips_widget_text"
-                                    android:textSize="11sp"
-                                    android:textStyle="bold" />
-
-                                <TextView
-                                    android:id="@+id/driverAccountValue"
-                                    android:layout_width="wrap_content"
-                                    android:layout_height="wrap_content"
-                                    android:layout_marginTop="3dp"
-                                    android:text="-"
-                                    android:textColor="@color/trips_widget_text"
-                                    android:textSize="22sp"
-                                    android:textStyle="bold" />
-                            </LinearLayout>
-                        </com.google.android.material.card.MaterialCardView>
-
-                        <!-- 6th: Helper Account Khata -->
-                        <com.google.android.material.card.MaterialCardView
-                            android:id="@+id/helperAccountWidget"
-                            android:layout_width="0dp"
-                            android:layout_height="wrap_content"
-                            android:layout_marginStart="6dp"
-                            android:layout_weight="1"
-                            app:cardBackgroundColor="@color/trips_widget_bg"
-                            app:cardCornerRadius="22dp"
-                            app:cardElevation="0dp">
-
-                            <LinearLayout
-                                android:layout_width="match_parent"
-                                android:layout_height="wrap_content"
-                                android:minHeight="92dp"
-                                android:orientation="vertical"
-                                android:padding="14dp">
-
-                                <ImageView
-                                    android:layout_width="18dp"
-                                    android:layout_height="18dp"
-                                    android:src="@drawable/ic_person"
-                                    app:tint="@color/trips_widget_text" />
-
-                                <TextView
-                                    android:layout_width="wrap_content"
-                                    android:layout_height="wrap_content"
-                                    android:layout_marginTop="10dp"
-                                    android:text="@string/helper_account_khata"
-                                    android:textColor="@color/trips_widget_text"
-                                    android:textSize="11sp"
-                                    android:textStyle="bold" />
-
-                                <TextView
-                                    android:id="@+id/helperAccountValue"
-                                    android:layout_width="wrap_content"
-                                    android:layout_height="wrap_content"
-                                    android:layout_marginTop="3dp"
-                                    android:text="-"
-                                    android:textColor="@color/trips_widget_text"
-                                    android:textSize="22sp"
-                                    android:textStyle="bold" />
-                            </LinearLayout>
-                        </com.google.android.material.card.MaterialCardView>
-                    </LinearLayout>
                 </LinearLayout>
 
-                <!-- Leave To Home - Full Width Horizontal -->
+                <!-- Start Trip Button - styled like Send Payment card -->
                 <com.google.android.material.card.MaterialCardView
-                    android:id="@+id/leaveToHomeCard"
+                    android:id="@+id/startTripButton"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:layout_marginTop="12dp"
@@ -454,7 +261,7 @@
                             <TextView
                                 android:layout_width="wrap_content"
                                 android:layout_height="wrap_content"
-                                android:text="@string/leave_to_home"
+                                android:text="@string/start_trip"
                                 android:textColor="@color/history_title"
                                 android:textSize="15sp"
                                 android:textStyle="bold" />
@@ -463,7 +270,7 @@
                                 android:layout_width="wrap_content"
                                 android:layout_height="wrap_content"
                                 android:layout_marginTop="2dp"
-                                android:text="@string/leave_to_home_subtitle"
+                                android:text="@string/start_trip_subtitle"
                                 android:textColor="@color/history_subtitle"
                                 android:textSize="11sp" />
                         </LinearLayout>
@@ -477,8 +284,62 @@
                             android:textStyle="bold" />
                     </LinearLayout>
                 </com.google.android.material.card.MaterialCardView>
+                <com.google.android.material.card.MaterialCardView
+                    android:id="@+id/dailyExpenseCard"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="12dp"
+                    android:clickable="true"
+                    android:focusable="true"
+                    app:cardBackgroundColor="@color/history_card"
+                    app:cardCornerRadius="22dp"
+                    app:cardElevation="0dp"
+                    app:rippleColor="#18000000"
+                    app:strokeColor="@color/history_stroke"
+                    app:strokeWidth="1dp">
 
-                <!-- View All Trips - Full Width Horizontal -->
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:gravity="center_vertical"
+                        android:orientation="horizontal"
+                        android:paddingStart="16dp"
+                        android:paddingTop="14dp"
+                        android:paddingEnd="16dp"
+                        android:paddingBottom="14dp">
+
+                        <LinearLayout
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_weight="1"
+                            android:orientation="vertical">
+
+                            <TextView
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:text="@string/daily_expense_history"
+                                android:textColor="@color/history_title"
+                                android:textSize="15sp"
+                                android:textStyle="bold" />
+
+                            <TextView
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:layout_marginTop="2dp"
+                                android:text="@string/daily_expense_history_subtitle"
+                                android:textColor="@color/history_subtitle"
+                                android:textSize="11sp" />
+                        </LinearLayout>
+
+                        <TextView
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="@string/history_arrow"
+                            android:textColor="@color/history_title"
+                            android:textSize="18sp"
+                            android:textStyle="bold" />
+                    </LinearLayout>
+                </com.google.android.material.card.MaterialCardView>
                 <com.google.android.material.card.MaterialCardView
                     android:id="@+id/tripHistoryCard"
                     android:layout_width="match_parent"
@@ -536,25 +397,241 @@
                     </LinearLayout>
                 </com.google.android.material.card.MaterialCardView>
 
-                <!-- Start Trip Button -->
-                <com.google.android.material.button.MaterialButton
-                    android:id="@+id/startTripButton"
+                <com.google.android.material.card.MaterialCardView
+                    android:id="@+id/paymentCard"
                     android:layout_width="match_parent"
-                    android:layout_height="52dp"
+                    android:layout_height="wrap_content"
                     android:layout_marginTop="12dp"
-                    android:text="@string/start_trip"
-                    android:textAllCaps="false"
-                    android:textColor="@color/white"
-                    android:textSize="15sp"
-                    android:textStyle="bold"
-                    app:backgroundTint="@color/button_primary"
-                    app:cornerRadius="18dp"
-                    app:elevation="0dp" />
+                    android:clickable="true"
+                    android:focusable="true"
+                    app:cardBackgroundColor="@color/history_card"
+                    app:cardCornerRadius="22dp"
+                    app:cardElevation="0dp"
+                    app:rippleColor="#18000000"
+                    app:strokeColor="@color/history_stroke"
+                    app:strokeWidth="1dp">
+
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:gravity="center_vertical"
+                        android:orientation="horizontal"
+                        android:paddingStart="16dp"
+                        android:paddingTop="14dp"
+                        android:paddingEnd="16dp"
+                        android:paddingBottom="14dp">
+
+                        <LinearLayout
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_weight="1"
+                            android:orientation="vertical">
+
+                            <TextView
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:text="@string/send_payment_to_company"
+                                android:textColor="@color/history_title"
+                                android:textSize="15sp"
+                                android:textStyle="bold" />
+
+                            <TextView
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:layout_marginTop="2dp"
+                                android:text="@string/send_payment_new_subtitle"
+                                android:textColor="@color/history_subtitle"
+                                android:textSize="11sp" />
+                        </LinearLayout>
+
+                        <TextView
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="@string/history_arrow"
+                            android:textColor="@color/history_title"
+                            android:textSize="18sp"
+                            android:textStyle="bold" />
+                    </LinearLayout>
+
+                </com.google.android.material.card.MaterialCardView>
+
+                <com.google.android.material.card.MaterialCardView
+                    android:id="@+id/driverAccount"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="12dp"
+                    android:clickable="true"
+                    android:focusable="true"
+                    app:cardBackgroundColor="@color/history_card"
+                    app:cardCornerRadius="22dp"
+                    app:cardElevation="0dp"
+                    app:rippleColor="#18000000"
+                    app:strokeColor="@color/history_stroke"
+                    app:strokeWidth="1dp">
+
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:gravity="center_vertical"
+                        android:orientation="horizontal"
+                        android:paddingStart="16dp"
+                        android:paddingTop="14dp"
+                        android:paddingEnd="16dp"
+                        android:paddingBottom="14dp">
+
+                        <LinearLayout
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_weight="1"
+                            android:orientation="vertical">
+
+                            <TextView
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:text="@string/driver_account_khata"
+                                android:textColor="@color/history_title"
+                                android:textSize="15sp"
+                                android:textStyle="bold" />
+
+                            <TextView
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:layout_marginTop="2dp"
+                                android:text="@string/driver_account_subtitle"
+                                android:textColor="@color/history_subtitle"
+                                android:textSize="11sp" />
+                        </LinearLayout>
+
+                        <TextView
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="@string/history_arrow"
+                            android:textColor="@color/history_title"
+                            android:textSize="18sp"
+                            android:textStyle="bold" />
+                    </LinearLayout>
+                </com.google.android.material.card.MaterialCardView>
+
+                <com.google.android.material.card.MaterialCardView
+                    android:id="@+id/helperAccount"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="12dp"
+                    android:clickable="true"
+                    android:focusable="true"
+                    app:cardBackgroundColor="@color/history_card"
+                    app:cardCornerRadius="22dp"
+                    app:cardElevation="0dp"
+                    app:rippleColor="#18000000"
+                    app:strokeColor="@color/history_stroke"
+                    app:strokeWidth="1dp">
+
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:gravity="center_vertical"
+                        android:orientation="horizontal"
+                        android:paddingStart="16dp"
+                        android:paddingTop="14dp"
+                        android:paddingEnd="16dp"
+                        android:paddingBottom="14dp">
+
+                        <LinearLayout
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_weight="1"
+                            android:orientation="vertical">
+
+                            <TextView
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:text="@string/helper_account_khata"
+                                android:textColor="@color/history_title"
+                                android:textSize="15sp"
+                                android:textStyle="bold" />
+
+                            <TextView
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:layout_marginTop="2dp"
+                                android:text="@string/helper_account_subtitle"
+                                android:textColor="@color/history_subtitle"
+                                android:textSize="11sp" />
+                        </LinearLayout>
+
+                        <TextView
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="@string/history_arrow"
+                            android:textColor="@color/history_title"
+                            android:textSize="18sp"
+                            android:textStyle="bold" />
+                    </LinearLayout>
+                </com.google.android.material.card.MaterialCardView>
+
+                <com.google.android.material.card.MaterialCardView
+                    android:id="@+id/leaveToHomeCard"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="12dp"
+                    android:clickable="true"
+                    android:focusable="true"
+                    app:cardBackgroundColor="@color/history_card"
+                    app:cardCornerRadius="22dp"
+                    app:cardElevation="0dp"
+                    app:rippleColor="#18000000"
+                    app:strokeColor="@color/history_stroke"
+                    app:strokeWidth="1dp">
+
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:gravity="center_vertical"
+                        android:orientation="horizontal"
+                        android:paddingStart="16dp"
+                        android:paddingTop="14dp"
+                        android:paddingEnd="16dp"
+                        android:paddingBottom="14dp">
+
+                        <LinearLayout
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_weight="1"
+                            android:orientation="vertical">
+
+                            <TextView
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:text="@string/leave_to_home"
+                                android:textColor="@color/history_title"
+                                android:textSize="15sp"
+                                android:textStyle="bold" />
+
+                            <TextView
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:layout_marginTop="2dp"
+                                android:text="@string/leave_to_home_subtitle"
+                                android:textColor="@color/history_subtitle"
+                                android:textSize="11sp" />
+                        </LinearLayout>
+
+                        <TextView
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="@string/history_arrow"
+                            android:textColor="@color/history_title"
+                            android:textSize="18sp"
+                            android:textStyle="bold" />
+                    </LinearLayout>
+                </com.google.android.material.card.MaterialCardView>
+
+
+
             </LinearLayout>
         </ScrollView>
     </androidx.swiperefreshlayout.widget.SwipeRefreshLayout>
 
-    <!-- Loading Overlay -->
     <LinearLayout
         android:id="@+id/dashboardLoadingOverlay"
         android:layout_width="match_parent"

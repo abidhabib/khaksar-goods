@@ -46,13 +46,7 @@
                     android:textSize="24sp"
                     android:textStyle="bold" />
 
-                <TextView
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:layout_marginTop="4dp"
-                    android:text="@string/trip_history_subtitle"
-                    android:textColor="@color/section_hint"
-                    android:textSize="13sp" />
+               
             </LinearLayout>
 
             <com.google.android.material.button.MaterialButton

@@ -83,4 +83,6 @@
     <color name="login_subtitle_color">#526579</color>
     <color name="login_button_bg">#12344D</color>
 
+    <color name="red">#FF0000</color>
+
 </resources>

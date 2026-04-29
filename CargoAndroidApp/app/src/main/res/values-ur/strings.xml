@@ -45,7 +45,6 @@
     <string name="end_trip_details">ٹرپ ختم کرنے کی تفصیل</string>
     <string name="loading_dashboard">ڈیش بورڈ لوڈ ہو رہا ہے...</string>
     <string name="trip_history">ٹرپ ہسٹری</string>
-    <string name="trip_history_subtitle"> ٹرپس میٹر، مالیات اور تصاویر کی تفصیل </string>
     <string name="refresh">ریفریش</string>
     <string name="loading_trip_history">ٹرپ ہسٹری لوڈ ہو رہی ہے...</string>
     <string name="no_history_title">کوئی ٹرپ نہیں ملا</string>
@@ -57,7 +56,7 @@
     <string name="trip_notes_value">نوٹس: %1$s</string>
 
     <string name="daily_expenses"> اخراجات</string>
-    <string name="daily_expenses_subtitle">   ڈرائیور کے روزانہ خرچے  محفوظ کریں۔</string>
+    <string name="daily_expenses_subtitle">    خرچے  محفوظ کریں۔</string>
     <string name="daily_expense_history_subtitle"> اخراجات شامل کریں </string>
 
     <string name="trip_expense_breakdown">ڈیزل %1$s • ٹول %2$s • کھانا %3$s • پولیس %4$s
@@ -67,6 +66,7 @@
     <string name="trip_start_image">شروع کے میٹر کی تصویر</string>
     <string name="trip_end_image">اختتامی میٹر کی تصویر</string>
     <string name="trip_bilty_image">بلٹی سلپ کی تصویر</string>
+    <string name="trip_load_image">لوڈ کی تصویر</string>
     <string name="tap_to_view">مکمل سائز دیکھنے کے لیے دبائیں</string>
     <string name="no_trip_image">کوئی تصویر اپ لوڈ نہیں ہوئی</string>
     <string name="close">بند کریں</string>
@@ -243,14 +243,22 @@
     <string name="save_moboil_expense">موبل آئل چینج محفوظ کریں</string>
 
     <string name="moboil_alert_title"> موبل آئل چینج</string>
-    <string name="moboil_alert_empty">ابھی موبل آئل چینج محفوظ نہیں ہوا</string>
-    <string name="moboil_alert_value">آخری بار %1$s پر • %2$s کلومیٹر پہلے</string>
+    <string name="moboil_alert_empty">  آئل چینج محفوظ نہیں </string>
+    <string name="moboil_alert_value"> %2$s کلومیٹر </string>
+    <string name="start_trip_subtitle">ٹرپ  شروع کریں </string>
+    <string name="add_photo">Add Photo</string>
+    <string name="add_expense_photo_optional">Add an expense photo? (optional)</string>
+    <string name="save_without_photo">Save without photo</string>
+    <string name="skip">Skip</string>
+    <string name="save">Save</string>
+    <string name="cancel">Cancel</string>
+    <string name="photo_selected_save_now">Photo selected. Save now?</string>
 
-    <string name="send_payment_to_company">کمپنی کو ادائیگی بھیجیں</string>
+    <string name="send_payment_to_company">کمپنی کا کھاتہ</string>
     <string name="driver_account_khata">ڈرائیور کھاتہ</string>
-    <string name="driver_account_subtitle">اپنا بیلنس اور لیجر دیکھیں</string>
+    <string name="driver_account_subtitle">اپنا بیلنس   دیکھیں</string>
     <string name="helper_account_khata">ہیلپر کھاتہ</string>
-    <string name="helper_account_subtitle">ہیلپر کا بیلنس اور لیجر دیکھیں</string>
+    <string name="helper_account_subtitle">ہیلپر کا بیلنس  دیکھیں</string>
     <string name="leave_to_home">گھر چھٹی</string>
     <string name="leave_to_home_subtitle">چھٹی کی درخواست کریں</string>
     <string name="send_payment_new_subtitle">کمپنی کو ادائیگی جمع کروائیں</string>
@@ -281,13 +289,13 @@
 
     <string name="apply_filter">فلٹر لگائیں</string>
 
-    <string name="chalaan_photo_required">چالان تصویر  ہے</string>
-    <string name="chalaan_photo">چالان تصویر</string>
+    <string name="chalaan_photo_required"> تصویر  </string>
+    <string name="chalaan_photo"> تصویر</string>
 
-    <string name="open_camera_for_chalaan">چالان تصویر کے لیے کیمرا کھولیں</string>
-    <string name="change_chalaan_photo">چالان تصویر تبدیل کریں</string>
+    <string name="open_camera_for_chalaan"> تصویر کے لیے کیمرا کھولیں</string>
+    <string name="change_chalaan_photo"> تصویر تبدیل کریں</string>
 
-    <string name="save_chalaan_expense">چالان خرچ محفوظ کریں</string>
+    <string name="save_chalaan_expense"> خرچ محفوظ کریں</string>
 
     <string name="success_check">✓</string>
 
