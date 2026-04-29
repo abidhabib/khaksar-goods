@@ -13,6 +13,7 @@ import androidx.core.graphics.Insets;
 import androidx.core.view.ViewCompat;
 import androidx.core.view.WindowCompat;
 import androidx.core.view.WindowInsetsCompat;
+import androidx.core.widget.NestedScrollView;
 
 import com.example.ishaqcargo.databinding.ActivityDriverDashboardBinding;
 import com.example.ishaqcargo.network.ApiClient;
@@ -101,6 +102,7 @@ public class DriverDashboardActivity extends AppCompatActivity {
         final int containerTopPadding = binding.scrollContainer.getPaddingTop();
         final int containerRightPadding = binding.scrollContainer.getPaddingRight();
         final int scrollBottomPadding = binding.scrollContainer.getPaddingBottom();
+
         ViewCompat.setOnApplyWindowInsetsListener(binding.getRoot(), (view, windowInsets) -> {
             Insets insets = windowInsets.getInsets(WindowInsetsCompat.Type.systemBars());
             binding.scrollContainer.setPadding(
@@ -111,8 +113,18 @@ public class DriverDashboardActivity extends AppCompatActivity {
             );
             return windowInsets;
         });
-    }
 
+        // FIX: Prevent SwipeRefresh from stealing scroll events
+        binding.dashboardSwipeRefresh.setDistanceToTriggerSync(400);
+
+        // FIX: Only enable SwipeRefresh when scrolled to top
+        binding.scrollContainer.setOnScrollChangeListener(new NestedScrollView.OnScrollChangeListener() {
+            @Override
+            public void onScrollChange(NestedScrollView v, int scrollX, int scrollY, int oldScrollX, int oldScrollY) {
+                binding.dashboardSwipeRefresh.setEnabled(scrollY == 0);
+            }
+        });
+    }
     private void openStartTripScreen() {
         if (ongoingTrip != null && ongoingTrip.length() > 0) {
             Toast.makeText(this, "End current trip first", Toast.LENGTH_SHORT).show();
@@ -271,10 +283,10 @@ public class DriverDashboardActivity extends AppCompatActivity {
         binding.tripHistoryCard.setEnabled(!loading);
         binding.dailyExpenseCard.setEnabled(!loading);
         binding.paymentCard.setEnabled(!loading);
-        binding.dashboardSwipeRefresh.setEnabled(!loading);
+        // REMOVED: binding.dashboardSwipeRefresh.setEnabled(!loading);
+        // The scroll listener now controls SwipeRefresh enable state
         binding.startTripButton.setEnabled(!loading && (ongoingTrip == null || ongoingTrip.length() == 0));
     }
-
     private String formatCurrency(double amount) {
         return formatPlainNumber(amount);
     }

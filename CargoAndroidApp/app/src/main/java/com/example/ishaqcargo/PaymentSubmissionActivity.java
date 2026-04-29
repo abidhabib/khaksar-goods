@@ -1,10 +1,16 @@
 package com.example.ishaqcargo;
 
+import android.app.Dialog;
 import android.content.ContentResolver;
+import android.graphics.Color;
+import android.graphics.drawable.ColorDrawable;
 import android.net.Uri;
 import android.os.Bundle;
 import android.text.TextUtils;
 import android.view.View;
+import android.view.ViewGroup;
+import android.view.Window;
+import android.widget.ImageView;
 import android.widget.LinearLayout;
 import android.widget.TextView;
 import android.widget.Toast;
@@ -19,6 +25,7 @@ import androidx.core.view.ViewCompat;
 import androidx.core.view.WindowCompat;
 import androidx.core.view.WindowInsetsCompat;
 
+import com.bumptech.glide.Glide;
 import com.example.ishaqcargo.databinding.ActivityPaymentSubmissionBinding;
 import com.example.ishaqcargo.network.ApiClient;
 import com.example.ishaqcargo.util.SessionManager;
@@ -29,11 +36,13 @@ import org.json.JSONObject;
 
 import java.io.File;
 import java.io.IOException;
+import java.text.ParseException;
 import java.text.SimpleDateFormat;
 import java.util.Date;
 import java.util.LinkedHashMap;
 import java.util.Locale;
 import java.util.Map;
+import java.util.TimeZone;
 
 import okhttp3.Call;
 import okhttp3.Callback;
@@ -250,6 +259,9 @@ public class PaymentSubmissionActivity extends AppCompatActivity {
             TextView emptyView = new TextView(this);
             emptyView.setText(R.string.payment_history_empty);
             emptyView.setTextColor(ContextCompat.getColor(this, R.color.section_hint));
+            emptyView.setTextSize(14f);
+            emptyView.setPadding(dpToPx(16), dpToPx(32), dpToPx(16), dpToPx(32));
+            emptyView.setGravity(android.view.Gravity.CENTER);
             binding.historyList.addView(emptyView);
             return;
         }
@@ -271,28 +283,45 @@ public class PaymentSubmissionActivity extends AppCompatActivity {
             int padding = dpToPx(14);
             layout.setPadding(padding, padding, padding, padding);
 
+            // Amount
             TextView amountView = new TextView(this);
             amountView.setText(formatCurrency(item.optDouble("amount", 0)));
             amountView.setTextColor(ContextCompat.getColor(this, R.color.section_title));
             amountView.setTextSize(16f);
+            amountView.setTypeface(null, android.graphics.Typeface.BOLD);
 
+            // Date
             TextView dateView = new TextView(this);
             dateView.setText(formatDateTime(item.optString("created_at", "")));
             dateView.setTextColor(ContextCompat.getColor(this, R.color.section_hint));
             dateView.setTextSize(12f);
             dateView.setPadding(0, dpToPx(4), 0, 0);
 
-            TextView imageHint = new TextView(this);
-            imageHint.setText(item.optString("screenshot_image", ""));
-            imageHint.setTextColor(ContextCompat.getColor(this, R.color.button_primary));
-            imageHint.setTextSize(12f);
-            imageHint.setPadding(0, dpToPx(8), 0, 0);
-            imageHint.setEllipsize(TextUtils.TruncateAt.END);
-            imageHint.setMaxLines(1);
+            // Screenshot thumbnail
+            String imageUrl = item.optString("screenshot_image", "");
+            ImageView screenshotThumb = new ImageView(this);
+            screenshotThumb.setLayoutParams(new LinearLayout.LayoutParams(
+                    LinearLayout.LayoutParams.MATCH_PARENT,
+                    dpToPx(160)
+            ));
+            screenshotThumb.setScaleType(ImageView.ScaleType.CENTER_CROP);
+            screenshotThumb.setBackgroundColor(ContextCompat.getColor(this, R.color.image_placeholder));
+            screenshotThumb.setPadding(0, dpToPx(8), 0, 0);
+
+            if (!TextUtils.isEmpty(imageUrl)) {
+                String fullImageUrl = imageUrl.startsWith("http") ? imageUrl : baseUrl + imageUrl;
+                Glide.with(this)
+                        .load(fullImageUrl)
+                        .placeholder(R.color.image_placeholder)
+                        .error(R.color.image_placeholder)
+                        .into(screenshotThumb);
+
+                screenshotThumb.setOnClickListener(v -> showImageModal(fullImageUrl));
+            }
 
             layout.addView(amountView);
             layout.addView(dateView);
-            layout.addView(imageHint);
+            layout.addView(screenshotThumb);
             card.addView(layout);
 
             LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(
@@ -304,6 +333,33 @@ public class PaymentSubmissionActivity extends AppCompatActivity {
 
             binding.historyList.addView(card);
         }
+    }
+
+    private void showImageModal(String imageUrl) {
+        Dialog dialog = new Dialog(this, android.R.style.Theme_Black_NoTitleBar_Fullscreen);
+        dialog.requestWindowFeature(Window.FEATURE_NO_TITLE);
+
+        ImageView imageView = new ImageView(this);
+        imageView.setLayoutParams(new ViewGroup.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.MATCH_PARENT
+        ));
+        imageView.setScaleType(ImageView.ScaleType.FIT_CENTER);
+        imageView.setBackgroundColor(Color.BLACK);
+        imageView.setOnClickListener(v -> dialog.dismiss());
+
+        Glide.with(this)
+                .load(imageUrl)
+                .placeholder(R.color.image_placeholder)
+                .error(R.color.image_placeholder)
+                .into(imageView);
+
+        dialog.setContentView(imageView);
+        if (dialog.getWindow() != null) {
+            dialog.getWindow().setBackgroundDrawable(new ColorDrawable(Color.BLACK));
+            dialog.getWindow().setLayout(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT);
+        }
+        dialog.show();
     }
 
     private void restoreTransientState(Bundle savedInstanceState) {
@@ -348,6 +404,36 @@ public class PaymentSubmissionActivity extends AppCompatActivity {
     }
 
     private String formatDateTime(String value) {
-        return value == null ? "-" : value.replace('T', ' ');
+        if (TextUtils.isEmpty(value)) {
+            return "-";
+        }
+
+        // Parse ISO 8601 format: 2026-04-29T08:43:58.00Z or 2026-04-29 08:43:58.00Z
+        String normalized = value.replace(' ', 'T');
+
+        SimpleDateFormat[] parsers = {
+                new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSS'Z'", Locale.US),
+                new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SS'Z'", Locale.US),
+                new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss'Z'", Locale.US),
+                new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss", Locale.US),
+                new SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.US)
+        };
+
+        for (SimpleDateFormat parser : parsers) {
+            parser.setTimeZone(TimeZone.getTimeZone("UTC"));
+            try {
+                Date date = parser.parse(normalized);
+                if (date != null) {
+                    SimpleDateFormat outputFormat = new SimpleDateFormat("dd MMM yyyy, hh:mm a", Locale.US);
+                    outputFormat.setTimeZone(TimeZone.getDefault());
+                    return outputFormat.format(date);
+                }
+            } catch (ParseException ignored) {
+                // Try next parser
+            }
+        }
+
+        // Fallback: just clean up the raw string
+        return normalized.replace('T', ' ');
     }
 }

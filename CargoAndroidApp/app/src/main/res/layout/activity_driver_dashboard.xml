@@ -9,10 +9,10 @@
     <androidx.swiperefreshlayout.widget.SwipeRefreshLayout
         android:id="@+id/dashboardSwipeRefresh"
         android:layout_width="match_parent"
-        android:layout_height="match_parent"
-        android:background="#D3D3D3">
+        android:layout_height="match_parent">
 
-        <ScrollView
+        <!-- FIX 1: NestedScrollView instead of ScrollView for better nested scrolling -->
+        <androidx.core.widget.NestedScrollView
             android:id="@+id/scrollContainer"
             android:layout_width="match_parent"
             android:layout_height="match_parent"
@@ -21,14 +21,18 @@
             android:paddingStart="16dp"
             android:paddingTop="16dp"
             android:paddingEnd="16dp"
-            android:paddingBottom="16dp"
-            android:scrollbars="none">
+            android:paddingBottom="24dp"
+            android:scrollbars="vertical"
+            android:fadeScrollbars="false">
 
+            <!-- FIX 2: Add descendantFocusability to prevent focus stealing -->
             <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:orientation="vertical">
+                android:orientation="vertical"
+                android:descendantFocusability="blocksDescendants">
 
+                <!-- ========== HEADER CARD ========== -->
                 <com.google.android.material.card.MaterialCardView
                     android:id="@+id/headerCard"
                     android:layout_width="match_parent"
@@ -62,15 +66,17 @@
                         <LinearLayout
                             android:layout_width="0dp"
                             android:layout_height="wrap_content"
-                            android:layout_marginStart="14dp"
+                            android:layout_marginStart="18dp"
                             android:layout_weight="1"
                             android:orientation="vertical">
 
                             <TextView
                                 android:id="@+id/currentDriverName"
-                                android:layout_width="203dp"
+                                android:layout_width="match_parent"
                                 android:layout_height="wrap_content"
-                                android:gravity="start"
+                                android:gravity="center"
+                                android:layout_marginStart="18dp"
+
                                 android:letterSpacing="0.08"
                                 android:text="@string/driver_name_value"
                                 android:textAllCaps="true"
@@ -81,11 +87,13 @@
 
                             <TextView
                                 android:id="@+id/carNumberText"
-                                android:layout_width="204dp"
+                                android:layout_width="216dp"
                                 android:layout_height="wrap_content"
                                 android:layout_marginTop="2dp"
                                 android:ellipsize="end"
-                                android:gravity="start"
+                                android:gravity="center"
+                                android:layout_marginStart="18dp"
+
                                 android:maxLines="1"
                                 android:text="@string/car_number_value"
                                 android:textColor="@color/white"
@@ -95,9 +103,11 @@
 
                             <TextView
                                 android:id="@+id/avgTextView"
-                                android:layout_width="203dp"
+                                android:layout_width="match_parent"
                                 android:layout_height="wrap_content"
-                                android:gravity="start"
+                                android:gravity="center"
+                                android:layout_marginStart="18dp"
+
                                 android:letterSpacing="0.08"
                                 android:textColor="@color/header_label"
                                 android:textSize="12sp"
@@ -123,111 +133,105 @@
                     </LinearLayout>
                 </com.google.android.material.card.MaterialCardView>
 
+                <!-- ========== STATS ROW ========== -->
                 <LinearLayout
                     android:id="@+id/statsGrid"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:layout_marginTop="12dp"
-                    android:orientation="vertical">
+                    android:orientation="horizontal">
 
-                    <LinearLayout
-                        android:layout_width="match_parent"
+                    <com.google.android.material.card.MaterialCardView
+                        android:layout_width="0dp"
                         android:layout_height="wrap_content"
-                        android:orientation="horizontal">
+                        android:layout_marginEnd="6dp"
+                        android:layout_weight="1"
+                        app:cardBackgroundColor="@color/trips_widget_bg"
+                        app:cardCornerRadius="22dp"
+                        app:cardElevation="0dp">
 
-                        <com.google.android.material.card.MaterialCardView
-                            android:layout_width="0dp"
+                        <LinearLayout
+                            android:layout_width="match_parent"
                             android:layout_height="wrap_content"
-                            android:layout_marginEnd="6dp"
-                            android:layout_weight="1"
-                            app:cardBackgroundColor="@color/trips_widget_bg"
-                            app:cardCornerRadius="22dp"
-                            app:cardElevation="0dp">
+                            android:minHeight="92dp"
+                            android:orientation="vertical"
+                            android:padding="14dp">
 
-                            <LinearLayout
-                                android:layout_width="match_parent"
+                            <ImageView
+                                android:layout_width="18dp"
+                                android:layout_height="18dp"
+                                android:src="@drawable/ic_dashboard_trips"
+                                app:tint="@color/trips_widget_text" />
+
+                            <TextView
+                                android:layout_width="wrap_content"
                                 android:layout_height="wrap_content"
-                                android:minHeight="92dp"
-                                android:orientation="vertical"
-                                android:padding="14dp">
+                                android:layout_marginTop="10dp"
+                                android:text="@string/total_trips"
+                                android:textColor="@color/trips_widget_text"
+                                android:textSize="11sp"
+                                android:textStyle="bold" />
 
-                                <ImageView
-                                    android:layout_width="18dp"
-                                    android:layout_height="18dp"
-                                    android:src="@drawable/ic_dashboard_trips"
-                                    app:tint="@color/trips_widget_text" />
+                            <TextView
+                                android:id="@+id/totalTripsValue"
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:layout_marginTop="3dp"
+                                android:text="0"
+                                android:textColor="@color/trips_widget_text"
+                                android:textSize="22sp"
+                                android:textStyle="bold" />
+                        </LinearLayout>
+                    </com.google.android.material.card.MaterialCardView>
 
-                                <TextView
-                                    android:layout_width="wrap_content"
-                                    android:layout_height="wrap_content"
-                                    android:layout_marginTop="10dp"
-                                    android:text="@string/total_trips"
-                                    android:textColor="@color/trips_widget_text"
-                                    android:textSize="11sp"
-                                    android:textStyle="bold" />
+                    <com.google.android.material.card.MaterialCardView
+                        android:id="@+id/moboilAlertWidget"
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_marginStart="6dp"
+                        android:layout_weight="1"
+                        app:cardBackgroundColor="@color/trips_widget_bg"
+                        app:cardCornerRadius="22dp"
+                        app:cardElevation="0dp">
 
-                                <TextView
-                                    android:id="@+id/totalTripsValue"
-                                    android:layout_width="wrap_content"
-                                    android:layout_height="wrap_content"
-                                    android:layout_marginTop="3dp"
-                                    android:text="0"
-                                    android:textColor="@color/trips_widget_text"
-                                    android:textSize="22sp"
-                                    android:textStyle="bold" />
-                            </LinearLayout>
-                        </com.google.android.material.card.MaterialCardView>
-
-                        <com.google.android.material.card.MaterialCardView
-                            android:id="@+id/moboilAlertWidget"
-                            android:layout_width="0dp"
+                        <LinearLayout
+                            android:layout_width="match_parent"
                             android:layout_height="wrap_content"
-                            android:layout_marginStart="6dp"
-                            android:layout_weight="1"
-                            app:cardBackgroundColor="@color/trips_widget_bg"
-                            app:cardCornerRadius="22dp"
-                            app:cardElevation="0dp">
+                            android:minHeight="92dp"
+                            android:orientation="vertical"
+                            android:padding="14dp">
 
-                            <LinearLayout
-                                android:layout_width="match_parent"
+                            <ImageView
+                                android:layout_width="18dp"
+                                android:layout_height="18dp"
+                                android:src="@drawable/ic_dashboard_expenses"
+                                app:tint="@color/km_widget_text" />
+
+                            <TextView
+                                android:layout_width="wrap_content"
                                 android:layout_height="wrap_content"
-                                android:minHeight="92dp"
-                                android:orientation="vertical"
-                                android:padding="14dp">
+                                android:layout_marginTop="10dp"
+                                android:text="@string/moboil_alert_title"
+                                android:textColor="@color/km_widget_text"
+                                android:textSize="11sp"
+                                android:textStyle="bold" />
 
-                                <ImageView
-                                    android:layout_width="18dp"
-                                    android:layout_height="18dp"
-                                    android:src="@drawable/ic_dashboard_expenses"
-                                    app:tint="@color/km_widget_text" />
-
-                                <TextView
-                                    android:layout_width="wrap_content"
-                                    android:layout_height="wrap_content"
-                                    android:layout_marginTop="10dp"
-                                    android:text="@string/moboil_alert_title"
-                                    android:textColor="@color/km_widget_text"
-                                    android:textSize="11sp"
-                                    android:textStyle="bold" />
-
-                                <TextView
-                                    android:id="@+id/moboilAlertValueWidget"
-                                    android:layout_width="wrap_content"
-                                    android:layout_height="wrap_content"
-                                    android:layout_marginTop="3dp"
-                                    android:ellipsize="end"
-                                    android:maxLines="2"
-                                    android:text="@string/moboil_alert_empty"
-                                    android:textColor="@color/km_widget_text"
-                                    android:textSize="22sp"
-                                    android:textStyle="bold" />
-                            </LinearLayout>
-                        </com.google.android.material.card.MaterialCardView>
-                    </LinearLayout>
-
+                            <TextView
+                                android:id="@+id/moboilAlertValueWidget"
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:layout_marginTop="3dp"
+                                android:ellipsize="end"
+                                android:maxLines="2"
+                                android:text="@string/moboil_alert_empty"
+                                android:textColor="@color/km_widget_text"
+                                android:textSize="22sp"
+                                android:textStyle="bold" />
+                        </LinearLayout>
+                    </com.google.android.material.card.MaterialCardView>
                 </LinearLayout>
 
-                <!-- Start Trip Button - styled like Send Payment card -->
+                <!-- ========== START TRIP CARD ========== -->
                 <com.google.android.material.card.MaterialCardView
                     android:id="@+id/startTripButton"
                     android:layout_width="match_parent"
@@ -284,6 +288,8 @@
                             android:textStyle="bold" />
                     </LinearLayout>
                 </com.google.android.material.card.MaterialCardView>
+
+                <!-- ========== DAILY EXPENSE CARD ========== -->
                 <com.google.android.material.card.MaterialCardView
                     android:id="@+id/dailyExpenseCard"
                     android:layout_width="match_parent"
@@ -340,6 +346,8 @@
                             android:textStyle="bold" />
                     </LinearLayout>
                 </com.google.android.material.card.MaterialCardView>
+
+                <!-- ========== TRIP HISTORY CARD ========== -->
                 <com.google.android.material.card.MaterialCardView
                     android:id="@+id/tripHistoryCard"
                     android:layout_width="match_parent"
@@ -397,6 +405,7 @@
                     </LinearLayout>
                 </com.google.android.material.card.MaterialCardView>
 
+                <!-- ========== PAYMENT CARD ========== -->
                 <com.google.android.material.card.MaterialCardView
                     android:id="@+id/paymentCard"
                     android:layout_width="match_parent"
@@ -452,9 +461,9 @@
                             android:textSize="18sp"
                             android:textStyle="bold" />
                     </LinearLayout>
-
                 </com.google.android.material.card.MaterialCardView>
 
+                <!-- ========== DRIVER ACCOUNT CARD ========== -->
                 <com.google.android.material.card.MaterialCardView
                     android:id="@+id/driverAccount"
                     android:layout_width="match_parent"
@@ -512,6 +521,7 @@
                     </LinearLayout>
                 </com.google.android.material.card.MaterialCardView>
 
+                <!-- ========== HELPER ACCOUNT CARD ========== -->
                 <com.google.android.material.card.MaterialCardView
                     android:id="@+id/helperAccount"
                     android:layout_width="match_parent"
@@ -569,11 +579,13 @@
                     </LinearLayout>
                 </com.google.android.material.card.MaterialCardView>
 
+                <!-- ========== LEAVE TO HOME CARD ========== -->
                 <com.google.android.material.card.MaterialCardView
                     android:id="@+id/leaveToHomeCard"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:layout_marginTop="12dp"
+                    android:layout_marginBottom="16dp"
                     android:clickable="true"
                     android:focusable="true"
                     app:cardBackgroundColor="@color/history_card"
@@ -626,12 +638,11 @@
                     </LinearLayout>
                 </com.google.android.material.card.MaterialCardView>
 
-
-
             </LinearLayout>
-        </ScrollView>
+        </androidx.core.widget.NestedScrollView>
     </androidx.swiperefreshlayout.widget.SwipeRefreshLayout>
 
+    <!-- ========== LOADING OVERLAY ========== -->
     <LinearLayout
         android:id="@+id/dashboardLoadingOverlay"
         android:layout_width="match_parent"
