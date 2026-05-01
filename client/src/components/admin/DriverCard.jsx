@@ -1,5 +1,6 @@
 import { useState } from 'react';
-import { User, Phone, Car, Activity, MoreVertical } from 'lucide-react';
+import { User, Phone, Car, Activity, MoreVertical, MapPin } from 'lucide-react';
+import { formatLocationAgo, formatLocationSummary } from '../../utils/location';
 
 const DriverCard = ({ driver, onEdit, onAssign, onViewReport }) => {
   const [menuOpen, setMenuOpen] = useState(false);
@@ -14,6 +15,8 @@ const DriverCard = ({ driver, onEdit, onAssign, onViewReport }) => {
     : driver.trip_status === 'completed'
       ? `Last completed: ${driver.last_from_location} -> ${driver.last_to_location}`
       : 'No trip history yet';
+  const lastLocationAgo = formatLocationAgo(driver.last_location_at);
+  const hasLocation = driver.last_location_latitude != null && driver.last_location_longitude != null;
 
   return (
     <div className="card hover:border-primary-500/50 transition-all group">
@@ -99,9 +102,33 @@ const DriverCard = ({ driver, onEdit, onAssign, onViewReport }) => {
         </div>
 
         <div className="rounded-lg bg-cargo-dark/70 border border-cargo-border px-3 py-2">
-          <p className={`text-xs font-medium ${driver.trip_status === 'ongoing' ? 'text-cargo-success' : 'text-cargo-muted'}`}>
+          <p className={`text-xs font-medium ${driver.trip_status === 'ongoing' ? 'text-amber-500' : 'text-cargo-muted'}`}>
             {tripStatusLabel}
           </p>
+        </div>
+
+        <div className="rounded-lg bg-cargo-dark/70 border border-cargo-border px-3 py-3">
+          <div className="flex items-start gap-2">
+            <MapPin className="w-4 h-4 text-primary-400 mt-0.5" />
+            <div className="min-w-0">
+              <div className="flex items-center gap-2 flex-wrap">
+                <p className="text-xs font-semibold text-cargo-text">Last location</p>
+                {lastLocationAgo ? (
+                  <span className="text-[11px] px-2 py-0.5 rounded-full bg-primary-600/10 text-primary-300">
+                    {lastLocationAgo}
+                  </span>
+                ) : null}
+              </div>
+              <p className="text-xs text-cargo-text mt-1">{formatLocationSummary(driver)}</p>
+              {hasLocation ? (
+                <p className="text-[11px] text-cargo-muted mt-1">
+                  {driver.last_location_latitude}, {driver.last_location_longitude}
+                </p>
+              ) : (
+                <p className="text-[11px] text-cargo-muted mt-1">No location saved yet</p>
+              )}
+            </div>
+          </div>
         </div>
       </div>
 

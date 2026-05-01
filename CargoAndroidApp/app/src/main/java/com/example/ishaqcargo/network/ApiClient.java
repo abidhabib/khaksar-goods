@@ -280,6 +280,21 @@ public class ApiClient {
         CLIENT.newCall(request).enqueue(callback);
     }
 
+    public static void saveCurrentLocation(String baseUrl, String token, Map<String, String> fields, Callback callback) {
+        FormBody.Builder formBuilder = new FormBody.Builder();
+        for (Map.Entry<String, String> entry : fields.entrySet()) {
+            formBuilder.add(entry.getKey(), entry.getValue());
+        }
+
+        Request request = new Request.Builder()
+                .url(baseUrl + "/driver/location")
+                .post(formBuilder.build())
+                .header("Authorization", "Bearer " + token)
+                .build();
+
+        CLIENT.newCall(request).enqueue(callback);
+    }
+
     private static void addImagePartIfExists(
             MultipartBody.Builder builder,
             Uri uri,

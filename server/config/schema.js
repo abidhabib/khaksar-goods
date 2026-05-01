@@ -168,6 +168,32 @@ const ensureDriverPaymentSubmissionsTable = async (connection) => {
     `);
 };
 
+const ensureDriverLocationLogsTable = async (connection) => {
+    await connection.query(`
+        CREATE TABLE IF NOT EXISTS driver_location_logs (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            driver_id INT NOT NULL,
+            trip_id INT NULL,
+            area VARCHAR(255) NULL,
+            city VARCHAR(255) NULL,
+            province VARCHAR(255) NULL,
+            address_label VARCHAR(255) NULL,
+            latitude DECIMAL(10,7) NOT NULL,
+            longitude DECIMAL(10,7) NOT NULL,
+            source VARCHAR(50) NOT NULL DEFAULT 'driver_app',
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            INDEX idx_driver_location_logs_driver_created (driver_id, created_at),
+            INDEX idx_driver_location_logs_trip_created (trip_id, created_at),
+            CONSTRAINT fk_driver_location_logs_driver
+                FOREIGN KEY (driver_id) REFERENCES drivers(id)
+                ON DELETE CASCADE,
+            CONSTRAINT fk_driver_location_logs_trip
+                FOREIGN KEY (trip_id) REFERENCES trips(id)
+                ON DELETE SET NULL
+        )
+    `);
+};
+
 const ensureExpensesCategoryColumn = async (connection, databaseName) => {
     const [[column]] = await connection.execute(
         `SELECT COLUMN_TYPE, DATA_TYPE
@@ -221,6 +247,7 @@ const ensureSchema = async () => {
         await ensureDriverDailyExpenseEntriesTable(connection);
         await ensureDriverDailyExpenseEntryColumns(connection, databaseName);
         await ensureDriverPaymentSubmissionsTable(connection);
+        await ensureDriverLocationLogsTable(connection);
     } finally {
         connection.release();
     }
@@ -230,5 +257,6 @@ module.exports = {
     ensureSchema,
     ensureDriverDailyExpenseEntriesTable,
     ensureDriverDailyExpenseEntryColumns,
-    ensureDriverPaymentSubmissionsTable
+    ensureDriverPaymentSubmissionsTable,
+    ensureDriverLocationLogsTable
 };

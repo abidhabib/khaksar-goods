@@ -12,6 +12,7 @@ import androidx.core.os.LocaleListCompat;
 
 import com.example.ishaqcargo.databinding.ActivityLoginBinding;
 import com.example.ishaqcargo.network.ApiClient;
+import com.example.ishaqcargo.util.LocationSyncScheduler;
 import com.example.ishaqcargo.util.SessionManager;
 
 import org.json.JSONObject;
@@ -147,6 +148,7 @@ public class LoginActivity extends AppCompatActivity {
                     }
 
                     sessionManager.saveSession(token, driverUsername);
+                    LocationSyncScheduler.schedule(getApplicationContext());
 
                     runOnUiThread(() -> {
                         setLoading(false);

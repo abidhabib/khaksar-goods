@@ -4,7 +4,8 @@ const MOBOIL_CHANGE_INTERVAL = 5000; // km
 const {
     ensureDriverDailyExpenseEntriesTable,
     ensureDriverDailyExpenseEntryColumns,
-    ensureDriverPaymentSubmissionsTable
+    ensureDriverPaymentSubmissionsTable,
+    ensureDriverLocationLogsTable
 } = require('../config/schema');
 const getAuthenticatedDriverId = (req) => {
     const driverId = req?.user?.driver_id;
@@ -69,6 +70,11 @@ const toOptionalDecimal = (value) => {
     }
 
     return parsed;
+};
+
+const toLocationDecimal = (value) => {
+    const parsed = Number(value);
+    return Number.isFinite(parsed) ? parsed : null;
 };
 
 const getUploadedFilePath = (req, ...fieldNames) => {
@@ -1185,6 +1191,77 @@ const submitCompanyPayment = async (req, res) => {
     }
 };
 
+const saveCurrentLocation = async (req, res) => {
+    try {
+        const driver_id = await resolveDriverId(req);
+        if (!driver_id) {
+            return res.status(403).json({ message: 'Driver account required' });
+        }
+
+        const schemaConnection = await pool.getConnection();
+        try {
+            await ensureDriverLocationLogsTable(schemaConnection);
+        } finally {
+            schemaConnection.release();
+        }
+
+        const latitude = toLocationDecimal(req.body.latitude);
+        const longitude = toLocationDecimal(req.body.longitude);
+
+        if (latitude === null || longitude === null) {
+            return res.status(400).json({ message: 'Latitude and longitude are required' });
+        }
+
+        const area = toNullableString(req.body.area);
+        const city = toNullableString(req.body.city);
+        const province = toNullableString(req.body.province);
+        const addressLabel = toNullableString(req.body.address_label);
+        const source = toNullableString(req.body.source) || 'driver_app';
+        const requestedTripId = Number.parseInt(req.body.trip_id, 10);
+
+        let tripId = null;
+        if (Number.isFinite(requestedTripId) && requestedTripId > 0) {
+            const [tripRows] = await pool.execute(
+                'SELECT id FROM trips WHERE id = ? AND driver_id = ? LIMIT 1',
+                [requestedTripId, driver_id]
+            );
+            if (tripRows.length) {
+                tripId = requestedTripId;
+            }
+        }
+
+        if (!tripId) {
+            const [ongoingRows] = await pool.execute(
+                'SELECT id FROM trips WHERE driver_id = ? AND status = "ongoing" ORDER BY started_at DESC LIMIT 1',
+                [driver_id]
+            );
+            tripId = ongoingRows.length ? Number(ongoingRows[0].id) : null;
+        }
+
+        const [result] = await pool.execute(
+            `INSERT INTO driver_location_logs
+                (driver_id, trip_id, area, city, province, address_label, latitude, longitude, source)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+            [driver_id, tripId, area, city, province, addressLabel, latitude, longitude, source]
+        );
+
+        const [rows] = await pool.execute(
+            `SELECT id, driver_id, trip_id, area, city, province, address_label, latitude, longitude, source, created_at
+             FROM driver_location_logs
+             WHERE id = ?`,
+            [result.insertId]
+        );
+
+        res.status(201).json({
+            success: true,
+            message: 'Location saved successfully',
+            location: rows[0]
+        });
+    } catch (error) {
+        res.status(500).json({ message: 'Server error', error: error.message });
+    }
+};
+
 module.exports = {
     getDashboard,
     startTrip,
@@ -1196,5 +1273,6 @@ module.exports = {
     getDailyExpenses,
     saveDailyExpense,
     submitCompanyPayment,
-    getCompanyPayments
+    getCompanyPayments,
+    saveCurrentLocation
 };

@@ -14,7 +14,8 @@ const {
     getDailyExpenses,
     saveDailyExpense,
     submitCompanyPayment,
-    getCompanyPayments
+    getCompanyPayments,
+    saveCurrentLocation
 } = require('../controllers/driverController');
 
 const upload = multer({ storage: meterStorage });
@@ -72,5 +73,6 @@ router.post(
     submitCompanyPayment
 );
 router.get('/company-payments', authMiddleware, driverOnly, getCompanyPayments);
+router.post('/location', authMiddleware, driverOnly, saveCurrentLocation);
 
 module.exports = router;

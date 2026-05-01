@@ -176,6 +176,13 @@ const getAllCars = async (req, res) => {
                    d.id as driver_id, 
                    u.username as assigned_driver,
                    u.phone as driver_phone,
+                   dll.area as last_location_area,
+                   dll.city as last_location_city,
+                   dll.province as last_location_province,
+                   dll.address_label as last_location_label,
+                   dll.latitude as last_location_latitude,
+                   dll.longitude as last_location_longitude,
+                   dll.created_at as last_location_at,
                    (
                        SELECT COALESCE(SUM(t4.end_meter_reading - t4.start_meter_reading), 0)
                        FROM trips t4
@@ -203,6 +210,13 @@ const getAllCars = async (req, res) => {
             LEFT JOIN car_assignments ca ON c.id = ca.car_id 
                 AND ca.unassigned_at IS NULL 
                 AND d.id = ca.driver_id
+            LEFT JOIN driver_location_logs dll ON dll.id = (
+                SELECT l1.id
+                FROM driver_location_logs l1
+                WHERE l1.driver_id = d.id
+                ORDER BY l1.created_at DESC, l1.id DESC
+                LIMIT 1
+            )
             LEFT JOIN trips ot ON ot.id = (
                 SELECT t1.id
                 FROM trips t1
@@ -488,6 +502,13 @@ const getAllDrivers = async (req, res) => {
         const [drivers] = await pool.execute(`
             SELECT d.*, u.username, u.phone, u.status, u.created_at,
                    c.id as car_id, c.car_number, c.current_meter_reading as car_current_meter,
+                   dll.area as last_location_area,
+                   dll.city as last_location_city,
+                   dll.province as last_location_province,
+                   dll.address_label as last_location_label,
+                   dll.latitude as last_location_latitude,
+                   dll.longitude as last_location_longitude,
+                   dll.created_at as last_location_at,
                    ot.from_location as ongoing_from_location,
                    ot.to_location as ongoing_to_location,
                    lt.from_location as last_from_location,
@@ -500,6 +521,13 @@ const getAllDrivers = async (req, res) => {
             FROM drivers d
             JOIN users u ON d.user_id = u.id
             LEFT JOIN cars c ON d.assigned_car_id = c.id
+            LEFT JOIN driver_location_logs dll ON dll.id = (
+                SELECT l1.id
+                FROM driver_location_logs l1
+                WHERE l1.driver_id = d.id
+                ORDER BY l1.created_at DESC, l1.id DESC
+                LIMIT 1
+            )
             LEFT JOIN trips ot ON ot.id = (
                 SELECT t1.id
                 FROM trips t1

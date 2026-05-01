@@ -8,6 +8,7 @@ import androidx.appcompat.app.AppCompatDelegate;
 import androidx.core.os.LocaleListCompat;
 
 import com.example.ishaqcargo.databinding.ActivityMainBinding;
+import com.example.ishaqcargo.util.LocationSyncScheduler;
 import com.example.ishaqcargo.util.SessionManager;
 
 public class MainActivity extends AppCompatActivity {
@@ -23,8 +24,10 @@ public class MainActivity extends AppCompatActivity {
 
         Intent intent;
         if (sessionManager.isLoggedIn()) {
+            LocationSyncScheduler.schedule(getApplicationContext());
             intent = new Intent(this, DriverDashboardActivity.class);
         } else {
+            LocationSyncScheduler.cancel(getApplicationContext());
             intent = new Intent(this, LoginActivity.class);
         }
 

@@ -1,4 +1,5 @@
-import { Car, User, Gauge, TrendingUp, AlertCircle, FileText } from 'lucide-react';
+import { Car, User, Gauge, TrendingUp, AlertCircle, FileText, MapPin } from 'lucide-react';
+import { formatLocationAgo, formatLocationSummary } from '../../utils/location';
 
 const formatAverage = (value) => {
   const numericValue = Number(value || 0);
@@ -17,6 +18,8 @@ const CarCard = ({ car, onEdit, onDelete, onAssign, onViewHistory }) => {
     : car.trip_status === 'completed'
       ? `Last completed: ${car.last_from_location} -> ${car.last_to_location}`
       : 'No trip history yet';
+  const lastLocationAgo = formatLocationAgo(car.last_location_at);
+  const hasLocation = car.last_location_latitude != null && car.last_location_longitude != null;
 
   return (
     <div className="card hover:border-primary-500/50 transition-all group">
@@ -103,6 +106,30 @@ const CarCard = ({ car, onEdit, onDelete, onAssign, onViewHistory }) => {
           <p className={`text-xs font-medium ${car.trip_status === 'ongoing' ? 'text-cargo-success' : 'text-cargo-muted'}`}>
             {tripStatusLabel}
           </p>
+        </div>
+
+        <div className="rounded-lg bg-cargo-dark/70 border border-cargo-border px-3 py-3">
+          <div className="flex items-start gap-2">
+            <MapPin className="w-4 h-4 text-primary-400 mt-0.5" />
+            <div className="min-w-0">
+              <div className="flex items-center gap-2 flex-wrap">
+                <p className="text-xs font-semibold text-cargo-text">Driver location</p>
+                {lastLocationAgo ? (
+                  <span className="text-[11px] px-2 py-0.5 rounded-full bg-primary-600/10 text-primary-300">
+                    {lastLocationAgo}
+                  </span>
+                ) : null}
+              </div>
+              <p className="text-xs text-cargo-text mt-1">{formatLocationSummary(car)}</p>
+              {hasLocation ? (
+                <p className="text-[11px] text-cargo-muted mt-1">
+                  {car.last_location_latitude}, {car.last_location_longitude}
+                </p>
+              ) : (
+                <p className="text-[11px] text-cargo-muted mt-1">No location saved yet</p>
+              )}
+            </div>
+          </div>
         </div>
 
         <button

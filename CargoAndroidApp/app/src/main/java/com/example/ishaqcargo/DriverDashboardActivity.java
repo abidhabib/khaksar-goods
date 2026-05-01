@@ -1,7 +1,10 @@
 package com.example.ishaqcargo;
 
+import android.Manifest;
 import android.content.Intent;
+import android.content.pm.PackageManager;
 import android.os.Bundle;
+import android.os.Build;
 import android.text.TextUtils;
 import android.view.View;
 import android.widget.Toast;
@@ -9,6 +12,7 @@ import android.widget.Toast;
 import androidx.activity.result.ActivityResultLauncher;
 import androidx.activity.result.contract.ActivityResultContracts;
 import androidx.appcompat.app.AppCompatActivity;
+import androidx.core.content.ContextCompat;
 import androidx.core.graphics.Insets;
 import androidx.core.view.ViewCompat;
 import androidx.core.view.WindowCompat;
@@ -17,6 +21,7 @@ import androidx.core.widget.NestedScrollView;
 
 import com.example.ishaqcargo.databinding.ActivityDriverDashboardBinding;
 import com.example.ishaqcargo.network.ApiClient;
+import com.example.ishaqcargo.util.LocationSyncScheduler;
 import com.example.ishaqcargo.util.SessionManager;
 
 import org.json.JSONObject;
@@ -39,6 +44,23 @@ public class DriverDashboardActivity extends AppCompatActivity {
     private String currentCarNumber;
     private String currentDriverName;
     private double currentVehicleAverage;
+    private final ActivityResultLauncher<String[]> locationPermissionLauncher = registerForActivityResult(
+            new ActivityResultContracts.RequestMultiplePermissions(),
+            result -> {
+                boolean hasForegroundPermission =
+                        Boolean.TRUE.equals(result.get(Manifest.permission.ACCESS_FINE_LOCATION))
+                                || Boolean.TRUE.equals(result.get(Manifest.permission.ACCESS_COARSE_LOCATION));
+
+                if (hasForegroundPermission) {
+                    requestBackgroundLocationPermissionIfNeeded();
+                    LocationSyncScheduler.schedule(getApplicationContext());
+                }
+            }
+    );
+    private final ActivityResultLauncher<String> backgroundLocationPermissionLauncher = registerForActivityResult(
+            new ActivityResultContracts.RequestPermission(),
+            granted -> LocationSyncScheduler.schedule(getApplicationContext())
+    );
 
     private final ActivityResultLauncher<Intent> startTripLauncher = registerForActivityResult(
             new ActivityResultContracts.StartActivityForResult(),
@@ -58,10 +80,12 @@ public class DriverDashboardActivity extends AppCompatActivity {
 
         sessionManager = new SessionManager(this);
         baseUrl = sessionManager.getBaseUrl();
+        ensureLocationSyncSetup();
 
         applyWindowInsets();
 
         binding.logoutButton.setOnClickListener(v -> {
+            LocationSyncScheduler.cancel(getApplicationContext());
             sessionManager.clearSession();
             startActivity(new Intent(this, LoginActivity.class));
             finish();
@@ -134,6 +158,36 @@ public class DriverDashboardActivity extends AppCompatActivity {
         Intent intent = new Intent(this, StartTripActivity.class);
         intent.putExtra(StartTripActivity.EXTRA_INITIAL_METER, currentCarMeterReading);
         startTripLauncher.launch(intent);
+    }
+
+    private void ensureLocationSyncSetup() {
+        if (hasForegroundLocationPermission()) {
+            requestBackgroundLocationPermissionIfNeeded();
+            LocationSyncScheduler.schedule(getApplicationContext());
+            return;
+        }
+
+        locationPermissionLauncher.launch(new String[]{
+                Manifest.permission.ACCESS_FINE_LOCATION,
+                Manifest.permission.ACCESS_COARSE_LOCATION
+        });
+    }
+
+    private boolean hasForegroundLocationPermission() {
+        return ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED
+                || ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_COARSE_LOCATION) == PackageManager.PERMISSION_GRANTED;
+    }
+
+    private void requestBackgroundLocationPermissionIfNeeded() {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) {
+            return;
+        }
+
+        if (ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_BACKGROUND_LOCATION) == PackageManager.PERMISSION_GRANTED) {
+            return;
+        }
+
+        backgroundLocationPermissionLauncher.launch(Manifest.permission.ACCESS_BACKGROUND_LOCATION);
     }
 
     private void fetchDashboard() {
