@@ -2,15 +2,14 @@ import { useEffect, useState } from 'react';
 import { useApi } from '../hooks/useApi';
 import { format } from 'date-fns';
 import { Route, Clock, MapPin, DollarSign, Activity } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 
 const TripMonitor = () => {
   const { get, loading } = useApi();
   const [trips, setTrips] = useState([]);
   const [filter, setFilter] = useState('all'); // all, ongoing, completed
-
-  useEffect(() => {
-    fetchTrips();
-  }, []);
+const navigate = useNavigate();
+ 
 
   const fetchTrips = async () => {
     // Fetch all trips from admin endpoint
@@ -19,7 +18,9 @@ const TripMonitor = () => {
       setTrips(result.data.recentTrips || []);
     }
   };
-
+ useEffect(() => {
+    fetchTrips();
+  }, []);
   const filteredTrips = trips.filter(trip => {
     if (filter === 'all') return true;
     return trip.status === filter;
@@ -106,7 +107,9 @@ const TripMonitor = () => {
       ) : (
         <div className="space-y-4">
           {filteredTrips.map(trip => (
-            <div key={trip.id} className={`card border-l-4 ${statusColors[trip.status]}`}>
+            <div key={trip.id} className={`card border-l-4 ${statusColors[trip.status]}`} 
+            
+            >
               <div className="flex items-start justify-between">
                 <div className="flex-1">
                   <div className="flex items-center gap-3 mb-3">
@@ -118,7 +121,7 @@ const TripMonitor = () => {
                     </span>
                   </div>
                   
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
                     <div>
                       <p className="text-xs text-cargo-muted mb-1">Driver</p>
                       <p className="text-sm font-medium text-cargo-text">{trip.driver_name}</p>
@@ -131,6 +134,12 @@ const TripMonitor = () => {
                       <p className="text-xs text-cargo-muted mb-1">Revenue</p>
                       <p className="text-sm font-medium text-cargo-text">{trip.freight_charge?.toLocaleString()}</p>
                     </div>
+  <div>
+                      <p className="text-xs text-amber-500  mb-1"                 onClick={() => navigate(`/trips/${trip.id}/report`)} className="cursor-pointer hover:text-primary-400 transition-colors underline text-sm font-medium text-amber-500    "
+>View Trip</p>
+                    </div>
+
+             
                   </div>
                   
                   <div className="flex items-center gap-2 mt-4 text-sm text-cargo-muted">
@@ -148,6 +157,7 @@ const TripMonitor = () => {
                   </div>
                 )}
               </div>
+              
             </div>
           ))}
           

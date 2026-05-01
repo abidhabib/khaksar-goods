@@ -1,7 +1,10 @@
 const bcrypt = require('bcryptjs');
 const pool = require('../config/database');
-const { ensureDriverPaymentSubmissionsTable } = require('../config/schema');
+const { ensureDriverPaymentSubmissionsTable, ensureDriverLeaveRequestsTable } = require('../config/schema');
 const { generateUsername } = require('../utils/helpers');
+
+const PAYMENT_SUBMISSION_STATUSES = new Set(['pending', 'approved', 'rejected']);
+const LEAVE_REQUEST_ACTIONS = new Set(['approve', 'reject']);
 
 const getDateFilter = (period = 'all', fromDate, toDate, alias = 't') => {
     const conditions = [];
@@ -47,6 +50,31 @@ const getMonthFilter = (month, column = 'de.expense_date') => {
     return {
         clause: `AND DATE_FORMAT(${column}, '%Y-%m') = ?`,
         params: [month]
+    };
+};
+
+const getTimestampFilter = ({ month, fromDate, toDate }, column = 'ps.submitted_at') => {
+    const conditions = [];
+    const params = [];
+
+    if (month && /^\d{4}-\d{2}$/.test(month)) {
+        conditions.push(`DATE_FORMAT(${column}, '%Y-%m') = ?`);
+        params.push(month);
+    }
+
+    if (fromDate) {
+        conditions.push(`${column} >= ?`);
+        params.push(`${fromDate} 00:00:00`);
+    }
+
+    if (toDate) {
+        conditions.push(`${column} <= ?`);
+        params.push(`${toDate} 23:59:59`);
+    }
+
+    return {
+        clause: conditions.length ? `AND ${conditions.join(' AND ')}` : '',
+        params
     };
 };
 
@@ -494,6 +522,50 @@ const getCarHistory = async (req, res) => {
     }
 };
 
+const getTripReport = async (req, res) => {
+    try {
+        const { id } = req.params;
+
+        const [tripRows] = await pool.execute(`
+            SELECT
+                t.*,
+                u.username as driver_name,
+                u.phone as driver_phone,
+                d.license_number,
+                c.car_number,
+                COALESCE(exp.total_expenses, 0) as total_expenses,
+                (COALESCE(t.freight_charge, 0) - COALESCE(exp.total_expenses, 0)) as net_profit,
+                (COALESCE(t.end_meter_reading, 0) - COALESCE(t.start_meter_reading, 0)) as distance_km
+            FROM trips t
+            JOIN drivers d ON t.driver_id = d.id
+            JOIN users u ON d.user_id = u.id
+            JOIN cars c ON t.car_id = c.id
+            LEFT JOIN (
+                SELECT trip_id, SUM(amount) as total_expenses
+                FROM expenses
+                GROUP BY trip_id
+            ) exp ON exp.trip_id = t.id
+            WHERE t.id = ?
+            LIMIT 1
+        `, [id]);
+
+        if (!tripRows.length) {
+            return res.status(404).json({ message: 'Trip not found' });
+        }
+
+        const [tripWithExpenses] = await attachExpensesToTrips(tripRows);
+
+        res.json({
+            success: true,
+            trip: tripWithExpenses,
+            expenses: tripWithExpenses.expenses || []
+        });
+    } catch (error) {
+        console.error('Trip report error:', error);
+        res.status(500).json({ message: 'Server error' });
+    }
+};
+
 // ========== DRIVER MANAGEMENT ==========
 
 // Get all drivers
@@ -894,30 +966,96 @@ const getDriverPaymentSubmissions = async (req, res) => {
             schemaConnection.release();
         }
 
-        const { driver_id, month } = req.query;
+        const { driver_id, month, from_date, to_date, status } = req.query;
         const filters = [];
         const params = [];
-        const monthFilter = getMonthFilter(month, 'ps.created_at');
+        const summaryFilters = [];
+        const summaryParams = [];
+        const paymentTimeFilter = getTimestampFilter(
+            { month, fromDate: from_date, toDate: to_date },
+            'ps.submitted_at'
+        );
+        const tripTimeFilter = getTimestampFilter(
+            { month, fromDate: from_date, toDate: to_date },
+            't.started_at'
+        );
+        const tripExpenseTimeFilter = getTimestampFilter(
+            { month, fromDate: from_date, toDate: to_date },
+            'e.created_at'
+        );
+        const dailyExpenseTimeFilter = getTimestampFilter(
+            { month, fromDate: from_date, toDate: to_date },
+            'de.expense_date'
+        );
 
         if (driver_id) {
             filters.push('ps.driver_id = ?');
             params.push(driver_id);
+            summaryFilters.push('ps.driver_id = ?');
+            summaryParams.push(driver_id);
         }
 
-        if (monthFilter.clause) {
-            filters.push(monthFilter.clause.replace(/^AND /, ''));
-            params.push(...monthFilter.params);
+        if (status && PAYMENT_SUBMISSION_STATUSES.has(status)) {
+            filters.push('ps.status = ?');
+            params.push(status);
+        }
+
+        if (paymentTimeFilter.clause) {
+            filters.push(paymentTimeFilter.clause.replace(/^AND /, ''));
+            params.push(...paymentTimeFilter.params);
+            summaryFilters.push(paymentTimeFilter.clause.replace(/^AND /, ''));
+            summaryParams.push(...paymentTimeFilter.params);
         }
 
         const whereClause = filters.length ? `WHERE ${filters.join(' AND ')}` : '';
+        const summaryWhereClause = summaryFilters.length ? `WHERE ${summaryFilters.join(' AND ')}` : '';
+        const tripFilters = [];
+        const tripParams = [];
+        const tripExpenseFilters = [];
+        const tripExpenseParams = [];
+        const dailyExpenseFilters = [];
+        const dailyExpenseParams = [];
+
+        if (driver_id) {
+            tripFilters.push('t.driver_id = ?');
+            tripParams.push(driver_id);
+            tripExpenseFilters.push('t.driver_id = ?');
+            tripExpenseParams.push(driver_id);
+            dailyExpenseFilters.push('de.driver_id = ?');
+            dailyExpenseParams.push(driver_id);
+        }
+
+        if (tripTimeFilter.clause) {
+            tripFilters.push(tripTimeFilter.clause.replace(/^AND /, ''));
+            tripParams.push(...tripTimeFilter.params);
+        }
+
+        if (tripExpenseTimeFilter.clause) {
+            tripExpenseFilters.push(tripExpenseTimeFilter.clause.replace(/^AND /, ''));
+            tripExpenseParams.push(...tripExpenseTimeFilter.params);
+        }
+
+        if (dailyExpenseTimeFilter.clause) {
+            dailyExpenseFilters.push(dailyExpenseTimeFilter.clause.replace(/^AND /, ''));
+            dailyExpenseParams.push(...dailyExpenseTimeFilter.params);
+        }
+
+        const tripWhereClause = tripFilters.length ? `WHERE ${tripFilters.join(' AND ')}` : '';
+        const tripExpenseWhereClause = tripExpenseFilters.length ? `WHERE ${tripExpenseFilters.join(' AND ')}` : '';
+        const dailyExpenseWhereClause = dailyExpenseFilters.length ? `WHERE ${dailyExpenseFilters.join(' AND ')}` : '';
 
         const [payments] = await pool.execute(
             `SELECT
                 ps.id,
                 ps.driver_id,
+                ps.payment_method,
                 ps.amount,
+                ps.sending_fee,
+                ps.handover_to,
                 ps.screenshot_image,
-                ps.created_at,
+                ps.status,
+                ps.submitted_at,
+                ps.status_updated_at,
                 u.username AS driver_name,
                 u.phone AS driver_phone,
                 c.car_number
@@ -926,7 +1064,7 @@ const getDriverPaymentSubmissions = async (req, res) => {
              JOIN users u ON d.user_id = u.id
              LEFT JOIN cars c ON d.assigned_car_id = c.id
              ${whereClause}
-             ORDER BY ps.created_at DESC, ps.id DESC`,
+             ORDER BY ps.submitted_at DESC, ps.id DESC`,
             params
         );
 
@@ -937,7 +1075,8 @@ const getDriverPaymentSubmissions = async (req, res) => {
                 u.phone AS driver_phone,
                 c.car_number,
                 COUNT(*) AS total_submissions,
-                COALESCE(SUM(ps.amount), 0) AS total_amount
+                COALESCE(SUM(ps.amount), 0) AS total_amount,
+                COALESCE(SUM(CASE WHEN ps.status = 'approved' THEN ps.amount ELSE 0 END), 0) AS total_received
              FROM driver_payment_submissions ps
              JOIN drivers d ON ps.driver_id = d.id
              JOIN users u ON d.user_id = u.id
@@ -952,17 +1091,269 @@ const getDriverPaymentSubmissions = async (req, res) => {
             `SELECT
                 COUNT(*) AS total_submissions,
                 COUNT(DISTINCT ps.driver_id) AS total_drivers,
-                COALESCE(SUM(ps.amount), 0) AS total_amount
+                COALESCE(SUM(ps.amount), 0) AS total_amount,
+                COALESCE(SUM(CASE WHEN ps.status = 'approved' THEN ps.amount ELSE 0 END), 0) AS total_amount_received,
+                COALESCE(SUM(CASE WHEN ps.status = 'pending' THEN ps.amount ELSE 0 END), 0) AS total_pending_amount,
+                COALESCE(SUM(CASE WHEN ps.status = 'rejected' THEN ps.amount ELSE 0 END), 0) AS total_rejected_amount
              FROM driver_payment_submissions ps
+             ${summaryWhereClause}`,
+            summaryParams
+        );
+
+        const [[incomeSummary]] = await pool.execute(
+            `SELECT
+                COALESCE(SUM(t.freight_charge), 0) AS total_cargo_income
+             FROM trips t
+             ${tripWhereClause}`,
+            tripParams
+        );
+
+        const [[tripExpenseSummary]] = await pool.execute(
+            `SELECT
+                COALESCE(SUM(e.amount), 0) AS total_trip_expenses
+             FROM expenses e
+             JOIN trips t ON e.trip_id = t.id
+             ${tripExpenseWhereClause}`,
+            tripExpenseParams
+        );
+
+        const [[dailyExpenseSummary]] = await pool.execute(
+            `SELECT
+                COALESCE(SUM(de.amount), 0) AS total_daily_expenses
+             FROM driver_daily_expense_entries de
+             ${dailyExpenseWhereClause}`,
+            dailyExpenseParams
+        );
+
+        const totalCargoIncome = Number(incomeSummary?.total_cargo_income) || 0;
+        const totalTripExpenses = Number(tripExpenseSummary?.total_trip_expenses) || 0;
+        const totalDailyExpenses = Number(dailyExpenseSummary?.total_daily_expenses) || 0;
+
+        res.json({
+            success: true,
+            payments,
+            driverTotals,
+            summary: {
+                ...summary,
+                total_cargo_income: totalCargoIncome,
+                total_trip_expenses: totalTripExpenses,
+                total_daily_expenses: totalDailyExpenses,
+                net_profit: totalCargoIncome - totalTripExpenses - totalDailyExpenses
+            }
+        });
+    } catch (error) {
+        res.status(500).json({ message: 'Server error', error: error.message });
+    }
+};
+
+const updateDriverPaymentSubmissionStatus = async (req, res) => {
+    try {
+        const schemaConnection = await pool.getConnection();
+        try {
+            await ensureDriverPaymentSubmissionsTable(schemaConnection);
+        } finally {
+            schemaConnection.release();
+        }
+
+        const { id } = req.params;
+        const nextStatus = String(req.body?.status || '').trim().toLowerCase();
+
+        if (!PAYMENT_SUBMISSION_STATUSES.has(nextStatus) || nextStatus === 'pending') {
+            return res.status(400).json({ message: 'Status must be approved or rejected' });
+        }
+
+        const [existingRows] = await pool.execute(
+            'SELECT id, status FROM driver_payment_submissions WHERE id = ? LIMIT 1',
+            [id]
+        );
+
+        if (!existingRows.length) {
+            return res.status(404).json({ message: 'Payment submission not found' });
+        }
+
+        await pool.execute(
+            `UPDATE driver_payment_submissions
+             SET status = ?, status_updated_at = CURRENT_TIMESTAMP
+             WHERE id = ?`,
+            [nextStatus, id]
+        );
+
+        const [[payment]] = await pool.execute(
+            `SELECT
+                ps.id,
+                ps.driver_id,
+                ps.payment_method,
+                ps.amount,
+                ps.sending_fee,
+                ps.handover_to,
+                ps.screenshot_image,
+                ps.status,
+                ps.submitted_at,
+                ps.status_updated_at,
+                u.username AS driver_name,
+                c.car_number
+             FROM driver_payment_submissions ps
+             JOIN drivers d ON ps.driver_id = d.id
+             JOIN users u ON d.user_id = u.id
+             LEFT JOIN cars c ON d.assigned_car_id = c.id
+             WHERE ps.id = ?
+             LIMIT 1`,
+            [id]
+        );
+
+        res.json({
+            success: true,
+            message: `Payment submission ${nextStatus} successfully`,
+            payment
+        });
+    } catch (error) {
+        res.status(500).json({ message: 'Server error', error: error.message });
+    }
+};
+
+const getDriverLeaveRequests = async (req, res) => {
+    try {
+        const schemaConnection = await pool.getConnection();
+        try {
+            await ensureDriverLeaveRequestsTable(schemaConnection);
+        } finally {
+            schemaConnection.release();
+        }
+
+        const { status = 'pending_join', driver_id } = req.query;
+        const filters = [];
+        const params = [];
+
+        if (status) {
+            filters.push('lr.status = ?');
+            params.push(status);
+        }
+
+        if (driver_id) {
+            filters.push('lr.driver_id = ?');
+            params.push(driver_id);
+        }
+
+        const whereClause = filters.length ? `WHERE ${filters.join(' AND ')}` : '';
+
+        const [requests] = await pool.execute(
+            `SELECT
+                lr.*,
+                u.username AS driver_name,
+                u.phone AS driver_phone,
+                d.license_number,
+                c.car_number
+             FROM driver_leave_requests lr
+             JOIN drivers d ON lr.driver_id = d.id
+             JOIN users u ON d.user_id = u.id
+             LEFT JOIN cars c ON lr.car_id = c.id
+             ${whereClause}
+             ORDER BY lr.leave_requested_at DESC, lr.id DESC`,
+            params
+        );
+
+        const [[summary]] = await pool.execute(
+            `SELECT
+                COUNT(*) AS total_requests,
+                COUNT(DISTINCT driver_id) AS total_drivers
+             FROM driver_leave_requests lr
              ${whereClause}`,
             params
         );
 
         res.json({
             success: true,
-            payments,
-            driverTotals,
+            requests,
             summary
+        });
+    } catch (error) {
+        res.status(500).json({ message: 'Server error', error: error.message });
+    }
+};
+
+const updateDriverLeaveRequestStatus = async (req, res) => {
+    try {
+        const schemaConnection = await pool.getConnection();
+        try {
+            await ensureDriverLeaveRequestsTable(schemaConnection);
+        } finally {
+            schemaConnection.release();
+        }
+
+        const { id } = req.params;
+        const action = String(req.body?.action || '').trim().toLowerCase();
+
+        if (!LEAVE_REQUEST_ACTIONS.has(action)) {
+            return res.status(400).json({ message: 'Action must be approve or reject' });
+        }
+
+        const [rows] = await pool.execute(
+            'SELECT * FROM driver_leave_requests WHERE id = ? LIMIT 1',
+            [id]
+        );
+
+        if (!rows.length) {
+            return res.status(404).json({ message: 'Leave request not found' });
+        }
+
+        const request = rows[0];
+
+        if (action === 'approve') {
+            if (request.status !== 'pending_join') {
+                return res.status(400).json({ message: 'Only pending join requests can be approved' });
+            }
+
+            if (request.car_id && request.join_meter_reading !== null) {
+                await pool.execute(
+                    'UPDATE cars SET current_meter_reading = ? WHERE id = ?',
+                    [request.join_meter_reading, request.car_id]
+                );
+            }
+
+            await pool.execute(
+                `UPDATE driver_leave_requests
+                 SET status = 'completed',
+                     join_approved_at = CURRENT_TIMESTAMP,
+                     status_updated_at = CURRENT_TIMESTAMP
+                 WHERE id = ?`,
+                [id]
+            );
+        } else {
+            if (request.status !== 'pending_join') {
+                return res.status(400).json({ message: 'Only pending join requests can be rejected' });
+            }
+
+            await pool.execute(
+                `UPDATE driver_leave_requests
+                 SET status = 'on_leave',
+                     join_meter_reading = NULL,
+                     join_location = NULL,
+                     join_coordinates = NULL,
+                     join_requested_at = NULL,
+                     status_updated_at = CURRENT_TIMESTAMP
+                 WHERE id = ?`,
+                [id]
+            );
+        }
+
+        const [[updated]] = await pool.execute(
+            `SELECT
+                lr.*,
+                u.username AS driver_name,
+                c.car_number
+             FROM driver_leave_requests lr
+             JOIN drivers d ON lr.driver_id = d.id
+             JOIN users u ON d.user_id = u.id
+             LEFT JOIN cars c ON lr.car_id = c.id
+             WHERE lr.id = ?
+             LIMIT 1`,
+            [id]
+        );
+
+        res.json({
+            success: true,
+            message: action === 'approve' ? 'Join request approved successfully' : 'Join request rejected successfully',
+            request: updated
         });
     } catch (error) {
         res.status(500).json({ message: 'Server error', error: error.message });
@@ -1377,6 +1768,7 @@ module.exports = {
     updateCar,
     deleteCar,
     getCarHistory,
+    getTripReport,
     
     // Drivers
     getAllDrivers,
@@ -1386,6 +1778,9 @@ module.exports = {
     getDriverReport,
     getDriversExpenseReport,
     getDriverPaymentSubmissions,
+    updateDriverPaymentSubmissionStatus,
+    getDriverLeaveRequests,
+    updateDriverLeaveRequestStatus,
     
     // Dashboard
     getDashboardStats,

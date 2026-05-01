@@ -295,6 +295,46 @@ public class ApiClient {
         CLIENT.newCall(request).enqueue(callback);
     }
 
+    public static void getLeaveStatus(String baseUrl, String token, Callback callback) {
+        Request request = new Request.Builder()
+                .url(baseUrl + "/driver/leave")
+                .get()
+                .header("Authorization", "Bearer " + token)
+                .build();
+
+        CLIENT.newCall(request).enqueue(callback);
+    }
+
+    public static void requestLeave(String baseUrl, String token, Map<String, String> fields, Callback callback) {
+        FormBody.Builder formBuilder = new FormBody.Builder();
+        for (Map.Entry<String, String> entry : fields.entrySet()) {
+            formBuilder.add(entry.getKey(), entry.getValue());
+        }
+
+        Request request = new Request.Builder()
+                .url(baseUrl + "/driver/leave/request")
+                .post(formBuilder.build())
+                .header("Authorization", "Bearer " + token)
+                .build();
+
+        CLIENT.newCall(request).enqueue(callback);
+    }
+
+    public static void requestJoinAfterLeave(String baseUrl, String token, Map<String, String> fields, Callback callback) {
+        FormBody.Builder formBuilder = new FormBody.Builder();
+        for (Map.Entry<String, String> entry : fields.entrySet()) {
+            formBuilder.add(entry.getKey(), entry.getValue());
+        }
+
+        Request request = new Request.Builder()
+                .url(baseUrl + "/driver/leave/join-request")
+                .post(formBuilder.build())
+                .header("Authorization", "Bearer " + token)
+                .build();
+
+        CLIENT.newCall(request).enqueue(callback);
+    }
+
     private static void addImagePartIfExists(
             MultipartBody.Builder builder,
             Uri uri,

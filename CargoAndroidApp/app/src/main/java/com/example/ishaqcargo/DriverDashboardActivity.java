@@ -44,6 +44,7 @@ public class DriverDashboardActivity extends AppCompatActivity {
     private String currentCarNumber;
     private String currentDriverName;
     private double currentVehicleAverage;
+    private boolean leaveRestricted;
     private final ActivityResultLauncher<String[]> locationPermissionLauncher = registerForActivityResult(
             new ActivityResultContracts.RequestMultiplePermissions(),
             result -> {
@@ -91,24 +92,36 @@ public class DriverDashboardActivity extends AppCompatActivity {
             finish();
         });
 
-        binding.startTripButton.setOnClickListener(v -> openStartTripScreen());
+        binding.startTripButton.setOnClickListener(v -> {
+            if (ensureLeaveAccess()) return;
+            openStartTripScreen();
+        });
         binding.tripHistoryCard.setOnClickListener(v ->
-                startActivity(new Intent(this, TripHistoryActivity.class))
+                {
+                    if (ensureLeaveAccess()) return;
+                    startActivity(new Intent(this, TripHistoryActivity.class));
+                }
         );
         binding.dailyExpenseCard.setOnClickListener(v ->
-                startActivity(new Intent(this, DailyExpensesActivity.class))
+                {
+                    if (ensureLeaveAccess()) return;
+                    startActivity(new Intent(this, DailyExpensesActivity.class));
+                }
         );
         binding.paymentCard.setOnClickListener(v ->
-                startActivity(new Intent(this, PaymentSubmissionActivity.class))
+                {
+                    if (ensureLeaveAccess()) return;
+                    startActivity(new Intent(this, PaymentSubmissionActivity.class));
+                }
         );
         binding.driverAccount.setOnClickListener(v -> {
-            // TODO: Navigate to Driver Account
+            if (ensureLeaveAccess()) return;
         });
         binding.helperAccount.setOnClickListener(v -> {
-            // TODO: Navigate to Helper Account
+            if (ensureLeaveAccess()) return;
         });
         binding.leaveToHomeCard.setOnClickListener(v -> {
-            // TODO: Navigate to Leave To Home
+            startActivity(new Intent(this, LeaveRequestActivity.class));
         });
         binding.dashboardSwipeRefresh.setOnRefreshListener(this::fetchDashboard);
 
@@ -227,8 +240,10 @@ public class DriverDashboardActivity extends AppCompatActivity {
                     JSONObject lifetime = root.optJSONObject("lifetimeStats");
                     JSONObject todayStats = root.optJSONObject("todayStats");
                     JSONObject profile = root.optJSONObject("profile");
+                    JSONObject leaveStatus = root.optJSONObject("leaveStatus");
                     ongoingTrip = root.optJSONObject("ongoingTrip");
                     currentCarMeterReading = profile != null ? profile.optDouble("current_meter_reading", 0) : 0;
+                    leaveRestricted = leaveStatus != null && leaveStatus.length() > 0;
                     
                     // FIXED: Use optDouble directly — backend now sends 0 instead of null
                     currentVehicleAverage = profile != null ? profile.optDouble("overall_average_km_per_liter", 0) : 0;
@@ -340,6 +355,15 @@ public class DriverDashboardActivity extends AppCompatActivity {
         // REMOVED: binding.dashboardSwipeRefresh.setEnabled(!loading);
         // The scroll listener now controls SwipeRefresh enable state
         binding.startTripButton.setEnabled(!loading && (ongoingTrip == null || ongoingTrip.length() == 0));
+    }
+
+    private boolean ensureLeaveAccess() {
+        if (!leaveRestricted) {
+            return false;
+        }
+
+        Toast.makeText(this, R.string.leave_currently_blocked, Toast.LENGTH_SHORT).show();
+        return true;
     }
     private String formatCurrency(double amount) {
         return formatPlainNumber(amount);

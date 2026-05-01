@@ -48,6 +48,18 @@
             android:theme="@style/Theme.IshaqCargo" />
 
         <activity
+            android:name=".PaymentSubmissionHistoryActivity"
+            android:exported="false"
+            android:windowSoftInputMode="adjustResize"
+            android:theme="@style/Theme.IshaqCargo" />
+
+        <activity
+            android:name=".LeaveRequestActivity"
+            android:exported="false"
+            android:windowSoftInputMode="adjustResize"
+            android:theme="@style/Theme.IshaqCargo" />
+
+        <activity
             android:name=".ReceiptExpenseActivity"
             android:exported="false"
             android:windowSoftInputMode="adjustResize"

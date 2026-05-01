@@ -15,6 +15,9 @@ const {
     saveDailyExpense,
     submitCompanyPayment,
     getCompanyPayments,
+    getLeaveStatus,
+    requestLeave,
+    requestJoinAfterLeave,
     saveCurrentLocation
 } = require('../controllers/driverController');
 
@@ -73,6 +76,9 @@ router.post(
     submitCompanyPayment
 );
 router.get('/company-payments', authMiddleware, driverOnly, getCompanyPayments);
+router.get('/leave', authMiddleware, driverOnly, getLeaveStatus);
+router.post('/leave/request', authMiddleware, driverOnly, requestLeave);
+router.post('/leave/join-request', authMiddleware, driverOnly, requestJoinAfterLeave);
 router.post('/location', authMiddleware, driverOnly, saveCurrentLocation);
 
 module.exports = router;

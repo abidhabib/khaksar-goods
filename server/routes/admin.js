@@ -7,6 +7,7 @@ const {
     updateCar,
     deleteCar,
     getCarHistory,
+    getTripReport,
     getAllDrivers,
     addDriver,
     assignCarToDriver,
@@ -14,6 +15,9 @@ const {
     getDriverReport,
     getDriversExpenseReport,
     getDriverPaymentSubmissions,
+    updateDriverPaymentSubmissionStatus,
+    getDriverLeaveRequests,
+    updateDriverLeaveRequestStatus,
     getDashboardStats,
     getReportsData
 } = require('../controllers/adminController');
@@ -28,6 +32,7 @@ router.post('/cars', authMiddleware, adminOnly, addCar);
 router.put('/cars/:id', authMiddleware, adminOnly, updateCar);
 router.delete('/cars/:id', authMiddleware, adminOnly, deleteCar);
 router.get('/cars/:id/history', authMiddleware, adminOnly, getCarHistory);
+router.get('/trips/:id/report', authMiddleware, adminOnly, getTripReport);
 
 // Drivers
 router.get('/drivers', authMiddleware, adminOnly, getAllDrivers);
@@ -37,5 +42,8 @@ router.post('/drivers/assign-car', authMiddleware, adminOnly, assignCarToDriver)
 router.get('/drivers/:id/report', authMiddleware, adminOnly, getDriverReport);
 router.get('/drivers-expenses', authMiddleware, adminOnly, getDriversExpenseReport);
 router.get('/payment-submissions', authMiddleware, adminOnly, getDriverPaymentSubmissions);
+router.put('/payment-submissions/:id/status', authMiddleware, adminOnly, updateDriverPaymentSubmissionStatus);
+router.get('/leave-requests', authMiddleware, adminOnly, getDriverLeaveRequests);
+router.put('/leave-requests/:id/status', authMiddleware, adminOnly, updateDriverLeaveRequestStatus);
 
 module.exports = router;

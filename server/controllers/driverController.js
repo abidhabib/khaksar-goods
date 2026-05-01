@@ -5,7 +5,8 @@ const {
     ensureDriverDailyExpenseEntriesTable,
     ensureDriverDailyExpenseEntryColumns,
     ensureDriverPaymentSubmissionsTable,
-    ensureDriverLocationLogsTable
+    ensureDriverLocationLogsTable,
+    ensureDriverLeaveRequestsTable
 } = require('../config/schema');
 const getAuthenticatedDriverId = (req) => {
     const driverId = req?.user?.driver_id;
@@ -125,6 +126,89 @@ const DAILY_EXPENSE_CATEGORY_MAP = {
     food: 'food',
     cargo_security_guard: 'cargo_security_guard',
     other: 'other'
+};
+
+const PAYMENT_METHODS = new Set(['cash', 'account']);
+const LEAVE_ACTIVE_STATUSES = new Set(['on_leave', 'pending_join']);
+
+const getCurrentLeaveCycleRange = (joinedDateValue, referenceDate = new Date()) => {
+    const joinedDate = joinedDateValue ? new Date(joinedDateValue) : new Date(referenceDate);
+    const joinedDay = joinedDate.getDate();
+    const year = referenceDate.getFullYear();
+    const month = referenceDate.getMonth();
+    const currentMonthMaxDay = new Date(year, month + 1, 0).getDate();
+    const cycleDayThisMonth = Math.min(joinedDay, currentMonthMaxDay);
+
+    let start = new Date(year, month, cycleDayThisMonth, 0, 0, 0, 0);
+    if (referenceDate < start) {
+        const prevMonthDate = new Date(year, month - 1, 1);
+        const prevMonthMaxDay = new Date(prevMonthDate.getFullYear(), prevMonthDate.getMonth() + 1, 0).getDate();
+        start = new Date(prevMonthDate.getFullYear(), prevMonthDate.getMonth(), Math.min(joinedDay, prevMonthMaxDay), 0, 0, 0, 0);
+    }
+
+    const nextMonthDate = new Date(start.getFullYear(), start.getMonth() + 1, 1);
+    const nextMonthMaxDay = new Date(nextMonthDate.getFullYear(), nextMonthDate.getMonth() + 1, 0).getDate();
+    const end = new Date(nextMonthDate.getFullYear(), nextMonthDate.getMonth(), Math.min(joinedDay, nextMonthMaxDay), 0, 0, 0, 0);
+
+    return { start, end };
+};
+
+const getDriverLeaveOverview = async (driverId) => {
+    const [driverRows] = await pool.execute(
+        `SELECT d.id, d.joined_date, d.assigned_car_id, c.car_number, c.current_meter_reading
+         FROM drivers d
+         LEFT JOIN cars c ON d.assigned_car_id = c.id
+         WHERE d.id = ?
+         LIMIT 1`,
+        [driverId]
+    );
+
+    if (!driverRows.length) {
+        return null;
+    }
+
+    const driver = driverRows[0];
+    const cycle = getCurrentLeaveCycleRange(driver.joined_date, new Date());
+    const [leaveRows] = await pool.execute(
+        `SELECT id, status, leave_meter_reading, leave_location, leave_coordinates, leave_requested_at,
+                join_meter_reading, join_location, join_coordinates, join_requested_at, join_approved_at, status_updated_at
+         FROM driver_leave_requests
+         WHERE driver_id = ?
+         ORDER BY leave_requested_at DESC, id DESC`,
+        [driverId]
+    );
+
+    const activeLeave = leaveRows.find((row) => LEAVE_ACTIVE_STATUSES.has(row.status)) || null;
+
+    let totalLeaveDays = 0;
+    for (const row of leaveRows) {
+        const leaveStart = row.leave_requested_at ? new Date(row.leave_requested_at) : null;
+        if (!leaveStart) continue;
+
+        const leaveEnd = row.join_approved_at
+            ? new Date(row.join_approved_at)
+            : row.status === 'on_leave' || row.status === 'pending_join'
+                ? new Date()
+                : null;
+
+        if (!leaveEnd) continue;
+
+        const overlapStart = new Date(Math.max(leaveStart.getTime(), cycle.start.getTime()));
+        const overlapEnd = new Date(Math.min(leaveEnd.getTime(), cycle.end.getTime()));
+        if (overlapEnd <= overlapStart) continue;
+
+        totalLeaveDays += Math.max(Math.floor((overlapEnd.getTime() - overlapStart.getTime()) / (1000 * 60 * 60 * 24)), 0);
+    }
+
+    return {
+        driver,
+        activeLeave,
+        summary: {
+            total_leave_days: totalLeaveDays,
+            cycle_start: cycle.start,
+            cycle_end: cycle.end
+        }
+    };
 };
 
 const buildMonthFilter = (monthValue, column = 'expense_date') => {
@@ -310,13 +394,17 @@ profilePayload.overall_average_km_per_liter = computeAverageKmPerLiter(
             lifetimeStats.total_diesel_liters
         );
 
+        const leaveOverview = await getDriverLeaveOverview(driver_id);
+
         res.json({
             success: true,
             profile: profilePayload,
             ongoingTrip: ongoingTrip[0] || null,
             todayStats,
             recentTrips,
-            lifetimeStats
+            lifetimeStats,
+            leaveStatus: leaveOverview?.activeLeave || null,
+            leaveSummary: leaveOverview?.summary || null
         });
     } catch (error) {
         console.error('Driver dashboard error:', error);
@@ -1115,26 +1203,67 @@ const getCompanyPayments = async (req, res) => {
             return res.status(403).json({ message: 'Driver account required' });
         }
 
-        const monthFilter = buildMonthFilter(req.query.month, 'created_at');
+        const monthFilter = buildMonthFilter(req.query.month, 'submitted_at');
         const [payments] = await pool.execute(
-            `SELECT id, driver_id, amount, screenshot_image, created_at
+            `SELECT
+                id,
+                driver_id,
+                payment_method,
+                amount,
+                sending_fee,
+                handover_to,
+                screenshot_image,
+                status,
+                submitted_at,
+                status_updated_at
              FROM driver_payment_submissions
              WHERE driver_id = ? ${monthFilter.clause}
-             ORDER BY created_at DESC, id DESC`,
+             ORDER BY submitted_at DESC, id DESC`,
             [driver_id, ...monthFilter.params]
         );
 
-        const [[summary]] = await pool.execute(
-            `SELECT COUNT(*) AS total_submissions, COALESCE(SUM(amount), 0) AS total_amount
+        const [[historySummary]] = await pool.execute(
+            `SELECT
+                COUNT(*) AS total_submissions,
+                COALESCE(SUM(amount), 0) AS total_amount
              FROM driver_payment_submissions
              WHERE driver_id = ? ${monthFilter.clause}`,
             [driver_id, ...monthFilter.params]
         );
 
+        const [[summary]] = await pool.execute(
+            `SELECT
+                COUNT(*) AS total_submissions,
+                COALESCE(SUM(amount), 0) AS total_submitted_amount,
+                COALESCE(SUM(CASE WHEN status = 'approved' THEN amount ELSE 0 END), 0) AS total_approved_amount,
+                COALESCE(SUM(CASE WHEN status = 'pending' THEN amount ELSE 0 END), 0) AS total_pending_amount,
+                COALESCE(SUM(CASE WHEN status = 'rejected' THEN amount ELSE 0 END), 0) AS total_rejected_amount
+             FROM driver_payment_submissions
+             WHERE driver_id = ?`,
+            [driver_id]
+        );
+
+        const [[income]] = await pool.execute(
+            `SELECT
+                c.car_number,
+                COALESCE(SUM(CASE WHEN t.status = 'completed' THEN t.freight_charge ELSE 0 END), 0) AS total_income
+             FROM drivers d
+             LEFT JOIN cars c ON d.assigned_car_id = c.id
+             LEFT JOIN trips t ON t.driver_id = d.id
+             WHERE d.id = ?
+             GROUP BY c.car_number`,
+            [driver_id]
+        );
+
         res.json({
             success: true,
             payments,
-            summary
+            historySummary,
+            summary: {
+                ...summary,
+                total_income: Number(income?.total_income) || 0,
+                car_number: income?.car_number || null
+            }
         });
     } catch (error) {
         console.error('Get company payments error:', error);
@@ -1156,25 +1285,56 @@ const submitCompanyPayment = async (req, res) => {
             return res.status(403).json({ message: 'Driver account required' });
         }
 
+        const paymentMethod = toNullableString(req.body?.payment_method);
         const amountValue = toExpenseNumber(req.body?.amount);
+        const sendingFeeValue = toExpenseNumber(req.body?.sending_fee);
+        const handoverTo = toNullableString(req.body?.handover_to);
         const screenshotImage = getUploadedFilePath(req, 'payment_screenshot', 'screenshot_image');
+
+        if (!paymentMethod || !PAYMENT_METHODS.has(paymentMethod)) {
+            return res.status(400).json({ message: 'Valid payment method is required' });
+        }
 
         if (!(amountValue > 0)) {
             return res.status(400).json({ message: 'Payment amount must be greater than zero' });
         }
 
-        if (!screenshotImage) {
-            return res.status(400).json({ message: 'Payment screenshot is required' });
+        if (paymentMethod === 'cash' && !handoverTo) {
+            return res.status(400).json({ message: 'Handover to is required for cash payment' });
+        }
+
+        
+
+        if (paymentMethod === 'account' && !screenshotImage) {
+            return res.status(400).json({ message: 'Payment screenshot is required for account payment' });
         }
 
         const [result] = await pool.execute(
-            `INSERT INTO driver_payment_submissions (driver_id, amount, screenshot_image)
-             VALUES (?, ?, ?)`,
-            [driver_id, amountValue, screenshotImage]
+            `INSERT INTO driver_payment_submissions
+                (driver_id, payment_method, amount, sending_fee, handover_to, screenshot_image, status, submitted_at, status_updated_at)
+             VALUES (?, ?, ?, ?, ?, ?, 'pending', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)`,
+            [
+                driver_id,
+                paymentMethod,
+                amountValue,
+                paymentMethod === 'account' ? sendingFeeValue : 0,
+                paymentMethod === 'cash' ? handoverTo : null,
+                paymentMethod === 'account' ? screenshotImage : null
+            ]
         );
 
         const [[payment]] = await pool.execute(
-            `SELECT id, driver_id, amount, screenshot_image, created_at
+            `SELECT
+                id,
+                driver_id,
+                payment_method,
+                amount,
+                sending_fee,
+                handover_to,
+                screenshot_image,
+                status,
+                submitted_at,
+                status_updated_at
              FROM driver_payment_submissions
              WHERE id = ? LIMIT 1`,
             [result.insertId]
@@ -1187,6 +1347,175 @@ const submitCompanyPayment = async (req, res) => {
         });
     } catch (error) {
         console.error('Submit company payment error:', error);
+        res.status(500).json({ message: 'Server error', error: error.message });
+    }
+};
+
+const getLeaveStatus = async (req, res) => {
+    try {
+        const schemaConnection = await pool.getConnection();
+        try {
+            await ensureDriverLeaveRequestsTable(schemaConnection);
+        } finally {
+            schemaConnection.release();
+        }
+
+        const driver_id = await resolveDriverId(req);
+        if (!driver_id) {
+            return res.status(403).json({ message: 'Driver account required' });
+        }
+
+        const leaveOverview = await getDriverLeaveOverview(driver_id);
+        if (!leaveOverview) {
+            return res.status(404).json({ message: 'Driver leave profile not found' });
+        }
+
+        res.json({
+            success: true,
+            leaveStatus: leaveOverview.activeLeave,
+            leaveSummary: leaveOverview.summary,
+            driver: leaveOverview.driver
+        });
+    } catch (error) {
+        console.error('Get leave status error:', error);
+        res.status(500).json({ message: 'Server error', error: error.message });
+    }
+};
+
+const requestLeave = async (req, res) => {
+    try {
+        const schemaConnection = await pool.getConnection();
+        try {
+            await ensureDriverLeaveRequestsTable(schemaConnection);
+        } finally {
+            schemaConnection.release();
+        }
+
+        const driver_id = await resolveDriverId(req);
+        if (!driver_id) {
+            return res.status(403).json({ message: 'Driver account required' });
+        }
+
+        const leaveOverview = await getDriverLeaveOverview(driver_id);
+        if (!leaveOverview) {
+            return res.status(404).json({ message: 'Driver leave profile not found' });
+        }
+
+        if (leaveOverview.activeLeave) {
+            return res.status(400).json({ message: 'You already have an active leave request' });
+        }
+
+        const [ongoingTripRows] = await pool.execute(
+            `SELECT id FROM trips WHERE driver_id = ? AND status = 'ongoing' LIMIT 1`,
+            [driver_id]
+        );
+        if (ongoingTripRows.length) {
+            return res.status(400).json({ message: 'Finish your current trip before going on leave' });
+        }
+
+        const leaveMeterReading = toExpenseNumber(req.body?.leave_meter_reading);
+        const leaveLocation = toNullableString(req.body?.leave_location);
+        const leaveCoordinates = toNullableString(req.body?.leave_coordinates);
+
+        if (!(leaveMeterReading >= 0)) {
+            return res.status(400).json({ message: 'Leave meter reading is required' });
+        }
+
+        if (!leaveLocation) {
+            return res.status(400).json({ message: 'Leave location is required' });
+        }
+
+        const [result] = await pool.execute(
+            `INSERT INTO driver_leave_requests
+                (driver_id, car_id, status, leave_meter_reading, leave_location, leave_coordinates, leave_requested_at, status_updated_at)
+             VALUES (?, ?, 'on_leave', ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)`,
+            [
+                driver_id,
+                leaveOverview.driver.assigned_car_id || null,
+                leaveMeterReading,
+                leaveLocation,
+                leaveCoordinates
+            ]
+        );
+
+        const [[leaveRequest]] = await pool.execute(
+            `SELECT *
+             FROM driver_leave_requests
+             WHERE id = ?
+             LIMIT 1`,
+            [result.insertId]
+        );
+
+        res.status(201).json({
+            success: true,
+            message: 'Leave started successfully',
+            leaveRequest
+        });
+    } catch (error) {
+        console.error('Request leave error:', error);
+        res.status(500).json({ message: 'Server error', error: error.message });
+    }
+};
+
+const requestJoinAfterLeave = async (req, res) => {
+    try {
+        const schemaConnection = await pool.getConnection();
+        try {
+            await ensureDriverLeaveRequestsTable(schemaConnection);
+        } finally {
+            schemaConnection.release();
+        }
+
+        const driver_id = await resolveDriverId(req);
+        if (!driver_id) {
+            return res.status(403).json({ message: 'Driver account required' });
+        }
+
+        const leaveOverview = await getDriverLeaveOverview(driver_id);
+        const activeLeave = leaveOverview?.activeLeave;
+        if (!activeLeave || activeLeave.status !== 'on_leave') {
+            return res.status(400).json({ message: 'No active leave found to join from' });
+        }
+
+        const joinMeterReading = toExpenseNumber(req.body?.join_meter_reading);
+        const joinLocation = toNullableString(req.body?.join_location);
+        const joinCoordinates = toNullableString(req.body?.join_coordinates);
+
+        if (!(joinMeterReading >= 0)) {
+            return res.status(400).json({ message: 'Join meter reading is required' });
+        }
+
+        if (!joinLocation) {
+            return res.status(400).json({ message: 'Join location is required' });
+        }
+
+        await pool.execute(
+            `UPDATE driver_leave_requests
+             SET status = 'pending_join',
+                 join_meter_reading = ?,
+                 join_location = ?,
+                 join_coordinates = ?,
+                 join_requested_at = CURRENT_TIMESTAMP,
+                 status_updated_at = CURRENT_TIMESTAMP
+             WHERE id = ?`,
+            [joinMeterReading, joinLocation, joinCoordinates, activeLeave.id]
+        );
+
+        const [[leaveRequest]] = await pool.execute(
+            `SELECT *
+             FROM driver_leave_requests
+             WHERE id = ?
+             LIMIT 1`,
+            [activeLeave.id]
+        );
+
+        res.json({
+            success: true,
+            message: 'Join request submitted for admin approval',
+            leaveRequest
+        });
+    } catch (error) {
+        console.error('Request join after leave error:', error);
         res.status(500).json({ message: 'Server error', error: error.message });
     }
 };
@@ -1274,5 +1603,8 @@ module.exports = {
     saveDailyExpense,
     submitCompanyPayment,
     getCompanyPayments,
+    getLeaveStatus,
+    requestLeave,
+    requestJoinAfterLeave,
     saveCurrentLocation
 };

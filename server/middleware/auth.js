@@ -10,6 +10,19 @@ const findDriverRecord = async (userId) => {
     return drivers.length > 0 ? drivers[0] : null;
 };
 
+const getActiveLeaveRequest = async (driverId) => {
+    const [rows] = await pool.execute(
+        `SELECT id, status
+         FROM driver_leave_requests
+         WHERE driver_id = ? AND status IN ('on_leave', 'pending_join')
+         ORDER BY leave_requested_at DESC, id DESC
+         LIMIT 1`,
+        [driverId]
+    );
+
+    return rows.length ? rows[0] : null;
+};
+
 const authMiddleware = async (req, res, next) => {
     try {
         const token = req.header('Authorization')?.replace('Bearer ', '');
@@ -78,6 +91,15 @@ const driverOnly = async (req, res, next) => {
 
             req.user.driver_id = driver.id;
             req.user.assigned_car_id = driver.assigned_car_id;
+        }
+
+        const leaveRequest = await getActiveLeaveRequest(req.user.driver_id);
+        req.user.leave_request = leaveRequest || null;
+
+        const path = req.path || '';
+        const leaveAllowed = path === '/dashboard' || path.startsWith('/leave');
+        if (leaveRequest && !leaveAllowed) {
+            return res.status(403).json({ message: 'You are currently on leave and cannot access this feature' });
         }
 
         next();

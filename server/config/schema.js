@@ -156,15 +156,59 @@ const ensureDriverPaymentSubmissionsTable = async (connection) => {
         CREATE TABLE IF NOT EXISTS driver_payment_submissions (
             id INT AUTO_INCREMENT PRIMARY KEY,
             driver_id INT NOT NULL,
+            payment_method ENUM('cash', 'account') NOT NULL DEFAULT 'account',
             amount DECIMAL(10,2) NOT NULL DEFAULT 0.00,
+            sending_fee DECIMAL(10,2) NOT NULL DEFAULT 0.00,
+            handover_to VARCHAR(255) NULL,
             screenshot_image VARCHAR(500) NULL,
+            status ENUM('pending', 'approved', 'rejected') NOT NULL DEFAULT 'pending',
+            submitted_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            status_updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
             INDEX idx_driver_payment_submissions_driver_date (driver_id, created_at),
+            INDEX idx_driver_payment_submissions_status (status),
             CONSTRAINT fk_driver_payment_submissions_driver
                 FOREIGN KEY (driver_id) REFERENCES drivers(id)
                 ON DELETE CASCADE
         )
+    `);
+
+    const paymentColumns = [
+        { name: 'payment_method', definition: "ENUM('cash', 'account') NOT NULL DEFAULT 'account' AFTER driver_id" },
+        { name: 'sending_fee', definition: 'DECIMAL(10,2) NOT NULL DEFAULT 0.00 AFTER amount' },
+        { name: 'handover_to', definition: 'VARCHAR(255) NULL AFTER sending_fee' },
+        { name: 'status', definition: "ENUM('pending', 'approved', 'rejected') NOT NULL DEFAULT 'pending' AFTER screenshot_image" },
+        { name: 'submitted_at', definition: 'TIMESTAMP DEFAULT CURRENT_TIMESTAMP AFTER status' },
+        { name: 'status_updated_at', definition: 'TIMESTAMP DEFAULT CURRENT_TIMESTAMP AFTER submitted_at' }
+    ];
+
+    const [[databaseRow]] = await connection.query('SELECT DATABASE() AS database_name');
+    const databaseName = databaseRow?.database_name;
+
+    for (const column of paymentColumns) {
+        const [rows] = await connection.execute(
+            `SELECT COLUMN_NAME
+             FROM INFORMATION_SCHEMA.COLUMNS
+             WHERE TABLE_SCHEMA = ? AND TABLE_NAME = 'driver_payment_submissions' AND COLUMN_NAME = ?`,
+            [databaseName, column.name]
+        );
+
+        if (!rows.length) {
+            await connection.query(
+                `ALTER TABLE driver_payment_submissions ADD COLUMN ${column.name} ${column.definition}`
+            );
+        }
+    }
+
+    await connection.query(`
+        UPDATE driver_payment_submissions
+        SET
+            payment_method = COALESCE(payment_method, 'account'),
+            sending_fee = COALESCE(sending_fee, 0.00),
+            status = COALESCE(status, 'pending'),
+            submitted_at = COALESCE(created_at, submitted_at, CURRENT_TIMESTAMP),
+            status_updated_at = COALESCE(updated_at, status_updated_at, submitted_at, CURRENT_TIMESTAMP)
     `);
 };
 
@@ -189,6 +233,35 @@ const ensureDriverLocationLogsTable = async (connection) => {
                 ON DELETE CASCADE,
             CONSTRAINT fk_driver_location_logs_trip
                 FOREIGN KEY (trip_id) REFERENCES trips(id)
+                ON DELETE SET NULL
+        )
+    `);
+};
+
+const ensureDriverLeaveRequestsTable = async (connection) => {
+    await connection.query(`
+        CREATE TABLE IF NOT EXISTS driver_leave_requests (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            driver_id INT NOT NULL,
+            car_id INT NULL,
+            status ENUM('on_leave', 'pending_join', 'completed', 'rejected_join') NOT NULL DEFAULT 'on_leave',
+            leave_meter_reading DECIMAL(10,2) NOT NULL DEFAULT 0.00,
+            leave_location VARCHAR(255) NULL,
+            leave_coordinates VARCHAR(64) NULL,
+            leave_requested_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            join_meter_reading DECIMAL(10,2) NULL,
+            join_location VARCHAR(255) NULL,
+            join_coordinates VARCHAR(64) NULL,
+            join_requested_at TIMESTAMP NULL,
+            join_approved_at TIMESTAMP NULL,
+            status_updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            INDEX idx_driver_leave_requests_driver_status (driver_id, status),
+            INDEX idx_driver_leave_requests_leave_date (leave_requested_at),
+            CONSTRAINT fk_driver_leave_requests_driver
+                FOREIGN KEY (driver_id) REFERENCES drivers(id)
+                ON DELETE CASCADE,
+            CONSTRAINT fk_driver_leave_requests_car
+                FOREIGN KEY (car_id) REFERENCES cars(id)
                 ON DELETE SET NULL
         )
     `);
@@ -248,6 +321,7 @@ const ensureSchema = async () => {
         await ensureDriverDailyExpenseEntryColumns(connection, databaseName);
         await ensureDriverPaymentSubmissionsTable(connection);
         await ensureDriverLocationLogsTable(connection);
+        await ensureDriverLeaveRequestsTable(connection);
     } finally {
         connection.release();
     }
@@ -258,5 +332,6 @@ module.exports = {
     ensureDriverDailyExpenseEntriesTable,
     ensureDriverDailyExpenseEntryColumns,
     ensureDriverPaymentSubmissionsTable,
-    ensureDriverLocationLogsTable
+    ensureDriverLocationLogsTable,
+    ensureDriverLeaveRequestsTable
 };

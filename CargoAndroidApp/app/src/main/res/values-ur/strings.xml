@@ -7,6 +7,8 @@
     <string name="login_password_hint">پاس ورڈ</string>
     <string name="login_button">سائن اِن</string>
     <string name="login_loading">سائن اِن ہو رہا ہے...</string>
+    <string name="loading_please_wait">براہ کرم انتظار کریں...</string>
+    <string name="saving_submission">محفوظ کیا جا رہا ہے...</string>
     <string name="login_error_empty_credentials">یوزرنیم اور پاس ورڈ درج کریں</string>
     <string name="login_error_network">نیٹ ورک خرابی۔ سرور اور ایک ہی وائی فائی چیک کریں۔</string>
     <string name="login_error_failed">لاگ اِن ناکام ہو گیا</string>
@@ -259,33 +261,63 @@
     <string name="driver_account_subtitle">اپنا بیلنس   دیکھیں</string>
     <string name="helper_account_khata">ہیلپر کھاتہ</string>
     <string name="helper_account_subtitle">ہیلپر کا بیلنس  دیکھیں</string>
-    <string name="leave_to_home">گھر چھٹی</string>
+    <string name="leave_to_home"> چھٹی</string>
     <string name="leave_to_home_subtitle">چھٹی کی درخواست کریں</string>
+    <string name="leave_total_month">اس مہینے کی کل چھٹی</string>
+    <string name="leave_days_placeholder">0 دن</string>
+    <string name="leave_meter_reading">میٹر ریڈنگ</string>
+    <string name="leave_location">موجودہ لوکیشن</string>
+    <string name="leave_status_ready"> گھر جانے کے لیے چھٹی کی درخواست دیں۔</string>
+    <string name="leave_status_on_leave">آپ اس وقت چھٹی پر ہیں۔ واپسی کے لیے جوائن درخواست جمع کریں۔</string>
+    <string name="leave_status_pending_join">آپ کی دوبارہ جوائن ہونے کی درخواست زیرِ التوا ہے اور ایڈمن کی منظوری کا انتظار کر رہی ہے۔</string>
+    <string name="leave_confirm_go">تصدیق کریں کہ میں چھٹی پر جانا چاہتا ہوں</string>
+    <string name="leave_confirm_join">تصدیق کریں کہ میں دوبارہ جوائن کرنا چاہتا ہوں</string>
+    <string name="leave_meter_required">میٹر ریڈنگ ضروری ہے</string>
+    <string name="leave_location_required">موجودہ لوکیشن ضروری ہے</string>
+    <string name="leave_started_successfully">چھٹی کی درخواست کامیابی سے جمع ہو گئی</string>
+    <string name="leave_join_requested_successfully">جوائن درخواست کامیابی سے جمع ہو گئی</string>
+    <string name="leave_currently_blocked">آپ اس وقت چھٹی پر ہیں، یہ فیچر استعمال نہیں کر سکتے</string>
     <string name="send_payment_new_subtitle">کمپنی کو ادائیگی جمع کروائیں</string>
-
     <string name="payment_submissions">ادائیگی جمع کروائیاں</string>
-
     <string name="payment_amount">ادائیگی رقم</string>
-
-    <string name="payment_screenshot_required">ادائیگی اسکرین شاٹ  ہے</string>
-    <string name="payment_amount_required">ادائیگی رقم  ہے</string>
-
-    <string name="payment_add_screenshot">ادائیگی اسکرین شاٹ کے لیے کیمرا کھولیں</string>
-    <string name="payment_change_screenshot">ادائیگی اسکرین شاٹ تبدیل کریں</string>
-
+    <string name="payment_screenshot_required">ادائیگی کا اسکرین شاٹ ضروری ہے</string>
+    <string name="payment_amount_required">ادائیگی کی رقم ضروری ہے</string>
+    <string name="payment_handover_required">جس کے حوالے کر رہے ہیں اس کا نام ضروری ہے</string>
+    <string name="payment_fee_required">بھیجنے کی فیس ضروری ہے</string>
+    <string name="payment_add_screenshot">ادائیگی کے اسکرین شاٹ کے لیے کیمرا کھولیں</string>
+    <string name="payment_change_screenshot">ادائیگی کا اسکرین شاٹ تبدیل کریں</string>
+    <string name="payment_add_screenshot_gallery">گیلری سے اسکرین شاٹ منتخب کریں</string>
+    <string name="payment_change_screenshot_gallery">گیلری سے اسکرین شاٹ تبدیل کریں</string>
     <string name="submit_payment">ادائیگی جمع کریں</string>
-
     <string name="payment_submit_history">ہسٹری</string>
     <string name="payment_submit_new">نئی جمع کروائی</string>
-
     <string name="payment_total_submissions">کل جمع کروائیاں: %1$s</string>
     <string name="payment_total_amount">کل رقم: %1$s</string>
-
-    <string name="payment_saved_successfully">ادائیگی   جمع ہو گئی</string>
-
+    <string name="payment_saved_successfully">ادائیگی کامیابی سے جمع ہو گئی</string>
     <string name="payment_history_empty">کوئی ادائیگی جمع کروائی نہیں ملی۔</string>
-
     <string name="payment_filter_month_hint">مہینہ (YYYY-MM)</string>
+    <string name="payment_total_income">کل آمدن</string>
+    <string name="payment_total_deposit">کل جمع رقم</string>
+    <string name="payment_amount_placeholder">Rs 0</string>
+    <string name="payment_deposit_cash">کیش کے ذریعے جمع کروائیں</string>
+    <string name="payment_deposit_cash_subtitle">رقم اور وصول کرنے والے شخص کی تفصیل محفوظ کریں</string>
+    <string name="payment_deposit_account">اکاؤنٹ کے ذریعے جمع کروائیں</string>
+    <string name="payment_deposit_account_subtitle"> بینک یا ایپ کا اسکرین شاٹ اپ لوڈ کریں</string>
+    <string name="payment_method_hint">جمع کروانے کا طریقہ منتخب کریں، فارم کھولیں اور پھر محفوظ کریں۔</string>
+    <string name="payment_sending_fee">بھیجنے کی فیس</string>
+    <string name="payment_handover_to">حوالہ کس کو کیا</string>
+    <string name="save_payment_submission">ادائیگی محفوظ کریں</string>
+    <string name="payment_history_title">ادائیگی جمع کروانے کی ہسٹری</string>
+    <string name="payment_history_subtitle">جمع کروائی گئی کیش اور اکاؤنٹ ادائیگیوں کی کیفیت اور تفصیل دیکھیں۔</string>
+    <string name="payment_history_card_title">ادائیگی کی ہسٹری دیکھیں</string>
+    <string name="payment_history_card_subtitle">ریفریش اور فلٹر کے ساتھ الگ اسکرین کھولیں</string>
+    <string name="payment_status_label">اسٹیٹس: %1$s</string>
+    <string name="payment_method_label">طریقہ: %1$s</string>
+    <string name="payment_submission_date_label">جمع کروائی گئی: %1$s</string>
+    <string name="payment_status_date_label">اپڈیٹ ہوئی: %1$s</string>
+    <string name="payment_fee_label">بھیجنے کی فیس: %1$s</string>
+    <string name="payment_handover_label">حوالہ کیا گیا: %1$s</string>
+    <string name="payment_no_screenshot">کوئی اسکرین شاٹ نہیں</string>
 
     <string name="apply_filter">فلٹر لگائیں</string>
 

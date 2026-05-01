@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useApi } from '../hooks/useApi';
 import StatCard from '../components/admin/StatCard';
 import TripTable from '../components/admin/TripTable';
@@ -14,6 +15,7 @@ import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContai
 
 const AdminDashboard = () => {
   const { get, loading } = useApi();
+  const navigate = useNavigate();
   const [stats, setStats] = useState(null);
   const [recentTrips, setRecentTrips] = useState([]);
   const [revenueData, setRevenueData] = useState([]);
@@ -149,7 +151,7 @@ const AdminDashboard = () => {
       {/* Recent Trips Table */}
       <TripTable 
         trips={recentTrips} 
-        onViewTrip={(trip) => console.log('View trip:', trip)}
+        onViewTrip={(trip) => navigate(`/trips/${trip.id}/report`)}
       />
     </div>
   );

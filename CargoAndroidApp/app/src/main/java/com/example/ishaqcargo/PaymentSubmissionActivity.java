@@ -2,8 +2,7 @@ package com.example.ishaqcargo;
 
 import android.app.Dialog;
 import android.content.ContentResolver;
-import android.graphics.Color;
-import android.graphics.drawable.ColorDrawable;
+import android.content.Intent;
 import android.net.Uri;
 import android.os.Bundle;
 import android.text.TextUtils;
@@ -18,31 +17,23 @@ import android.widget.Toast;
 import androidx.activity.result.ActivityResultLauncher;
 import androidx.activity.result.contract.ActivityResultContracts;
 import androidx.appcompat.app.AppCompatActivity;
-import androidx.core.content.ContextCompat;
-import androidx.core.content.FileProvider;
 import androidx.core.graphics.Insets;
 import androidx.core.view.ViewCompat;
 import androidx.core.view.WindowCompat;
 import androidx.core.view.WindowInsetsCompat;
 
-import com.bumptech.glide.Glide;
 import com.example.ishaqcargo.databinding.ActivityPaymentSubmissionBinding;
 import com.example.ishaqcargo.network.ApiClient;
 import com.example.ishaqcargo.util.SessionManager;
-import com.google.android.material.card.MaterialCardView;
+import com.google.android.material.button.MaterialButton;
+import com.google.android.material.textfield.TextInputEditText;
 
-import org.json.JSONArray;
 import org.json.JSONObject;
 
-import java.io.File;
 import java.io.IOException;
-import java.text.ParseException;
-import java.text.SimpleDateFormat;
-import java.util.Date;
 import java.util.LinkedHashMap;
 import java.util.Locale;
 import java.util.Map;
-import java.util.TimeZone;
 
 import okhttp3.Call;
 import okhttp3.Callback;
@@ -50,25 +41,32 @@ import okhttp3.Response;
 
 public class PaymentSubmissionActivity extends AppCompatActivity {
 
-    private static final String STATE_PENDING_URI = "state_pending_uri";
+    private static final String METHOD_CASH = "cash";
+    private static final String METHOD_ACCOUNT = "account";
     private static final String STATE_IMAGE_URI = "state_image_uri";
 
     private ActivityPaymentSubmissionBinding binding;
     private SessionManager sessionManager;
     private String baseUrl;
-    private Uri pendingCameraUri;
     private Uri paymentScreenshotUri;
+    private Dialog activeAccountDialog;
+    private TextView activeUploadHint;
+    private ImageView activeScreenshotPreview;
 
-    private final ActivityResultLauncher<Uri> takeScreenshotLauncher = registerForActivityResult(
-            new ActivityResultContracts.TakePicture(),
-            success -> {
-                if (success && pendingCameraUri != null) {
-                    paymentScreenshotUri = pendingCameraUri;
-                    binding.screenshotPreview.setImageURI(paymentScreenshotUri);
-                    binding.screenshotPreview.setVisibility(View.VISIBLE);
-                    binding.uploadHint.setText(R.string.payment_change_screenshot);
-                } else {
-                    pendingCameraUri = null;
+    private final ActivityResultLauncher<String> pickScreenshotLauncher = registerForActivityResult(
+            new ActivityResultContracts.GetContent(),
+            uri -> {
+                if (uri == null) {
+                    return;
+                }
+
+                paymentScreenshotUri = uri;
+                if (activeScreenshotPreview != null) {
+                    activeScreenshotPreview.setImageURI(paymentScreenshotUri);
+                    activeScreenshotPreview.setVisibility(View.VISIBLE);
+                }
+                if (activeUploadHint != null) {
+                    activeUploadHint.setText(R.string.payment_change_screenshot_gallery);
                 }
             }
     );
@@ -83,31 +81,28 @@ public class PaymentSubmissionActivity extends AppCompatActivity {
         sessionManager = new SessionManager(this);
         baseUrl = sessionManager.getBaseUrl();
 
-        applyWindowInsets();
         restoreTransientState(savedInstanceState);
-        setupTabs();
+        applyWindowInsets();
+        setupInteractions();
+        loadOverview();
+    }
 
-        binding.backButton.setOnClickListener(v -> finish());
-        binding.uploadHint.setOnClickListener(v -> openCamera());
-        binding.screenshotPreview.setOnClickListener(v -> openCamera());
-        binding.submitButton.setOnClickListener(v -> submitPayment());
-        binding.filterButton.setOnClickListener(v -> loadHistory(getInput(binding.monthFilterInput)));
-
-        binding.monthFilterInput.setText(new SimpleDateFormat("yyyy-MM", Locale.US).format(new Date()));
-        showTab(true);
-        loadHistory(getInput(binding.monthFilterInput));
+    @Override
+    protected void onResume() {
+        super.onResume();
+        loadOverview();
     }
 
     @Override
     protected void onSaveInstanceState(Bundle outState) {
         super.onSaveInstanceState(outState);
-        outState.putString(STATE_PENDING_URI, pendingCameraUri != null ? pendingCameraUri.toString() : null);
         outState.putString(STATE_IMAGE_URI, paymentScreenshotUri != null ? paymentScreenshotUri.toString() : null);
     }
 
     private void applyWindowInsets() {
         final int topBarTopPadding = binding.topBar.getPaddingTop();
         final int contentBottomPadding = binding.contentScroll.getPaddingBottom();
+
         ViewCompat.setOnApplyWindowInsetsListener(binding.getRoot(), (view, windowInsets) -> {
             Insets insets = windowInsets.getInsets(WindowInsetsCompat.Type.systemBars());
             binding.topBar.setPadding(
@@ -126,93 +121,160 @@ public class PaymentSubmissionActivity extends AppCompatActivity {
         });
     }
 
-    private void setupTabs() {
-        binding.newTabButton.setOnClickListener(v -> showTab(true));
-        binding.historyTabButton.setOnClickListener(v -> showTab(false));
+    private void setupInteractions() {
+        binding.backButton.setOnClickListener(v -> finish());
+        binding.cashMethodCard.setOnClickListener(v -> openCashDialog());
+        binding.accountMethodCard.setOnClickListener(v -> openAccountDialog());
+        binding.historyCard.setOnClickListener(v ->
+                startActivity(new Intent(this, PaymentSubmissionHistoryActivity.class))
+        );
     }
 
-    private void showTab(boolean showNewSubmission) {
-        binding.newSubmissionContainer.setVisibility(showNewSubmission ? View.VISIBLE : View.GONE);
-        binding.historyContainer.setVisibility(showNewSubmission ? View.GONE : View.VISIBLE);
-        updateTabState(binding.newTabButton, showNewSubmission);
-        updateTabState(binding.historyTabButton, !showNewSubmission);
-    }
+    private void openCashDialog() {
+        Dialog dialog = new Dialog(this);
+        dialog.requestWindowFeature(Window.FEATURE_NO_TITLE);
+        dialog.setContentView(R.layout.dialog_payment_cash);
+        dialog.setCancelable(true);
 
-    private void openCamera() {
-        try {
-            pendingCameraUri = createTempImageUri("payment_");
-            takeScreenshotLauncher.launch(pendingCameraUri);
-        } catch (Exception exception) {
-            Toast.makeText(this, R.string.unable_to_open_camera, Toast.LENGTH_SHORT).show();
-        }
-    }
+        TextInputEditText amountInput = dialog.findViewById(R.id.cashAmountInput);
+        TextInputEditText handoverInput = dialog.findViewById(R.id.cashHandoverToInput);
+        MaterialButton submitButton = dialog.findViewById(R.id.cashSubmitButton);
 
-    private Uri createTempImageUri(String prefix) throws IOException {
-        File mediaDir = new File(getFilesDir(), "trip-media");
-        if (!mediaDir.exists() && !mediaDir.mkdirs()) {
-            throw new IOException("Unable to create media directory");
-        }
+        submitButton.setOnClickListener(v -> {
+            String amount = getInput(amountInput);
+            String handoverTo = getInput(handoverInput);
 
-        File imageFile = File.createTempFile(prefix + System.currentTimeMillis(), ".jpg", mediaDir);
-        return FileProvider.getUriForFile(this, getPackageName() + ".fileprovider", imageFile);
-    }
-
-    private void submitPayment() {
-        String amount = getInput(binding.amountInput);
-        if (TextUtils.isEmpty(amount)) {
-            binding.amountInput.setError(getString(R.string.payment_amount_required));
-            return;
-        }
-
-        if (paymentScreenshotUri == null) {
-            Toast.makeText(this, R.string.payment_screenshot_required, Toast.LENGTH_SHORT).show();
-            return;
-        }
-
-        Map<String, String> fields = new LinkedHashMap<>();
-        fields.put("amount", amount);
-
-        setLoading(true);
-        ContentResolver contentResolver = getContentResolver();
-        ApiClient.submitCompanyPayment(baseUrl, sessionManager.getToken(), fields, paymentScreenshotUri, contentResolver, new Callback() {
-            @Override
-            public void onFailure(Call call, IOException e) {
-                runOnUiThread(() -> {
-                    setLoading(false);
-                    Toast.makeText(PaymentSubmissionActivity.this, R.string.unable_to_save_expense, Toast.LENGTH_LONG).show();
-                });
+            if (TextUtils.isEmpty(amount)) {
+                amountInput.setError(getString(R.string.payment_amount_required));
+                return;
             }
 
-            @Override
-            public void onResponse(Call call, Response response) throws IOException {
-                String body = response.body() != null ? response.body().string() : "";
-                if (!response.isSuccessful()) {
-                    String message = ApiClient.parseErrorMessage(body, getString(R.string.unable_to_save_expense));
-                    runOnUiThread(() -> {
-                        setLoading(false);
-                        Toast.makeText(PaymentSubmissionActivity.this, message, Toast.LENGTH_LONG).show();
-                    });
-                    return;
-                }
-
-                runOnUiThread(() -> {
-                    binding.amountInput.setText("");
-                    paymentScreenshotUri = null;
-                    pendingCameraUri = null;
-                    binding.screenshotPreview.setVisibility(View.GONE);
-                    binding.uploadHint.setText(R.string.payment_add_screenshot);
-                    setLoading(false);
-                    Toast.makeText(PaymentSubmissionActivity.this, R.string.payment_saved_successfully, Toast.LENGTH_SHORT).show();
-                    showTab(false);
-                    loadHistory(getInput(binding.monthFilterInput));
-                });
+            if (TextUtils.isEmpty(handoverTo)) {
+                handoverInput.setError(getString(R.string.payment_handover_required));
+                return;
             }
+
+            Map<String, String> fields = new LinkedHashMap<>();
+            fields.put("payment_method", METHOD_CASH);
+            fields.put("amount", amount);
+            fields.put("handover_to", handoverTo);
+            submitPayment(fields, null, dialog);
         });
+
+        showDialog(dialog);
     }
 
-    private void loadHistory(String month) {
+    private void openAccountDialog() {
+        Dialog dialog = new Dialog(this);
+        dialog.requestWindowFeature(Window.FEATURE_NO_TITLE);
+        dialog.setContentView(R.layout.dialog_payment_account);
+        dialog.setCancelable(true);
+
+        TextInputEditText amountInput = dialog.findViewById(R.id.accountAmountInput);
+        TextInputEditText feeInput = dialog.findViewById(R.id.accountFeeInput);
+        TextView uploadHint = dialog.findViewById(R.id.uploadHint);
+        ImageView screenshotPreview = dialog.findViewById(R.id.screenshotPreview);
+        MaterialButton submitButton = dialog.findViewById(R.id.accountSubmitButton);
+
+        activeAccountDialog = dialog;
+        activeUploadHint = uploadHint;
+        activeScreenshotPreview = screenshotPreview;
+
+        if (paymentScreenshotUri != null) {
+            screenshotPreview.setImageURI(paymentScreenshotUri);
+            screenshotPreview.setVisibility(View.VISIBLE);
+            uploadHint.setText(R.string.payment_change_screenshot_gallery);
+        } else {
+            screenshotPreview.setVisibility(View.GONE);
+            uploadHint.setText(R.string.payment_add_screenshot_gallery);
+        }
+
+        View.OnClickListener pickListener = v -> pickScreenshotLauncher.launch("image/*");
+        uploadHint.setOnClickListener(pickListener);
+        screenshotPreview.setOnClickListener(pickListener);
+
+        submitButton.setOnClickListener(v -> {
+            String amount = getInput(amountInput);
+            String fee = getInput(feeInput);
+
+            if (TextUtils.isEmpty(amount)) {
+                amountInput.setError(getString(R.string.payment_amount_required));
+                return;
+            }
+
+          
+
+            if (paymentScreenshotUri == null) {
+                Toast.makeText(this, R.string.payment_screenshot_required, Toast.LENGTH_SHORT).show();
+                return;
+            }
+
+            Map<String, String> fields = new LinkedHashMap<>();
+            fields.put("payment_method", METHOD_ACCOUNT);
+            fields.put("amount", amount);
+            fields.put("sending_fee", fee);
+            submitPayment(fields, paymentScreenshotUri, dialog);
+        });
+
+        dialog.setOnDismissListener(d -> {
+            activeAccountDialog = null;
+            activeUploadHint = null;
+            activeScreenshotPreview = null;
+        });
+
+        showDialog(dialog);
+    }
+
+    private void submitPayment(Map<String, String> fields, Uri screenshotUri, Dialog dialogToClose) {
         setLoading(true);
-        ApiClient.getCompanyPayments(baseUrl, sessionManager.getToken(), month, new Callback() {
+        setDialogSubmitting(dialogToClose, true);
+        ContentResolver contentResolver = getContentResolver();
+        ApiClient.submitCompanyPayment(
+                baseUrl,
+                sessionManager.getToken(),
+                fields,
+                screenshotUri,
+                contentResolver,
+                new Callback() {
+                    @Override
+                    public void onFailure(Call call, IOException e) {
+                        runOnUiThread(() -> {
+                            setLoading(false);
+                            setDialogSubmitting(dialogToClose, false);
+                            Toast.makeText(PaymentSubmissionActivity.this, R.string.unable_to_save_expense, Toast.LENGTH_LONG).show();
+                        });
+                    }
+
+                    @Override
+                    public void onResponse(Call call, Response response) throws IOException {
+                        String body = response.body() != null ? response.body().string() : "";
+                        if (!response.isSuccessful()) {
+                            String message = ApiClient.parseErrorMessage(body, getString(R.string.unable_to_save_expense));
+                            runOnUiThread(() -> {
+                                setLoading(false);
+                                setDialogSubmitting(dialogToClose, false);
+                                Toast.makeText(PaymentSubmissionActivity.this, message, Toast.LENGTH_LONG).show();
+                            });
+                            return;
+                        }
+
+                        runOnUiThread(() -> {
+                            paymentScreenshotUri = null;
+                            if (dialogToClose != null && dialogToClose.isShowing()) {
+                                dialogToClose.dismiss();
+                            }
+                            setLoading(false);
+                            Toast.makeText(PaymentSubmissionActivity.this, R.string.payment_saved_successfully, Toast.LENGTH_SHORT).show();
+                            loadOverview();
+                        });
+                    }
+                }
+        );
+    }
+
+    private void loadOverview() {
+        setLoading(true);
+        ApiClient.getCompanyPayments(baseUrl, sessionManager.getToken(), "", new Callback() {
             @Override
             public void onFailure(Call call, IOException e) {
                 runOnUiThread(() -> {
@@ -235,10 +297,9 @@ public class PaymentSubmissionActivity extends AppCompatActivity {
 
                 try {
                     JSONObject root = new JSONObject(body);
-                    JSONArray payments = root.optJSONArray("payments");
                     JSONObject summary = root.optJSONObject("summary");
                     runOnUiThread(() -> {
-                        bindHistory(payments, summary);
+                        bindOverview(summary);
                         setLoading(false);
                     });
                 } catch (Exception exception) {
@@ -248,118 +309,52 @@ public class PaymentSubmissionActivity extends AppCompatActivity {
         });
     }
 
-    private void bindHistory(JSONArray payments, JSONObject summary) {
-        int totalSubmissions = summary != null ? summary.optInt("total_submissions", 0) : 0;
-        double totalAmount = summary != null ? summary.optDouble("total_amount", 0) : 0;
-        binding.totalSubmissionsText.setText(getString(R.string.payment_total_submissions, String.valueOf(totalSubmissions)));
-        binding.totalAmountText.setText(getString(R.string.payment_total_amount, formatCurrency(totalAmount)));
-        binding.historyList.removeAllViews();
+    private void bindOverview(JSONObject summary) {
+        double totalIncome = summary != null ? summary.optDouble("total_income", 0) : 0;
+        double totalApprovedDeposit = summary != null ? summary.optDouble("total_approved_amount", 0) : 0;
+        binding.totalIncomeValueText.setText(formatCurrency(totalIncome));
+        binding.totalSubmittedValueText.setText(formatCurrency(totalApprovedDeposit));
+    }
 
-        if (payments == null || payments.length() == 0) {
-            TextView emptyView = new TextView(this);
-            emptyView.setText(R.string.payment_history_empty);
-            emptyView.setTextColor(ContextCompat.getColor(this, R.color.section_hint));
-            emptyView.setTextSize(14f);
-            emptyView.setPadding(dpToPx(16), dpToPx(32), dpToPx(16), dpToPx(32));
-            emptyView.setGravity(android.view.Gravity.CENTER);
-            binding.historyList.addView(emptyView);
-            return;
-        }
-
-        for (int index = 0; index < payments.length(); index++) {
-            JSONObject item = payments.optJSONObject(index);
-            if (item == null) {
-                continue;
-            }
-
-            MaterialCardView card = new MaterialCardView(this);
-            card.setCardBackgroundColor(ContextCompat.getColor(this, R.color.white));
-            card.setStrokeColor(ContextCompat.getColor(this, R.color.card_stroke));
-            card.setStrokeWidth(dpToPx(1));
-            card.setRadius(dpToPx(18));
-
-            LinearLayout layout = new LinearLayout(this);
-            layout.setOrientation(LinearLayout.VERTICAL);
-            int padding = dpToPx(14);
-            layout.setPadding(padding, padding, padding, padding);
-
-            // Amount
-            TextView amountView = new TextView(this);
-            amountView.setText(formatCurrency(item.optDouble("amount", 0)));
-            amountView.setTextColor(ContextCompat.getColor(this, R.color.section_title));
-            amountView.setTextSize(16f);
-            amountView.setTypeface(null, android.graphics.Typeface.BOLD);
-
-            // Date
-            TextView dateView = new TextView(this);
-            dateView.setText(formatDateTime(item.optString("created_at", "")));
-            dateView.setTextColor(ContextCompat.getColor(this, R.color.section_hint));
-            dateView.setTextSize(12f);
-            dateView.setPadding(0, dpToPx(4), 0, 0);
-
-            // Screenshot thumbnail
-            String imageUrl = item.optString("screenshot_image", "");
-            ImageView screenshotThumb = new ImageView(this);
-            screenshotThumb.setLayoutParams(new LinearLayout.LayoutParams(
-                    LinearLayout.LayoutParams.MATCH_PARENT,
-                    dpToPx(160)
-            ));
-            screenshotThumb.setScaleType(ImageView.ScaleType.CENTER_CROP);
-            screenshotThumb.setBackgroundColor(ContextCompat.getColor(this, R.color.image_placeholder));
-            screenshotThumb.setPadding(0, dpToPx(8), 0, 0);
-
-            if (!TextUtils.isEmpty(imageUrl)) {
-                String fullImageUrl = imageUrl.startsWith("http") ? imageUrl : baseUrl + imageUrl;
-                Glide.with(this)
-                        .load(fullImageUrl)
-                        .placeholder(R.color.image_placeholder)
-                        .error(R.color.image_placeholder)
-                        .into(screenshotThumb);
-
-                screenshotThumb.setOnClickListener(v -> showImageModal(fullImageUrl));
-            }
-
-            layout.addView(amountView);
-            layout.addView(dateView);
-            layout.addView(screenshotThumb);
-            card.addView(layout);
-
-            LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(
-                    LinearLayout.LayoutParams.MATCH_PARENT,
-                    LinearLayout.LayoutParams.WRAP_CONTENT
-            );
-            params.bottomMargin = dpToPx(10);
-            card.setLayoutParams(params);
-
-            binding.historyList.addView(card);
+    private void showDialog(Dialog dialog) {
+        dialog.show();
+        if (dialog.getWindow() != null) {
+            dialog.getWindow().setLayout(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
         }
     }
 
-    private void showImageModal(String imageUrl) {
-        Dialog dialog = new Dialog(this, android.R.style.Theme_Black_NoTitleBar_Fullscreen);
-        dialog.requestWindowFeature(Window.FEATURE_NO_TITLE);
-
-        ImageView imageView = new ImageView(this);
-        imageView.setLayoutParams(new ViewGroup.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT,
-                ViewGroup.LayoutParams.MATCH_PARENT
-        ));
-        imageView.setScaleType(ImageView.ScaleType.FIT_CENTER);
-        imageView.setBackgroundColor(Color.BLACK);
-        imageView.setOnClickListener(v -> dialog.dismiss());
-
-        Glide.with(this)
-                .load(imageUrl)
-                .placeholder(R.color.image_placeholder)
-                .error(R.color.image_placeholder)
-                .into(imageView);
-
-        dialog.setContentView(imageView);
-        if (dialog.getWindow() != null) {
-            dialog.getWindow().setBackgroundDrawable(new ColorDrawable(Color.BLACK));
-            dialog.getWindow().setLayout(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT);
+    private void setDialogSubmitting(Dialog dialog, boolean loading) {
+        if (dialog == null) {
+            return;
         }
-        dialog.show();
+
+        MaterialButton cashSubmitButton = dialog.findViewById(R.id.cashSubmitButton);
+        MaterialButton accountSubmitButton = dialog.findViewById(R.id.accountSubmitButton);
+        TextInputEditText cashAmountInput = dialog.findViewById(R.id.cashAmountInput);
+        TextInputEditText cashHandoverInput = dialog.findViewById(R.id.cashHandoverToInput);
+        TextInputEditText accountAmountInput = dialog.findViewById(R.id.accountAmountInput);
+        TextInputEditText accountFeeInput = dialog.findViewById(R.id.accountFeeInput);
+        TextView uploadHint = dialog.findViewById(R.id.uploadHint);
+        ImageView screenshotPreview = dialog.findViewById(R.id.screenshotPreview);
+        LinearLayout cashSavingState = dialog.findViewById(R.id.cashSavingState);
+        LinearLayout accountSavingState = dialog.findViewById(R.id.accountSavingState);
+
+        if (cashSubmitButton != null) {
+            cashSubmitButton.setEnabled(!loading);
+            cashSubmitButton.setText(loading ? R.string.saving_submission : R.string.save_payment_submission);
+        }
+        if (accountSubmitButton != null) {
+            accountSubmitButton.setEnabled(!loading);
+            accountSubmitButton.setText(loading ? R.string.saving_submission : R.string.save_payment_submission);
+        }
+        if (cashAmountInput != null) cashAmountInput.setEnabled(!loading);
+        if (cashHandoverInput != null) cashHandoverInput.setEnabled(!loading);
+        if (accountAmountInput != null) accountAmountInput.setEnabled(!loading);
+        if (accountFeeInput != null) accountFeeInput.setEnabled(!loading);
+        if (uploadHint != null) uploadHint.setEnabled(!loading);
+        if (screenshotPreview != null) screenshotPreview.setEnabled(!loading);
+        if (cashSavingState != null) cashSavingState.setVisibility(loading ? View.VISIBLE : View.GONE);
+        if (accountSavingState != null) accountSavingState.setVisibility(loading ? View.VISIBLE : View.GONE);
     }
 
     private void restoreTransientState(Bundle savedInstanceState) {
@@ -367,73 +362,24 @@ public class PaymentSubmissionActivity extends AppCompatActivity {
             return;
         }
 
-        String pendingUri = savedInstanceState.getString(STATE_PENDING_URI);
         String imageUri = savedInstanceState.getString(STATE_IMAGE_URI);
-        if (!TextUtils.isEmpty(pendingUri)) {
-            pendingCameraUri = Uri.parse(pendingUri);
-        }
         if (!TextUtils.isEmpty(imageUri)) {
             paymentScreenshotUri = Uri.parse(imageUri);
-            binding.screenshotPreview.setImageURI(paymentScreenshotUri);
-            binding.screenshotPreview.setVisibility(View.VISIBLE);
-            binding.uploadHint.setText(R.string.payment_change_screenshot);
         }
     }
 
     private void setLoading(boolean loading) {
         binding.loadingOverlay.setVisibility(loading ? View.VISIBLE : View.GONE);
-        binding.submitButton.setEnabled(!loading);
-        binding.filterButton.setEnabled(!loading);
+        binding.cashMethodCard.setEnabled(!loading);
+        binding.accountMethodCard.setEnabled(!loading);
+        binding.historyCard.setEnabled(!loading);
     }
 
-    private int dpToPx(int dp) {
-        return Math.round(dp * getResources().getDisplayMetrics().density);
-    }
-
-    private void updateTabState(com.google.android.material.button.MaterialButton button, boolean active) {
-        button.setSelected(active);
-        button.setAlpha(active ? 1f : 0.72f);
-    }
-
-    private String getInput(com.google.android.material.textfield.TextInputEditText input) {
+    private String getInput(TextInputEditText input) {
         return input.getText() != null ? input.getText().toString().trim() : "";
     }
 
     private String formatCurrency(double amount) {
         return String.format(Locale.US, "Rs %.0f", amount);
-    }
-
-    private String formatDateTime(String value) {
-        if (TextUtils.isEmpty(value)) {
-            return "-";
-        }
-
-        // Parse ISO 8601 format: 2026-04-29T08:43:58.00Z or 2026-04-29 08:43:58.00Z
-        String normalized = value.replace(' ', 'T');
-
-        SimpleDateFormat[] parsers = {
-                new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSS'Z'", Locale.US),
-                new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SS'Z'", Locale.US),
-                new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss'Z'", Locale.US),
-                new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss", Locale.US),
-                new SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.US)
-        };
-
-        for (SimpleDateFormat parser : parsers) {
-            parser.setTimeZone(TimeZone.getTimeZone("UTC"));
-            try {
-                Date date = parser.parse(normalized);
-                if (date != null) {
-                    SimpleDateFormat outputFormat = new SimpleDateFormat("dd MMM yyyy, hh:mm a", Locale.US);
-                    outputFormat.setTimeZone(TimeZone.getDefault());
-                    return outputFormat.format(date);
-                }
-            } catch (ParseException ignored) {
-                // Try next parser
-            }
-        }
-
-        // Fallback: just clean up the raw string
-        return normalized.replace('T', ' ');
     }
 }
