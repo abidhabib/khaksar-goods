@@ -4,6 +4,8 @@ import Login from './pages/Login'
 import AdminDashboard from './pages/AdminDashboard'
 import CarsManagement from './pages/CarsManagement'
 import DriversManagement from './pages/DriversManagement'
+import HelpersManagement from './pages/HelpersManagement'
+import AccountRequestsPage from './pages/AccountRequestsPage'
 import CarReportPage from './pages/CarReportPage'
 import DriverReportPage from './pages/DriverReportPage'
 import DriverExpensesReportPage from './pages/DriverExpensesReportPage'
@@ -28,6 +30,8 @@ function App() {
           <Route path="/cars" element={<CarsManagement />} />
           <Route path="/cars/:id/report" element={<CarReportPage />} />
           <Route path="/drivers" element={<DriversManagement />} />
+          <Route path="/helpers" element={<HelpersManagement />} />
+          <Route path="/account-requests" element={<AccountRequestsPage />} />
           <Route path="/drivers/:id/report" element={<DriverReportPage />} />
           <Route path="/drivers-expenses" element={<DriverExpensesReportPage />} />
           <Route path="/payment-submissions" element={<PaymentSubmissionsPage />} />

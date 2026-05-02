@@ -39,7 +39,8 @@ const authMiddleware = async (req, res, next) => {
                     d.id as driver_id, d.assigned_car_id
              FROM users u
              LEFT JOIN drivers d ON d.user_id = u.id
-             WHERE u.id = ? AND u.status = "active"`,
+             WHERE u.id = ?
+               AND u.status IN ('active', 'on_leave', 'pending_join')`,
             [decoded.id]
         );
 
@@ -51,7 +52,8 @@ const authMiddleware = async (req, res, next) => {
         const issuedAtMs = decoded.iat ? decoded.iat * 1000 : 0;
         const updatedAtMs = new Date(user.updated_at).getTime();
 
-        if (issuedAtMs && updatedAtMs > issuedAtMs) {
+        const shouldInvalidateByUpdatedAt = user.role !== 'driver';
+        if (shouldInvalidateByUpdatedAt && issuedAtMs && updatedAtMs > issuedAtMs) {
             return res.status(401).json({ message: 'Token is not valid' });
         }
 

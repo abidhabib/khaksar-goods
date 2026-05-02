@@ -116,9 +116,11 @@ public class DriverDashboardActivity extends AppCompatActivity {
         );
         binding.driverAccount.setOnClickListener(v -> {
             if (ensureLeaveAccess()) return;
+            startActivity(new Intent(this, DriverAccountActivity.class));
         });
         binding.helperAccount.setOnClickListener(v -> {
             if (ensureLeaveAccess()) return;
+            startActivity(new Intent(this, HelperAccountActivity.class));
         });
         binding.leaveToHomeCard.setOnClickListener(v -> {
             startActivity(new Intent(this, LeaveRequestActivity.class));
@@ -320,7 +322,7 @@ public class DriverDashboardActivity extends AppCompatActivity {
     ) {
         int totalTrips = lifetime != null ? lifetime.optInt("total_trips", 0) : 0;
         currentCarNumber = profile != null ? profile.optString("car_number", "") : "";
-        currentDriverName = profile != null ? profile.optString("username", "") : "";
+        currentDriverName = profile != null ? profile.optString("full_name", profile.optString("username", "")) : "";
 
         binding.totalTripsValue.setText(String.valueOf(totalTrips));
         binding.carNumberText.setText(getString(

@@ -15,6 +15,10 @@ const {
     saveDailyExpense,
     submitCompanyPayment,
     getCompanyPayments,
+    getDriverAccount,
+    createDriverCashoutRequest,
+    getHelperAccount,
+    createHelperCashoutRequest,
     getLeaveStatus,
     requestLeave,
     requestJoinAfterLeave,
@@ -76,9 +80,27 @@ router.post(
     submitCompanyPayment
 );
 router.get('/company-payments', authMiddleware, driverOnly, getCompanyPayments);
+router.get('/account', authMiddleware, driverOnly, getDriverAccount);
+router.post('/account/cashout-requests', authMiddleware, driverOnly, createDriverCashoutRequest);
+router.get('/driver-account', authMiddleware, driverOnly, getDriverAccount);
+router.post('/driver-account/cashout-requests', authMiddleware, driverOnly, createDriverCashoutRequest);
+router.get('/helper-account', authMiddleware, driverOnly, getHelperAccount);
+router.post('/helper-account/cashout-requests', authMiddleware, driverOnly, createHelperCashoutRequest);
 router.get('/leave', authMiddleware, driverOnly, getLeaveStatus);
-router.post('/leave/request', authMiddleware, driverOnly, requestLeave);
-router.post('/leave/join-request', authMiddleware, driverOnly, requestJoinAfterLeave);
+router.post(
+    '/leave/request',
+    authMiddleware,
+    driverOnly,
+    upload.fields([{ name: 'meter_image', maxCount: 1 }]),
+    requestLeave
+);
+router.post(
+    '/leave/join-request',
+    authMiddleware,
+    driverOnly,
+    upload.fields([{ name: 'meter_image', maxCount: 1 }]),
+    requestJoinAfterLeave
+);
 router.post('/location', authMiddleware, driverOnly, saveCurrentLocation);
 
 module.exports = router;

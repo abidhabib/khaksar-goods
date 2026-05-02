@@ -280,6 +280,56 @@ public class ApiClient {
         CLIENT.newCall(request).enqueue(callback);
     }
 
+    public static void getDriverAccount(String baseUrl, String token, Callback callback) {
+        Request request = new Request.Builder()
+                .url(baseUrl + "/driver/account")
+                .get()
+                .header("Authorization", "Bearer " + token)
+                .build();
+
+        CLIENT.newCall(request).enqueue(callback);
+    }
+
+    public static void submitDriverCashoutRequest(String baseUrl, String token, Map<String, String> fields, Callback callback) {
+        FormBody.Builder formBuilder = new FormBody.Builder();
+        for (Map.Entry<String, String> entry : fields.entrySet()) {
+            formBuilder.add(entry.getKey(), entry.getValue());
+        }
+
+        Request request = new Request.Builder()
+                .url(baseUrl + "/driver/account/cashout-requests")
+                .post(formBuilder.build())
+                .header("Authorization", "Bearer " + token)
+                .build();
+
+        CLIENT.newCall(request).enqueue(callback);
+    }
+
+    public static void getHelperAccount(String baseUrl, String token, Callback callback) {
+        Request request = new Request.Builder()
+                .url(baseUrl + "/driver/helper-account")
+                .get()
+                .header("Authorization", "Bearer " + token)
+                .build();
+
+        CLIENT.newCall(request).enqueue(callback);
+    }
+
+    public static void submitHelperCashoutRequest(String baseUrl, String token, Map<String, String> fields, Callback callback) {
+        FormBody.Builder formBuilder = new FormBody.Builder();
+        for (Map.Entry<String, String> entry : fields.entrySet()) {
+            formBuilder.add(entry.getKey(), entry.getValue());
+        }
+
+        Request request = new Request.Builder()
+                .url(baseUrl + "/driver/helper-account/cashout-requests")
+                .post(formBuilder.build())
+                .header("Authorization", "Bearer " + token)
+                .build();
+
+        CLIENT.newCall(request).enqueue(callback);
+    }
+
     public static void saveCurrentLocation(String baseUrl, String token, Map<String, String> fields, Callback callback) {
         FormBody.Builder formBuilder = new FormBody.Builder();
         for (Map.Entry<String, String> entry : fields.entrySet()) {
@@ -320,6 +370,27 @@ public class ApiClient {
         CLIENT.newCall(request).enqueue(callback);
     }
 
+    public static void requestLeave(
+            String baseUrl,
+            String token,
+            Map<String, String> fields,
+            Uri meterImageUri,
+            ContentResolver contentResolver,
+            Callback callback
+    ) {
+        Map<String, Uri> fileUris = new LinkedHashMap<>();
+        fileUris.put("meter_image", meterImageUri);
+        RequestBody requestBody = buildFormRequestBody(fields, fileUris, contentResolver);
+
+        Request request = new Request.Builder()
+                .url(baseUrl + "/driver/leave/request")
+                .post(requestBody)
+                .header("Authorization", "Bearer " + token)
+                .build();
+
+        CLIENT.newCall(request).enqueue(callback);
+    }
+
     public static void requestJoinAfterLeave(String baseUrl, String token, Map<String, String> fields, Callback callback) {
         FormBody.Builder formBuilder = new FormBody.Builder();
         for (Map.Entry<String, String> entry : fields.entrySet()) {
@@ -329,6 +400,27 @@ public class ApiClient {
         Request request = new Request.Builder()
                 .url(baseUrl + "/driver/leave/join-request")
                 .post(formBuilder.build())
+                .header("Authorization", "Bearer " + token)
+                .build();
+
+        CLIENT.newCall(request).enqueue(callback);
+    }
+
+    public static void requestJoinAfterLeave(
+            String baseUrl,
+            String token,
+            Map<String, String> fields,
+            Uri meterImageUri,
+            ContentResolver contentResolver,
+            Callback callback
+    ) {
+        Map<String, Uri> fileUris = new LinkedHashMap<>();
+        fileUris.put("meter_image", meterImageUri);
+        RequestBody requestBody = buildFormRequestBody(fields, fileUris, contentResolver);
+
+        Request request = new Request.Builder()
+                .url(baseUrl + "/driver/leave/join-request")
+                .post(requestBody)
                 .header("Authorization", "Bearer " + token)
                 .build();
 

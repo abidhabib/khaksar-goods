@@ -8,6 +8,12 @@ const {
     ensureDriverLocationLogsTable,
     ensureDriverLeaveRequestsTable
 } = require('../config/schema');
+const {
+    roundCurrency,
+    syncDriverSalaryForDriver,
+    syncHelperSalaryForHelper,
+    validateReceiveMethodPayload
+} = require('../services/accountService');
 const getAuthenticatedDriverId = (req) => {
     const driverId = req?.user?.driver_id;
     return driverId !== undefined && driverId !== null ? Number(driverId) : null;
@@ -130,6 +136,43 @@ const DAILY_EXPENSE_CATEGORY_MAP = {
 
 const PAYMENT_METHODS = new Set(['cash', 'account']);
 const LEAVE_ACTIVE_STATUSES = new Set(['on_leave', 'pending_join']);
+const DRIVER_BALANCE_TYPES = new Set(['available', 'commission']);
+
+const createDriverAccountTransaction = async (connection, {
+    driverId,
+    balanceType,
+    transactionType,
+    direction,
+    amount,
+    sourceType,
+    sourceId,
+    notes
+}) => {
+    await connection.execute(
+        `INSERT INTO driver_account_transactions
+            (driver_id, balance_type, transaction_type, direction, amount, source_type, source_id, notes)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+        [driverId, balanceType, transactionType, direction, amount, sourceType || null, sourceId || null, notes || null]
+    );
+};
+
+const createHelperAccountTransaction = async (connection, {
+    helperId,
+    driverId,
+    transactionType,
+    direction,
+    amount,
+    sourceType,
+    sourceId,
+    notes
+}) => {
+    await connection.execute(
+        `INSERT INTO helper_account_transactions
+            (helper_id, driver_id, transaction_type, direction, amount, source_type, source_id, notes)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+        [helperId, driverId || null, transactionType, direction, amount, sourceType || null, sourceId || null, notes || null]
+    );
+};
 
 const getCurrentLeaveCycleRange = (joinedDateValue, referenceDate = new Date()) => {
     const joinedDate = joinedDateValue ? new Date(joinedDateValue) : new Date(referenceDate);
@@ -252,10 +295,20 @@ const getDashboard = async (req, res) => {
             return res.status(403).json({ message: 'Driver account required' });
         }
 
+        const accountConnection = await pool.getConnection();
+        try {
+            await syncDriverSalaryForDriver(accountConnection, driver_id);
+        } finally {
+            accountConnection.release();
+        }
+
         // Driver profile with car
         const [profile] = await pool.execute(`
-            SELECT d.*, u.username, u.phone,
+            SELECT d.*,
+                   COALESCE(d.full_name, u.username) AS full_name,
+                   u.username, u.phone,
                    c.id as car_id, c.car_number, c.current_meter_reading,
+                   h.id as helper_id, h.helper_name, h.phone_number as helper_phone_number, h.salary_amount as helper_salary_amount, h.available_balance as helper_available_balance,
                    (
                        SELECT COALESCE(SUM(t2.end_meter_reading - t2.start_meter_reading), 0)
                        FROM trips t2
@@ -270,11 +323,28 @@ const getDashboard = async (req, res) => {
             FROM drivers d
             JOIN users u ON d.user_id = u.id
             LEFT JOIN cars c ON d.assigned_car_id = c.id
+            LEFT JOIN helpers h ON d.helper_id = h.id
             WHERE d.id = ?
         `, [driver_id]);
 
         if (profile.length === 0) {
             return res.status(404).json({ message: 'Driver profile not found' });
+        }
+
+        if (profile[0].helper_id) {
+            const helperConnection = await pool.getConnection();
+            try {
+                await syncHelperSalaryForHelper(helperConnection, profile[0].helper_id);
+            } finally {
+                helperConnection.release();
+            }
+            const [helperRows] = await pool.execute(
+                'SELECT available_balance FROM helpers WHERE id = ? LIMIT 1',
+                [profile[0].helper_id]
+            );
+            if (helperRows.length) {
+                profile[0].helper_available_balance = helperRows[0].available_balance;
+            }
         }
 
         // Check for ongoing trip
@@ -737,6 +807,19 @@ const endTrip = async (req, res) => {
             [trip_id]
         );
         const totalExpenses = Number(tripExpenseTotals?.total_expenses) || 0;
+        const netProfit = roundCurrency((Number(trip[0].freight_charge) || 0) - totalExpenses);
+
+        const [driverRows] = await connection.execute(
+            `SELECT commission_percentage
+             FROM drivers
+             WHERE id = ?
+             LIMIT 1`,
+            [driver_id]
+        );
+        const commissionPercentage = Number(driverRows[0]?.commission_percentage) || 0;
+        const commissionAmount = netProfit > 0 && commissionPercentage > 0
+            ? roundCurrency((netProfit * commissionPercentage) / 100)
+            : 0;
         
         await connection.execute(
             `UPDATE cars 
@@ -748,6 +831,23 @@ const endTrip = async (req, res) => {
             [meterReadingValue, trip[0].freight_charge, totalExpenses, distance_km, trip[0].car_id]
         );
 
+        if (commissionAmount > 0) {
+            await connection.execute(
+                `INSERT INTO driver_commission_requests
+                    (driver_id, trip_id, commission_percentage, net_profit, commission_amount, status)
+                 VALUES (?, ?, ?, ?, ?, 'pending')
+                 ON DUPLICATE KEY UPDATE
+                    commission_percentage = VALUES(commission_percentage),
+                    net_profit = VALUES(net_profit),
+                    commission_amount = VALUES(commission_amount),
+                    status = 'pending',
+                    reviewed_by = NULL,
+                    reviewed_at = NULL,
+                    remarks = NULL`,
+                [driver_id, trip_id, commissionPercentage, netProfit, commissionAmount]
+            );
+        }
+
         await connection.commit();
 
         res.json({
@@ -758,7 +858,14 @@ const endTrip = async (req, res) => {
                 distance_km,
                 freight_charge: trip[0].freight_charge,
                 total_expenses: totalExpenses,
-                net_profit: trip[0].freight_charge - totalExpenses
+                net_profit: netProfit,
+                commission_request: commissionAmount > 0
+                    ? {
+                        status: 'pending',
+                        commission_percentage: commissionPercentage,
+                        commission_amount: commissionAmount
+                    }
+                    : null
             }
         });
     } catch (error) {
@@ -1351,6 +1458,275 @@ const submitCompanyPayment = async (req, res) => {
     }
 };
 
+const getDriverAccount = async (req, res) => {
+    const connection = await pool.getConnection();
+    try {
+        const driver_id = await resolveDriverId(req);
+        if (!driver_id) {
+            return res.status(403).json({ message: 'Driver account required' });
+        }
+
+        await syncDriverSalaryForDriver(connection, driver_id);
+
+        const [[account]] = await connection.execute(
+            `SELECT d.id, COALESCE(d.full_name, u.username) AS full_name, d.available_balance, d.commission_balance, d.salary_amount, d.commission_percentage,
+                    u.username, c.car_number
+             FROM drivers d
+             JOIN users u ON d.user_id = u.id
+             LEFT JOIN cars c ON d.assigned_car_id = c.id
+             WHERE d.id = ?
+             LIMIT 1`,
+            [driver_id]
+        );
+
+        const [transactions] = await connection.execute(
+            `SELECT id, balance_type, transaction_type, direction, amount, source_type, source_id, notes, created_at
+             FROM driver_account_transactions
+             WHERE driver_id = ?
+             ORDER BY created_at DESC, id DESC
+             LIMIT 100`,
+            [driver_id]
+        );
+
+        const [cashouts] = await connection.execute(
+            `SELECT id, balance_type, amount, receive_method, account_number, account_name, bank_name, status, remarks, created_at, reviewed_at
+             FROM driver_cashout_requests
+             WHERE driver_id = ?
+             ORDER BY created_at DESC, id DESC
+             LIMIT 100`,
+            [driver_id]
+        );
+
+        const [commissions] = await connection.execute(
+            `SELECT id, trip_id, commission_percentage, net_profit, commission_amount, status, remarks, created_at, reviewed_at
+             FROM driver_commission_requests
+             WHERE driver_id = ?
+             ORDER BY created_at DESC, id DESC
+             LIMIT 100`,
+            [driver_id]
+        );
+
+        res.json({ success: true, account, transactions, cashouts, commissions });
+    } catch (error) {
+        res.status(500).json({ message: 'Server error', error: error.message });
+    } finally {
+        connection.release();
+    }
+};
+
+const createDriverCashoutRequest = async (req, res) => {
+    const connection = await pool.getConnection();
+    try {
+        await connection.beginTransaction();
+
+        const driver_id = await resolveDriverId(req);
+        if (!driver_id) {
+            return res.status(403).json({ message: 'Driver account required' });
+        }
+
+        await syncDriverSalaryForDriver(connection, driver_id);
+
+        const balanceType = toNullableString(req.body?.balance_type);
+        const receiveMethod = toNullableString(req.body?.receive_method);
+        const amountValue = toExpenseNumber(req.body?.amount);
+        const accountNumber = toNullableString(req.body?.account_number);
+        const accountName = toNullableString(req.body?.account_name);
+        const bankName = toNullableString(req.body?.bank_name);
+
+        if (!balanceType || !DRIVER_BALANCE_TYPES.has(balanceType)) {
+            return res.status(400).json({ message: 'Valid driver balance type is required' });
+        }
+
+        const validationError = validateReceiveMethodPayload({
+            receiveMethod,
+            amountValue,
+            accountNumber,
+            accountName,
+            bankName
+        });
+        if (validationError) {
+            return res.status(400).json({ message: validationError });
+        }
+
+        const balanceColumn = balanceType === 'commission' ? 'commission_balance' : 'available_balance';
+        const [balanceRows] = await connection.execute(
+            `SELECT ${balanceColumn} AS balance FROM drivers WHERE id = ? LIMIT 1`,
+            [driver_id]
+        );
+        const balance = Number(balanceRows[0]?.balance) || 0;
+
+        if (balance < amountValue) {
+            return res.status(400).json({ message: 'Requested amount exceeds available balance' });
+        }
+
+        const [result] = await connection.execute(
+            `INSERT INTO driver_cashout_requests
+                (driver_id, balance_type, amount, receive_method, account_number, account_name, bank_name, status)
+             VALUES (?, ?, ?, ?, ?, ?, ?, 'pending')`,
+            [
+                driver_id,
+                balanceType,
+                amountValue,
+                receiveMethod,
+                receiveMethod === 'account' ? accountNumber : null,
+                receiveMethod === 'account' ? accountName : null,
+                receiveMethod === 'account' ? bankName : null
+            ]
+        );
+
+        await connection.commit();
+        res.status(201).json({ success: true, message: 'Driver cashout request submitted', request_id: result.insertId });
+    } catch (error) {
+        await connection.rollback();
+        res.status(500).json({ message: 'Server error', error: error.message });
+    } finally {
+        connection.release();
+    }
+};
+
+const getHelperAccount = async (req, res) => {
+    const connection = await pool.getConnection();
+    try {
+        const driver_id = await resolveDriverId(req);
+        if (!driver_id) {
+            return res.status(403).json({ message: 'Driver account required' });
+        }
+
+        const [[driverRow]] = await connection.execute(
+            `SELECT d.id, COALESCE(d.full_name, u.username) AS full_name, d.helper_id, c.car_number
+             FROM drivers d
+             JOIN users u ON d.user_id = u.id
+             LEFT JOIN cars c ON d.assigned_car_id = c.id
+             WHERE d.id = ?
+             LIMIT 1`,
+            [driver_id]
+        );
+
+        if (!driverRow?.helper_id) {
+            return res.status(404).json({ message: 'No helper assigned to this driver' });
+        }
+
+        await syncHelperSalaryForHelper(connection, driverRow.helper_id);
+
+        const [[helper]] = await connection.execute(
+            `SELECT id, helper_name, phone_number, salary_amount, available_balance, status
+             FROM helpers
+             WHERE id = ?
+             LIMIT 1`,
+            [driverRow.helper_id]
+        );
+
+        const [transactions] = await connection.execute(
+            `SELECT id, transaction_type, direction, amount, source_type, source_id, notes, created_at
+             FROM helper_account_transactions
+             WHERE helper_id = ?
+             ORDER BY created_at DESC, id DESC
+             LIMIT 100`,
+            [driverRow.helper_id]
+        );
+
+        const [cashouts] = await connection.execute(
+            `SELECT id, amount, receive_method, account_number, account_name, bank_name, status, remarks, created_at, reviewed_at
+             FROM helper_cashout_requests
+             WHERE helper_id = ?
+             ORDER BY created_at DESC, id DESC
+             LIMIT 100`,
+            [driverRow.helper_id]
+        );
+
+        res.json({
+            success: true,
+            driver: driverRow,
+            helper,
+            transactions,
+            cashouts
+        });
+    } catch (error) {
+        res.status(500).json({ message: 'Server error', error: error.message });
+    } finally {
+        connection.release();
+    }
+};
+
+const createHelperCashoutRequest = async (req, res) => {
+    const connection = await pool.getConnection();
+    try {
+        await connection.beginTransaction();
+
+        const driver_id = await resolveDriverId(req);
+        if (!driver_id) {
+            return res.status(403).json({ message: 'Driver account required' });
+        }
+
+        const [[driverRow]] = await connection.execute(
+            `SELECT d.helper_id, d.assigned_car_id, COALESCE(d.full_name, u.username) AS full_name, c.car_number
+             FROM drivers d
+             JOIN users u ON d.user_id = u.id
+             LEFT JOIN cars c ON d.assigned_car_id = c.id
+             WHERE d.id = ?
+             LIMIT 1`,
+            [driver_id]
+        );
+
+        if (!driverRow?.helper_id) {
+            return res.status(404).json({ message: 'No helper assigned to this driver' });
+        }
+
+        await syncHelperSalaryForHelper(connection, driverRow.helper_id);
+
+        const receiveMethod = toNullableString(req.body?.receive_method);
+        const amountValue = toExpenseNumber(req.body?.amount);
+        const accountNumber = toNullableString(req.body?.account_number);
+        const accountName = toNullableString(req.body?.account_name);
+        const bankName = toNullableString(req.body?.bank_name);
+
+        const validationError = validateReceiveMethodPayload({
+            receiveMethod,
+            amountValue,
+            accountNumber,
+            accountName,
+            bankName
+        });
+        if (validationError) {
+            return res.status(400).json({ message: validationError });
+        }
+
+        const [helperBalanceRows] = await connection.execute(
+            'SELECT available_balance FROM helpers WHERE id = ? LIMIT 1',
+            [driverRow.helper_id]
+        );
+        const helperBalance = Number(helperBalanceRows[0]?.available_balance) || 0;
+
+        if (helperBalance < amountValue) {
+            return res.status(400).json({ message: 'Requested amount exceeds helper available balance' });
+        }
+
+        const [result] = await connection.execute(
+            `INSERT INTO helper_cashout_requests
+                (helper_id, driver_id, car_id, amount, receive_method, account_number, account_name, bank_name, status)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'pending')`,
+            [
+                driverRow.helper_id,
+                driver_id,
+                driverRow.assigned_car_id || null,
+                amountValue,
+                receiveMethod,
+                receiveMethod === 'account' ? accountNumber : null,
+                receiveMethod === 'account' ? accountName : null,
+                receiveMethod === 'account' ? bankName : null
+            ]
+        );
+
+        await connection.commit();
+        res.status(201).json({ success: true, message: 'Helper cashout request submitted', request_id: result.insertId });
+    } catch (error) {
+        await connection.rollback();
+        res.status(500).json({ message: 'Server error', error: error.message });
+    } finally {
+        connection.release();
+    }
+};
+
 const getLeaveStatus = async (req, res) => {
     try {
         const schemaConnection = await pool.getConnection();
@@ -1414,6 +1790,7 @@ const requestLeave = async (req, res) => {
         }
 
         const leaveMeterReading = toExpenseNumber(req.body?.leave_meter_reading);
+        const leaveMeterImage = getUploadedFilePath(req, 'meter_image');
         const leaveLocation = toNullableString(req.body?.leave_location);
         const leaveCoordinates = toNullableString(req.body?.leave_coordinates);
 
@@ -1425,18 +1802,43 @@ const requestLeave = async (req, res) => {
             return res.status(400).json({ message: 'Leave location is required' });
         }
 
-        const [result] = await pool.execute(
-            `INSERT INTO driver_leave_requests
-                (driver_id, car_id, status, leave_meter_reading, leave_location, leave_coordinates, leave_requested_at, status_updated_at)
-             VALUES (?, ?, 'on_leave', ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)`,
-            [
-                driver_id,
-                leaveOverview.driver.assigned_car_id || null,
-                leaveMeterReading,
-                leaveLocation,
-                leaveCoordinates
-            ]
-        );
+        if (!leaveMeterImage) {
+            return res.status(400).json({ message: 'Leave meter photo is required' });
+        }
+
+        const connection = await pool.getConnection();
+        let result;
+        try {
+            await connection.beginTransaction();
+            [result] = await connection.execute(
+                `INSERT INTO driver_leave_requests
+                    (driver_id, car_id, status, leave_meter_reading, leave_meter_image, leave_location, leave_coordinates, leave_requested_at, status_updated_at)
+                 VALUES (?, ?, 'on_leave', ?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)`,
+                [
+                    driver_id,
+                    leaveOverview.driver.assigned_car_id || null,
+                    leaveMeterReading,
+                    leaveMeterImage,
+                    leaveLocation,
+                    leaveCoordinates
+                ]
+            );
+
+            await connection.execute(
+                `UPDATE users u
+                 JOIN drivers d ON d.user_id = u.id
+                 SET u.status = 'on_leave'
+                 WHERE d.id = ?`,
+                [driver_id]
+            );
+
+            await connection.commit();
+        } catch (error) {
+            await connection.rollback();
+            throw error;
+        } finally {
+            connection.release();
+        }
 
         const [[leaveRequest]] = await pool.execute(
             `SELECT *
@@ -1478,6 +1880,7 @@ const requestJoinAfterLeave = async (req, res) => {
         }
 
         const joinMeterReading = toExpenseNumber(req.body?.join_meter_reading);
+        const joinMeterImage = getUploadedFilePath(req, 'meter_image');
         const joinLocation = toNullableString(req.body?.join_location);
         const joinCoordinates = toNullableString(req.body?.join_coordinates);
 
@@ -1489,17 +1892,41 @@ const requestJoinAfterLeave = async (req, res) => {
             return res.status(400).json({ message: 'Join location is required' });
         }
 
-        await pool.execute(
-            `UPDATE driver_leave_requests
-             SET status = 'pending_join',
-                 join_meter_reading = ?,
-                 join_location = ?,
-                 join_coordinates = ?,
-                 join_requested_at = CURRENT_TIMESTAMP,
-                 status_updated_at = CURRENT_TIMESTAMP
-             WHERE id = ?`,
-            [joinMeterReading, joinLocation, joinCoordinates, activeLeave.id]
-        );
+        if (!joinMeterImage) {
+            return res.status(400).json({ message: 'Join meter photo is required' });
+        }
+
+        const connection = await pool.getConnection();
+        try {
+            await connection.beginTransaction();
+            await connection.execute(
+                `UPDATE driver_leave_requests
+                 SET status = 'pending_join',
+                     join_meter_reading = ?,
+                     join_meter_image = ?,
+                     join_location = ?,
+                     join_coordinates = ?,
+                     join_requested_at = CURRENT_TIMESTAMP,
+                     status_updated_at = CURRENT_TIMESTAMP
+                 WHERE id = ?`,
+                [joinMeterReading, joinMeterImage, joinLocation, joinCoordinates, activeLeave.id]
+            );
+
+            await connection.execute(
+                `UPDATE users u
+                 JOIN drivers d ON d.user_id = u.id
+                 SET u.status = 'pending_join'
+                 WHERE d.id = ?`,
+                [driver_id]
+            );
+
+            await connection.commit();
+        } catch (error) {
+            await connection.rollback();
+            throw error;
+        } finally {
+            connection.release();
+        }
 
         const [[leaveRequest]] = await pool.execute(
             `SELECT *
@@ -1603,6 +2030,10 @@ module.exports = {
     saveDailyExpense,
     submitCompanyPayment,
     getCompanyPayments,
+    getDriverAccount,
+    createDriverCashoutRequest,
+    getHelperAccount,
+    createHelperCashoutRequest,
     getLeaveStatus,
     requestLeave,
     requestJoinAfterLeave,

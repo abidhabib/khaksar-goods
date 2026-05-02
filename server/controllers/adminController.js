@@ -1,10 +1,96 @@
 const bcrypt = require('bcryptjs');
 const pool = require('../config/database');
 const { ensureDriverPaymentSubmissionsTable, ensureDriverLeaveRequestsTable } = require('../config/schema');
-const { generateUsername } = require('../utils/helpers');
+const {
+    roundCurrency,
+    syncDriverSalaryForDriver,
+    syncHelperSalaryForHelper,
+    syncAllDriverSalary,
+    syncAllHelperSalary,
+    validateReceiveMethodPayload
+} = require('../services/accountService');
 
 const PAYMENT_SUBMISSION_STATUSES = new Set(['pending', 'approved', 'rejected']);
 const LEAVE_REQUEST_ACTIONS = new Set(['approve', 'reject']);
+const ACCOUNT_REVIEW_STATUSES = new Set(['approved', 'rejected']);
+
+const toNullableString = (value) => {
+    if (value === undefined || value === null) {
+        return null;
+    }
+
+    const normalized = String(value).trim();
+    return normalized ? normalized : null;
+};
+
+const toNonNegativeAmount = (value) => {
+    const parsed = Number(value);
+    return Number.isFinite(parsed) && parsed >= 0 ? roundCurrency(parsed) : 0;
+};
+
+const syncDriverHelperAssignment = async (connection, driverId, helperId) => {
+    const normalizedHelperId = helperId ? Number(helperId) : null;
+
+    if (!normalizedHelperId) {
+        await connection.execute('UPDATE drivers SET helper_id = NULL WHERE id = ?', [driverId]);
+        return;
+    }
+
+    const [helperRows] = await connection.execute(
+        'SELECT id, status FROM helpers WHERE id = ? LIMIT 1',
+        [normalizedHelperId]
+    );
+
+    if (!helperRows.length) {
+        throw new Error('Helper not found');
+    }
+
+    if (helperRows[0].status !== 'active') {
+        throw new Error('Only active helpers can be assigned');
+    }
+
+    await connection.execute(
+        'UPDATE drivers SET helper_id = NULL WHERE helper_id = ? AND id != ?',
+        [normalizedHelperId, driverId]
+    );
+    await connection.execute('UPDATE drivers SET helper_id = ? WHERE id = ?', [normalizedHelperId, driverId]);
+};
+
+const createDriverAccountTransaction = async (connection, {
+    driverId,
+    balanceType,
+    transactionType,
+    direction,
+    amount,
+    sourceType,
+    sourceId,
+    notes
+}) => {
+    await connection.execute(
+        `INSERT INTO driver_account_transactions
+            (driver_id, balance_type, transaction_type, direction, amount, source_type, source_id, notes)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+        [driverId, balanceType, transactionType, direction, amount, sourceType || null, sourceId || null, notes || null]
+    );
+};
+
+const createHelperAccountTransaction = async (connection, {
+    helperId,
+    driverId,
+    transactionType,
+    direction,
+    amount,
+    sourceType,
+    sourceId,
+    notes
+}) => {
+    await connection.execute(
+        `INSERT INTO helper_account_transactions
+            (helper_id, driver_id, transaction_type, direction, amount, source_type, source_id, notes)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+        [helperId, driverId || null, transactionType, direction, amount, sourceType || null, sourceId || null, notes || null]
+    );
+};
 
 const getDateFilter = (period = 'all', fromDate, toDate, alias = 't') => {
     const conditions = [];
@@ -571,9 +657,20 @@ const getTripReport = async (req, res) => {
 // Get all drivers
 const getAllDrivers = async (req, res) => {
     try {
+        const connection = await pool.getConnection();
+        try {
+            await syncAllDriverSalary(connection);
+            await syncAllHelperSalary(connection);
+        } finally {
+            connection.release();
+        }
+
         const [drivers] = await pool.execute(`
-            SELECT d.*, u.username, u.phone, u.status, u.created_at,
+            SELECT d.*,
+                   COALESCE(d.full_name, u.username) AS full_name,
+                   u.username, u.phone, u.status, u.created_at,
                    c.id as car_id, c.car_number, c.current_meter_reading as car_current_meter,
+                   h.helper_name, h.phone_number as helper_phone_number, h.salary_amount as helper_salary_amount,
                    dll.area as last_location_area,
                    dll.city as last_location_city,
                    dll.province as last_location_province,
@@ -593,6 +690,7 @@ const getAllDrivers = async (req, res) => {
             FROM drivers d
             JOIN users u ON d.user_id = u.id
             LEFT JOIN cars c ON d.assigned_car_id = c.id
+            LEFT JOIN helpers h ON d.helper_id = h.id
             LEFT JOIN driver_location_logs dll ON dll.id = (
                 SELECT l1.id
                 FROM driver_location_logs l1
@@ -629,31 +727,60 @@ const addDriver = async (req, res) => {
     try {
         await connection.beginTransaction();
         
-        const { name, phone, password, license_number, car_id } = req.body;
+        const {
+            name,
+            username,
+            phone,
+            password,
+            license_number,
+            car_id,
+            helper_id,
+            salary_amount,
+            commission_percentage
+        } = req.body;
+
+        const fullName = toNullableString(name);
+        const normalizedUsername = toNullableString(username);
+        const helperId = helper_id ? Number(helper_id) : null;
+        const salaryAmount = toNonNegativeAmount(salary_amount);
+        const commissionPercentage = toNonNegativeAmount(commission_percentage);
+
+        if (!fullName || !normalizedUsername || !password) {
+            return res.status(400).json({ message: 'Driver name, username, and password are required' });
+        }
+
+        const [existingUsers] = await connection.execute(
+            'SELECT id FROM users WHERE username = ? LIMIT 1',
+            [normalizedUsername]
+        );
+
+        if (existingUsers.length) {
+            return res.status(400).json({ message: 'Username already exists' });
+        }
         
-        // Generate username
-        const username = generateUsername(name, phone);
-        
-        // Hash password
         const salt = await bcrypt.genSalt(10);
         const password_hash = await bcrypt.hash(password, salt);
 
-        // Create user
         const [userResult] = await connection.execute(
-            'INSERT INTO users (username, password_hash, role, phone) VALUES (?, ?, "driver", ?)',
-            [username, password_hash, phone]
+            'INSERT INTO users (username, password_hash, role, phone, status) VALUES (?, ?, "driver", ?, "active")',
+            [normalizedUsername, password_hash, toNullableString(phone)]
         );
 
         const user_id = userResult.insertId;
 
-        // Create driver profile
         const [driverResult] = await connection.execute(
-            'INSERT INTO drivers (user_id, license_number, assigned_car_id) VALUES (?, ?, NULL)',
-            [user_id, license_number]
+            `INSERT INTO drivers
+                (user_id, full_name, license_number, salary_amount, commission_percentage, assigned_car_id, helper_id, available_balance, commission_balance, next_salary_credit_date)
+             VALUES (?, ?, ?, ?, ?, NULL, NULL, 0.00, 0.00, DATE_ADD(CURDATE(), INTERVAL 1 DAY))`,
+            [user_id, fullName, toNullableString(license_number), salaryAmount, commissionPercentage]
         );
 
         if (car_id) {
             await assignCarWithIntegrity(connection, driverResult.insertId, car_id);
+        }
+
+        if (helperId) {
+            await syncDriverHelperAssignment(connection, driverResult.insertId, helperId);
         }
 
         await connection.commit();
@@ -664,7 +791,8 @@ const addDriver = async (req, res) => {
             driver: {
                 id: driverResult.insertId,
                 user_id,
-                username,
+                full_name: fullName,
+                username: normalizedUsername,
                 phone,
                 assigned_car_id: car_id
             }
@@ -711,7 +839,18 @@ const updateDriver = async (req, res) => {
 
     try {
         const { id } = req.params;
-        const { phone, status, password, license_number, car_id } = req.body;
+        const {
+            full_name,
+            username,
+            phone,
+            status,
+            password,
+            license_number,
+            car_id,
+            helper_id,
+            salary_amount,
+            commission_percentage
+        } = req.body;
 
         await connection.beginTransaction();
 
@@ -726,15 +865,36 @@ const updateDriver = async (req, res) => {
 
         const user_id = driver[0].user_id;
 
-        // Update phone and status
+        if (username) {
+            const [existingRows] = await connection.execute(
+                'SELECT id FROM users WHERE username = ? AND id != ? LIMIT 1',
+                [username, user_id]
+            );
+
+            if (existingRows.length) {
+                return res.status(400).json({ message: 'Username already exists' });
+            }
+        }
+
         await connection.execute(
-            'UPDATE users SET phone = ?, status = ? WHERE id = ?',
-            [phone, status, user_id]
+            'UPDATE users SET username = COALESCE(?, username), phone = ?, status = ? WHERE id = ?',
+            [toNullableString(username), toNullableString(phone), status, user_id]
         );
 
         await connection.execute(
-            'UPDATE drivers SET license_number = ? WHERE id = ?',
-            [license_number, id]
+            `UPDATE drivers
+             SET full_name = COALESCE(?, full_name),
+                 license_number = ?,
+                 salary_amount = ?,
+                 commission_percentage = ?
+             WHERE id = ?`,
+            [
+                toNullableString(full_name),
+                toNullableString(license_number),
+                toNonNegativeAmount(salary_amount),
+                toNonNegativeAmount(commission_percentage),
+                id
+            ]
         );
 
         // Update password if provided
@@ -751,6 +911,16 @@ const updateDriver = async (req, res) => {
             await assignCarWithIntegrity(connection, Number(id), car_id);
         }
 
+        if (helper_id !== undefined) {
+            await syncDriverHelperAssignment(connection, Number(id), helper_id);
+        }
+
+        await syncDriverSalaryForDriver(connection, Number(id));
+        const [updatedDriverRows] = await connection.execute('SELECT helper_id FROM drivers WHERE id = ? LIMIT 1', [id]);
+        if (updatedDriverRows[0]?.helper_id) {
+            await syncHelperSalaryForHelper(connection, updatedDriverRows[0].helper_id);
+        }
+
         await connection.commit();
 
         res.json({ success: true, message: 'Driver updated successfully' });
@@ -758,11 +928,429 @@ const updateDriver = async (req, res) => {
         await connection.rollback();
         if (error.message === 'Driver not found' ||
             error.message === 'Car not found' ||
+            error.message === 'Helper not found' ||
+            error.message === 'Only active helpers can be assigned' ||
             error.message === 'Only active cars can be assigned' ||
             error.message === 'Driver has ongoing trip. Complete it first.' ||
             error.message === 'Selected cargo is assigned to a driver with an ongoing trip') {
             return res.status(400).json({ message: error.message });
         }
+        res.status(500).json({ message: 'Server error', error: error.message });
+    } finally {
+        connection.release();
+    }
+};
+
+const getHelpers = async (req, res) => {
+    try {
+        const connection = await pool.getConnection();
+        try {
+            await syncAllHelperSalary(connection);
+        } finally {
+            connection.release();
+        }
+
+        const [helpers] = await pool.execute(`
+            SELECT h.*,
+                   d.id AS driver_id,
+                   d.full_name AS driver_full_name,
+                   u.username AS driver_username,
+                   c.car_number
+            FROM helpers h
+            LEFT JOIN drivers d ON d.helper_id = h.id
+            LEFT JOIN users u ON d.user_id = u.id
+            LEFT JOIN cars c ON d.assigned_car_id = c.id
+            ORDER BY h.created_at DESC, h.id DESC
+        `);
+
+        res.json({ success: true, helpers });
+    } catch (error) {
+        res.status(500).json({ message: 'Server error', error: error.message });
+    }
+};
+
+const addHelper = async (req, res) => {
+    try {
+        const helperName = toNullableString(req.body?.helper_name);
+        const phoneNumber = toNullableString(req.body?.phone_number);
+        const salaryAmount = toNonNegativeAmount(req.body?.salary_amount);
+
+        if (!helperName) {
+            return res.status(400).json({ message: 'Helper name is required' });
+        }
+
+        const [result] = await pool.execute(
+            `INSERT INTO helpers
+                (helper_name, phone_number, salary_amount, available_balance, next_salary_credit_date, status)
+             VALUES (?, ?, ?, 0.00, DATE_ADD(CURDATE(), INTERVAL 1 MONTH), 'active')`,
+            [helperName, phoneNumber, salaryAmount]
+        );
+
+        const [rows] = await pool.execute('SELECT * FROM helpers WHERE id = ? LIMIT 1', [result.insertId]);
+        res.status(201).json({ success: true, helper: rows[0], message: 'Helper created successfully' });
+    } catch (error) {
+        res.status(500).json({ message: 'Server error', error: error.message });
+    }
+};
+
+const updateHelper = async (req, res) => {
+    try {
+        const helperId = Number(req.params.id);
+        const helperName = toNullableString(req.body?.helper_name);
+        const phoneNumber = toNullableString(req.body?.phone_number);
+        const salaryAmount = toNonNegativeAmount(req.body?.salary_amount);
+        const status = toNullableString(req.body?.status) || 'active';
+
+        await pool.execute(
+            `UPDATE helpers
+             SET helper_name = COALESCE(?, helper_name),
+                 phone_number = ?,
+                 salary_amount = ?,
+                 status = ?
+             WHERE id = ?`,
+            [helperName, phoneNumber, salaryAmount, status, helperId]
+        );
+
+        const connection = await pool.getConnection();
+        try {
+            await syncHelperSalaryForHelper(connection, helperId);
+        } finally {
+            connection.release();
+        }
+
+        const [rows] = await pool.execute('SELECT * FROM helpers WHERE id = ? LIMIT 1', [helperId]);
+        if (!rows.length) {
+            return res.status(404).json({ message: 'Helper not found' });
+        }
+
+        res.json({ success: true, helper: rows[0], message: 'Helper updated successfully' });
+    } catch (error) {
+        res.status(500).json({ message: 'Server error', error: error.message });
+    }
+};
+
+const getDriverCommissionRequests = async (req, res) => {
+    try {
+        const { status = '', driver_id = '' } = req.query;
+        const filters = [];
+        const params = [];
+
+        if (status && PAYMENT_SUBMISSION_STATUSES.has(status)) {
+            filters.push('cr.status = ?');
+            params.push(status);
+        }
+
+        if (driver_id) {
+            filters.push('cr.driver_id = ?');
+            params.push(driver_id);
+        }
+
+        const whereClause = filters.length ? `WHERE ${filters.join(' AND ')}` : '';
+        const [requests] = await pool.execute(
+            `SELECT cr.*,
+                    d.full_name AS driver_full_name,
+                    u.username AS driver_username,
+                    c.car_number,
+                    t.from_location,
+                    t.to_location,
+                    reviewer.username AS reviewed_by_username
+             FROM driver_commission_requests cr
+             JOIN drivers d ON cr.driver_id = d.id
+             JOIN users u ON d.user_id = u.id
+             JOIN trips t ON cr.trip_id = t.id
+             LEFT JOIN cars c ON t.car_id = c.id
+             LEFT JOIN users reviewer ON cr.reviewed_by = reviewer.id
+             ${whereClause}
+             ORDER BY cr.created_at DESC, cr.id DESC`,
+            params
+        );
+
+        res.json({ success: true, requests });
+    } catch (error) {
+        res.status(500).json({ message: 'Server error', error: error.message });
+    }
+};
+
+const updateDriverCommissionRequestStatus = async (req, res) => {
+    const connection = await pool.getConnection();
+    try {
+        await connection.beginTransaction();
+
+        const requestId = Number(req.params.id);
+        const status = String(req.body?.status || '').trim().toLowerCase();
+        const remarks = toNullableString(req.body?.remarks);
+
+        if (!ACCOUNT_REVIEW_STATUSES.has(status)) {
+            return res.status(400).json({ message: 'Status must be approved or rejected' });
+        }
+
+        const [rows] = await connection.execute(
+            'SELECT * FROM driver_commission_requests WHERE id = ? LIMIT 1',
+            [requestId]
+        );
+
+        if (!rows.length) {
+            return res.status(404).json({ message: 'Commission request not found' });
+        }
+
+        const request = rows[0];
+        if (request.status !== 'pending') {
+            return res.status(400).json({ message: 'Only pending requests can be updated' });
+        }
+
+        if (status === 'approved') {
+            await connection.execute(
+                'UPDATE drivers SET commission_balance = commission_balance + ? WHERE id = ?',
+                [request.commission_amount, request.driver_id]
+            );
+            await createDriverAccountTransaction(connection, {
+                driverId: request.driver_id,
+                balanceType: 'commission',
+                transactionType: 'commission_credit',
+                direction: 'credit',
+                amount: request.commission_amount,
+                sourceType: 'commission_request',
+                sourceId: request.id,
+                notes: `Commission approved for trip #${request.trip_id}`
+            });
+        }
+
+        await connection.execute(
+            `UPDATE driver_commission_requests
+             SET status = ?, reviewed_by = ?, reviewed_at = CURRENT_TIMESTAMP, remarks = ?
+             WHERE id = ?`,
+            [status, req.user.id, remarks, requestId]
+        );
+
+        await connection.commit();
+        res.json({ success: true, message: `Commission request ${status}` });
+    } catch (error) {
+        await connection.rollback();
+        res.status(500).json({ message: 'Server error', error: error.message });
+    } finally {
+        connection.release();
+    }
+};
+
+const getDriverCashoutRequests = async (req, res) => {
+    try {
+        const { status = '', driver_id = '' } = req.query;
+        const filters = [];
+        const params = [];
+
+        if (status && PAYMENT_SUBMISSION_STATUSES.has(status)) {
+            filters.push('r.status = ?');
+            params.push(status);
+        }
+
+        if (driver_id) {
+            filters.push('r.driver_id = ?');
+            params.push(driver_id);
+        }
+
+        const whereClause = filters.length ? `WHERE ${filters.join(' AND ')}` : '';
+        const [requests] = await pool.execute(
+            `SELECT r.*,
+                    d.full_name AS driver_full_name,
+                    u.username AS driver_username,
+                    c.car_number,
+                    reviewer.username AS reviewed_by_username
+             FROM driver_cashout_requests r
+             JOIN drivers d ON r.driver_id = d.id
+             JOIN users u ON d.user_id = u.id
+             LEFT JOIN cars c ON d.assigned_car_id = c.id
+             LEFT JOIN users reviewer ON r.reviewed_by = reviewer.id
+             ${whereClause}
+             ORDER BY r.created_at DESC, r.id DESC`,
+            params
+        );
+
+        res.json({ success: true, requests });
+    } catch (error) {
+        res.status(500).json({ message: 'Server error', error: error.message });
+    }
+};
+
+const updateDriverCashoutRequestStatus = async (req, res) => {
+    const connection = await pool.getConnection();
+    try {
+        await connection.beginTransaction();
+
+        const requestId = Number(req.params.id);
+        const status = String(req.body?.status || '').trim().toLowerCase();
+        const remarks = toNullableString(req.body?.remarks);
+
+        if (!ACCOUNT_REVIEW_STATUSES.has(status)) {
+            return res.status(400).json({ message: 'Status must be approved or rejected' });
+        }
+
+        const [rows] = await connection.execute(
+            'SELECT * FROM driver_cashout_requests WHERE id = ? LIMIT 1',
+            [requestId]
+        );
+
+        if (!rows.length) {
+            return res.status(404).json({ message: 'Driver cashout request not found' });
+        }
+
+        const request = rows[0];
+        if (request.status !== 'pending') {
+            return res.status(400).json({ message: 'Only pending requests can be updated' });
+        }
+
+        if (status === 'approved') {
+            await syncDriverSalaryForDriver(connection, request.driver_id);
+            const balanceColumn = request.balance_type === 'commission' ? 'commission_balance' : 'available_balance';
+            const [balanceRows] = await connection.execute(
+                `SELECT ${balanceColumn} AS balance FROM drivers WHERE id = ? LIMIT 1`,
+                [request.driver_id]
+            );
+            const balance = Number(balanceRows[0]?.balance) || 0;
+
+            if (balance < Number(request.amount)) {
+                throw new Error('Insufficient driver balance to approve this cashout');
+            }
+
+            await connection.execute(
+                `UPDATE drivers SET ${balanceColumn} = ${balanceColumn} - ? WHERE id = ?`,
+                [request.amount, request.driver_id]
+            );
+            await createDriverAccountTransaction(connection, {
+                driverId: request.driver_id,
+                balanceType: request.balance_type,
+                transactionType: 'cashout_debit',
+                direction: 'debit',
+                amount: request.amount,
+                sourceType: 'driver_cashout_request',
+                sourceId: request.id,
+                notes: `Driver cashout approved via ${request.receive_method}`
+            });
+        }
+
+        await connection.execute(
+            `UPDATE driver_cashout_requests
+             SET status = ?, reviewed_by = ?, reviewed_at = CURRENT_TIMESTAMP, remarks = ?
+             WHERE id = ?`,
+            [status, req.user.id, remarks, requestId]
+        );
+
+        await connection.commit();
+        res.json({ success: true, message: `Driver cashout request ${status}` });
+    } catch (error) {
+        await connection.rollback();
+        res.status(500).json({ message: 'Server error', error: error.message });
+    } finally {
+        connection.release();
+    }
+};
+
+const getHelperCashoutRequests = async (req, res) => {
+    try {
+        const { status = '', helper_id = '' } = req.query;
+        const filters = [];
+        const params = [];
+
+        if (status && PAYMENT_SUBMISSION_STATUSES.has(status)) {
+            filters.push('r.status = ?');
+            params.push(status);
+        }
+
+        if (helper_id) {
+            filters.push('r.helper_id = ?');
+            params.push(helper_id);
+        }
+
+        const whereClause = filters.length ? `WHERE ${filters.join(' AND ')}` : '';
+        const [requests] = await pool.execute(
+            `SELECT r.*,
+                    h.helper_name,
+                    d.full_name AS driver_full_name,
+                    u.username AS driver_username,
+                    c.car_number,
+                    reviewer.username AS reviewed_by_username
+             FROM helper_cashout_requests r
+             JOIN helpers h ON r.helper_id = h.id
+             JOIN drivers d ON r.driver_id = d.id
+             JOIN users u ON d.user_id = u.id
+             LEFT JOIN cars c ON r.car_id = c.id
+             LEFT JOIN users reviewer ON r.reviewed_by = reviewer.id
+             ${whereClause}
+             ORDER BY r.created_at DESC, r.id DESC`,
+            params
+        );
+
+        res.json({ success: true, requests });
+    } catch (error) {
+        res.status(500).json({ message: 'Server error', error: error.message });
+    }
+};
+
+const updateHelperCashoutRequestStatus = async (req, res) => {
+    const connection = await pool.getConnection();
+    try {
+        await connection.beginTransaction();
+
+        const requestId = Number(req.params.id);
+        const status = String(req.body?.status || '').trim().toLowerCase();
+        const remarks = toNullableString(req.body?.remarks);
+
+        if (!ACCOUNT_REVIEW_STATUSES.has(status)) {
+            return res.status(400).json({ message: 'Status must be approved or rejected' });
+        }
+
+        const [rows] = await connection.execute(
+            'SELECT * FROM helper_cashout_requests WHERE id = ? LIMIT 1',
+            [requestId]
+        );
+
+        if (!rows.length) {
+            return res.status(404).json({ message: 'Helper cashout request not found' });
+        }
+
+        const request = rows[0];
+        if (request.status !== 'pending') {
+            return res.status(400).json({ message: 'Only pending requests can be updated' });
+        }
+
+        if (status === 'approved') {
+            await syncHelperSalaryForHelper(connection, request.helper_id);
+            const [balanceRows] = await connection.execute(
+                'SELECT available_balance FROM helpers WHERE id = ? LIMIT 1',
+                [request.helper_id]
+            );
+            const balance = Number(balanceRows[0]?.available_balance) || 0;
+
+            if (balance < Number(request.amount)) {
+                throw new Error('Insufficient helper balance to approve this cashout');
+            }
+
+            await connection.execute(
+                'UPDATE helpers SET available_balance = available_balance - ? WHERE id = ?',
+                [request.amount, request.helper_id]
+            );
+            await createHelperAccountTransaction(connection, {
+                helperId: request.helper_id,
+                driverId: request.driver_id,
+                transactionType: 'cashout_debit',
+                direction: 'debit',
+                amount: request.amount,
+                sourceType: 'helper_cashout_request',
+                sourceId: request.id,
+                notes: `Helper cashout approved via ${request.receive_method}`
+            });
+        }
+
+        await connection.execute(
+            `UPDATE helper_cashout_requests
+             SET status = ?, reviewed_by = ?, reviewed_at = CURRENT_TIMESTAMP, remarks = ?
+             WHERE id = ?`,
+            [status, req.user.id, remarks, requestId]
+        );
+
+        await connection.commit();
+        res.json({ success: true, message: `Helper cashout request ${status}` });
+    } catch (error) {
+        await connection.rollback();
         res.status(500).json({ message: 'Server error', error: error.message });
     } finally {
         connection.release();
@@ -1272,6 +1860,7 @@ const getDriverLeaveRequests = async (req, res) => {
 };
 
 const updateDriverLeaveRequestStatus = async (req, res) => {
+    const connection = await pool.getConnection();
     try {
         const schemaConnection = await pool.getConnection();
         try {
@@ -1287,7 +1876,7 @@ const updateDriverLeaveRequestStatus = async (req, res) => {
             return res.status(400).json({ message: 'Action must be approve or reject' });
         }
 
-        const [rows] = await pool.execute(
+        const [rows] = await connection.execute(
             'SELECT * FROM driver_leave_requests WHERE id = ? LIMIT 1',
             [id]
         );
@@ -1298,19 +1887,21 @@ const updateDriverLeaveRequestStatus = async (req, res) => {
 
         const request = rows[0];
 
+        await connection.beginTransaction();
+
         if (action === 'approve') {
             if (request.status !== 'pending_join') {
                 return res.status(400).json({ message: 'Only pending join requests can be approved' });
             }
 
             if (request.car_id && request.join_meter_reading !== null) {
-                await pool.execute(
+                await connection.execute(
                     'UPDATE cars SET current_meter_reading = ? WHERE id = ?',
                     [request.join_meter_reading, request.car_id]
                 );
             }
 
-            await pool.execute(
+            await connection.execute(
                 `UPDATE driver_leave_requests
                  SET status = 'completed',
                      join_approved_at = CURRENT_TIMESTAMP,
@@ -1318,12 +1909,19 @@ const updateDriverLeaveRequestStatus = async (req, res) => {
                  WHERE id = ?`,
                 [id]
             );
+            await connection.execute(
+                `UPDATE users u
+                 JOIN drivers d ON d.user_id = u.id
+                 SET u.status = 'active'
+                 WHERE d.id = ?`,
+                [request.driver_id]
+            );
         } else {
             if (request.status !== 'pending_join') {
                 return res.status(400).json({ message: 'Only pending join requests can be rejected' });
             }
 
-            await pool.execute(
+            await connection.execute(
                 `UPDATE driver_leave_requests
                  SET status = 'on_leave',
                      join_meter_reading = NULL,
@@ -1334,7 +1932,16 @@ const updateDriverLeaveRequestStatus = async (req, res) => {
                  WHERE id = ?`,
                 [id]
             );
+            await connection.execute(
+                `UPDATE users u
+                 JOIN drivers d ON d.user_id = u.id
+                 SET u.status = 'on_leave'
+                 WHERE d.id = ?`,
+                [request.driver_id]
+            );
         }
+
+        await connection.commit();
 
         const [[updated]] = await pool.execute(
             `SELECT
@@ -1356,7 +1963,10 @@ const updateDriverLeaveRequestStatus = async (req, res) => {
             request: updated
         });
     } catch (error) {
+        await connection.rollback();
         res.status(500).json({ message: 'Server error', error: error.message });
+    } finally {
+        connection.release();
     }
 };
 
@@ -1775,8 +2385,17 @@ module.exports = {
     addDriver,
     assignCarToDriver,
     updateDriver,
+    getHelpers,
+    addHelper,
+    updateHelper,
     getDriverReport,
     getDriversExpenseReport,
+    getDriverCommissionRequests,
+    updateDriverCommissionRequestStatus,
+    getDriverCashoutRequests,
+    updateDriverCashoutRequestStatus,
+    getHelperCashoutRequests,
+    updateHelperCashoutRequestStatus,
     getDriverPaymentSubmissions,
     updateDriverPaymentSubmissionStatus,
     getDriverLeaveRequests,

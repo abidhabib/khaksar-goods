@@ -1,6 +1,7 @@
 package com.example.ishaqcargo;
 
 import android.Manifest;
+import android.content.ContentResolver;
 import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.location.Address;
@@ -8,6 +9,7 @@ import android.location.Geocoder;
 import android.location.Location;
 import android.location.LocationListener;
 import android.location.LocationManager;
+import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
 import android.text.TextUtils;
@@ -18,6 +20,7 @@ import androidx.activity.result.ActivityResultLauncher;
 import androidx.activity.result.contract.ActivityResultContracts;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.core.app.ActivityCompat;
+import androidx.core.content.FileProvider;
 import androidx.core.graphics.Insets;
 import androidx.core.view.ViewCompat;
 import androidx.core.view.WindowCompat;
@@ -29,6 +32,7 @@ import com.example.ishaqcargo.util.SessionManager;
 
 import org.json.JSONObject;
 
+import java.io.File;
 import java.io.IOException;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -45,8 +49,9 @@ public class LeaveRequestActivity extends AppCompatActivity {
     private SessionManager sessionManager;
     private String baseUrl;
     private String currentMode = "leave";
-    private String fetchedLocation;
     private String fetchedCoordinates;
+    private Uri pendingCameraUri;
+    private Uri meterPhotoUri;
 
     private final ActivityResultLauncher<String[]> locationPermissionLauncher = registerForActivityResult(
             new ActivityResultContracts.RequestMultiplePermissions(),
@@ -57,6 +62,20 @@ public class LeaveRequestActivity extends AppCompatActivity {
                     fetchCurrentLocation();
                 } else {
                     Toast.makeText(this, R.string.location_permission_required, Toast.LENGTH_SHORT).show();
+                }
+            }
+    );
+
+    private final ActivityResultLauncher<Uri> takeMeterPhotoLauncher = registerForActivityResult(
+            new ActivityResultContracts.TakePicture(),
+            success -> {
+                if (success && pendingCameraUri != null) {
+                    meterPhotoUri = pendingCameraUri;
+                    binding.meterImagePreview.setImageURI(meterPhotoUri);
+                    binding.meterImagePreview.setVisibility(View.VISIBLE);
+                    binding.meterUploadHint.setText(R.string.change_leave_meter_photo);
+                } else {
+                    pendingCameraUri = null;
                 }
             }
     );
@@ -73,8 +92,11 @@ public class LeaveRequestActivity extends AppCompatActivity {
 
         applyWindowInsets();
         binding.backButton.setOnClickListener(v -> finish());
-        binding.fetchLocationButton.setOnClickListener(v -> ensureLocationPermissionAndFetch());
         binding.confirmButton.setOnClickListener(v -> submitCurrentAction());
+        binding.meterUploadHint.setOnClickListener(v -> openCameraForMeterPhoto());
+        binding.meterImagePreview.setOnClickListener(v -> openCameraForMeterPhoto());
+
+        binding.locationInputLayout.setEndIconOnClickListener(v -> ensureLocationPermissionAndFetch());
 
         loadLeaveStatus();
         ensureLocationPermissionAndFetch();
@@ -150,24 +172,30 @@ public class LeaveRequestActivity extends AppCompatActivity {
             binding.confirmButton.setText(R.string.leave_confirm_join);
             binding.confirmButton.setEnabled(true);
             binding.meterReadingInput.setEnabled(true);
-            binding.fetchLocationButton.setEnabled(true);
             binding.locationInput.setEnabled(true);
+            binding.locationInputLayout.setEndIconVisible(true);
+            binding.meterUploadHint.setEnabled(true);
+            binding.meterImagePreview.setEnabled(true);
         } else if ("pending_join".equals(status)) {
             currentMode = "pending_join";
             binding.statusText.setText(R.string.leave_status_pending_join);
             binding.confirmButton.setText(R.string.leave_confirm_join);
             binding.confirmButton.setEnabled(false);
             binding.meterReadingInput.setEnabled(false);
-            binding.fetchLocationButton.setEnabled(false);
             binding.locationInput.setEnabled(false);
+            binding.locationInputLayout.setEndIconVisible(false);
+            binding.meterUploadHint.setEnabled(false);
+            binding.meterImagePreview.setEnabled(false);
         } else {
             currentMode = "leave";
             binding.statusText.setText(R.string.leave_status_ready);
             binding.confirmButton.setText(R.string.leave_confirm_go);
             binding.confirmButton.setEnabled(true);
             binding.meterReadingInput.setEnabled(true);
-            binding.fetchLocationButton.setEnabled(true);
             binding.locationInput.setEnabled(true);
+            binding.locationInputLayout.setEndIconVisible(true);
+            binding.meterUploadHint.setEnabled(true);
+            binding.meterImagePreview.setEnabled(true);
         }
     }
 
@@ -228,7 +256,7 @@ public class LeaveRequestActivity extends AppCompatActivity {
         }
 
         fetchedCoordinates = formatCoordinates(location);
-        fetchedLocation = buildLocationLabel(location);
+        String fetchedLocation = buildLocationLabel(location);
         binding.locationInput.setText(fetchedLocation);
         binding.coordinatesText.setText(fetchedCoordinates);
         Toast.makeText(this, R.string.location_fetched_success, Toast.LENGTH_SHORT).show();
@@ -284,19 +312,43 @@ public class LeaveRequestActivity extends AppCompatActivity {
         return builder.toString();
     }
 
+    private void openCameraForMeterPhoto() {
+        try {
+            pendingCameraUri = createTempImageUri("leave_meter_");
+            takeMeterPhotoLauncher.launch(pendingCameraUri);
+        } catch (Exception exception) {
+            Toast.makeText(this, R.string.unable_to_open_camera, Toast.LENGTH_SHORT).show();
+        }
+    }
+
+    private Uri createTempImageUri(String prefix) throws IOException {
+        File mediaDir = new File(getFilesDir(), "trip-media");
+        if (!mediaDir.exists() && !mediaDir.mkdirs()) {
+            throw new IOException("Unable to create media directory");
+        }
+
+        File imageFile = File.createTempFile(prefix + System.currentTimeMillis(), ".jpg", mediaDir);
+        return FileProvider.getUriForFile(this, getPackageName() + ".fileprovider", imageFile);
+    }
+
     private void submitCurrentAction() {
         String meterReading = getInput(binding.meterReadingInput);
+        String locationText = getInput(binding.locationInput);
         if (TextUtils.isEmpty(meterReading)) {
             binding.meterReadingInput.setError(getString(R.string.leave_meter_required));
             return;
         }
 
-        if (TextUtils.isEmpty(fetchedLocation)) {
-            Toast.makeText(this, R.string.leave_location_required, Toast.LENGTH_SHORT).show();
+        if (TextUtils.isEmpty(locationText)) {
+            binding.locationInput.setError(getString(R.string.leave_location_required));
             return;
         }
 
-        Map<String, String> fields = new LinkedHashMap<>();
+        if (meterPhotoUri == null) {
+            Toast.makeText(this, R.string.leave_meter_photo_required, Toast.LENGTH_SHORT).show();
+            return;
+        }
+
         Callback callback = new Callback() {
             @Override
             public void onFailure(Call call, IOException e) {
@@ -333,24 +385,28 @@ public class LeaveRequestActivity extends AppCompatActivity {
             }
         };
 
+        Map<String, String> fields = new LinkedHashMap<>();
         setLoading(true);
+        ContentResolver contentResolver = getContentResolver();
         if ("join".equals(currentMode)) {
             fields.put("join_meter_reading", meterReading);
-            fields.put("join_location", fetchedLocation);
+            fields.put("join_location", locationText);
             fields.put("join_coordinates", fetchedCoordinates != null ? fetchedCoordinates : "");
-            ApiClient.requestJoinAfterLeave(baseUrl, sessionManager.getToken(), fields, callback);
+            ApiClient.requestJoinAfterLeave(baseUrl, sessionManager.getToken(), fields, meterPhotoUri, contentResolver, callback);
         } else if ("leave".equals(currentMode)) {
             fields.put("leave_meter_reading", meterReading);
-            fields.put("leave_location", fetchedLocation);
+            fields.put("leave_location", locationText);
             fields.put("leave_coordinates", fetchedCoordinates != null ? fetchedCoordinates : "");
-            ApiClient.requestLeave(baseUrl, sessionManager.getToken(), fields, callback);
+            ApiClient.requestLeave(baseUrl, sessionManager.getToken(), fields, meterPhotoUri, contentResolver, callback);
         }
     }
 
     private void setLoading(boolean loading) {
         binding.loadingOverlay.setVisibility(loading ? View.VISIBLE : View.GONE);
         binding.confirmButton.setEnabled(!loading && !"pending_join".equals(currentMode));
-        binding.fetchLocationButton.setEnabled(!loading);
+        binding.locationInputLayout.setEnabled(!loading);
+        binding.meterUploadHint.setEnabled(!loading);
+        binding.meterImagePreview.setEnabled(!loading);
     }
 
     private String getInput(com.google.android.material.textfield.TextInputEditText input) {

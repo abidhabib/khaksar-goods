@@ -312,8 +312,11 @@ public class PaymentSubmissionActivity extends AppCompatActivity {
     private void bindOverview(JSONObject summary) {
         double totalIncome = summary != null ? summary.optDouble("total_income", 0) : 0;
         double totalApprovedDeposit = summary != null ? summary.optDouble("total_approved_amount", 0) : 0;
+        double remainingAmount = totalIncome - totalApprovedDeposit;
+
         binding.totalIncomeValueText.setText(formatCurrency(totalIncome));
         binding.totalSubmittedValueText.setText(formatCurrency(totalApprovedDeposit));
+        binding.remainingAmountValueText.setText(formatCurrency(remainingAmount));
     }
 
     private void showDialog(Dialog dialog) {

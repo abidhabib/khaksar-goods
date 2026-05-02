@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { User, Phone, Car, Activity, MoreVertical, MapPin } from 'lucide-react';
+import { User, Phone, Car, Activity, MoreVertical, MapPin, HandHelping } from 'lucide-react';
 import { formatLocationAgo, formatLocationSummary } from '../../utils/location';
 
 const DriverCard = ({ driver, onEdit, onAssign, onViewReport }) => {
@@ -26,7 +26,8 @@ const DriverCard = ({ driver, onEdit, onAssign, onViewReport }) => {
             <User className="w-6 h-6 text-cargo-muted" />
           </div>
           <div>
-            <h3 className="font-semibold text-cargo-text">{driver.username}</h3>
+            <h3 className="font-semibold text-cargo-text">{driver.full_name || driver.username}</h3>
+            <p className="text-xs text-cargo-muted mt-1">@{driver.username}</p>
             <span className={`text-xs px-2 py-1 rounded-full ${statusColors[driver.status]}`}>
               {driver.status}
             </span>
@@ -98,6 +99,13 @@ const DriverCard = ({ driver, onEdit, onAssign, onViewReport }) => {
           <Activity className="w-4 h-4 text-cargo-muted" />
           <span className="text-cargo-text">
             {driver.license_number || 'License: N/A'}
+          </span>
+        </div>
+
+        <div className="flex items-center gap-2 text-sm">
+          <HandHelping className="w-4 h-4 text-cargo-muted" />
+          <span className="text-cargo-text">
+            {driver.helper_name ? `${driver.helper_name}${driver.helper_phone_number ? ` • ${driver.helper_phone_number}` : ''}` : 'No helper assigned'}
           </span>
         </div>
 

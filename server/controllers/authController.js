@@ -12,7 +12,11 @@ const login = async (req, res) => {
         }
 
         const [users] = await pool.execute(
-            'SELECT u.*, d.id as driver_id, d.assigned_car_id FROM users u LEFT JOIN drivers d ON u.id = d.user_id WHERE u.username = ? AND u.status = "active"',
+            `SELECT u.*, d.id as driver_id, d.assigned_car_id, d.full_name
+             FROM users u
+             LEFT JOIN drivers d ON u.id = d.user_id
+             WHERE u.username = ?
+               AND u.status IN ('active', 'on_leave', 'pending_join')`,
             [username]
         );
 
@@ -41,6 +45,7 @@ const login = async (req, res) => {
             token,
             user: {
                 id: user.id,
+                full_name: user.full_name || user.username,
                 username: user.username,
                 role: user.role,
                 phone: user.phone,
@@ -59,6 +64,7 @@ const getProfile = async (req, res) => {
     try {
         const [users] = await pool.execute(
             `SELECT u.id, u.username, u.role, u.phone, u.status, u.created_at,
+                    COALESCE(d.full_name, u.username) as full_name,
                     d.id as driver_id, d.license_number, d.joined_date,
                     c.id as car_id, c.car_number, c.current_meter_reading
              FROM users u
