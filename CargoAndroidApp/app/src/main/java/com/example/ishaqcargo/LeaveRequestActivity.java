@@ -114,7 +114,6 @@ public class LeaveRequestActivity extends AppCompatActivity {
         binding.locationInputLayout.setEndIconOnClickListener(v -> ensureLocationPermissionAndFetch());
 
         loadLeaveStatus();
-        ensureLocationPermissionAndFetch();
     }
 
     @Override
@@ -195,32 +194,17 @@ public class LeaveRequestActivity extends AppCompatActivity {
             currentMode = "join";
             binding.statusText.setText(R.string.leave_status_on_leave);
             binding.confirmButton.setText(R.string.leave_confirm_join);
-            binding.confirmButton.setEnabled(true);
-            binding.meterReadingInput.setEnabled(true);
-            binding.locationInput.setEnabled(true);
-            binding.locationInputLayout.setEndIconVisible(true);
-            binding.meterUploadHint.setEnabled(true);
-            binding.meterImagePreview.setEnabled(true);
+            applyFormState(true, true);
         } else if ("pending_join".equals(status)) {
-            currentMode = "pending_join";
+            currentMode = "join";
             binding.statusText.setText(R.string.leave_status_pending_join);
             binding.confirmButton.setText(R.string.leave_confirm_join);
-            binding.confirmButton.setEnabled(false);
-            binding.meterReadingInput.setEnabled(false);
-            binding.locationInput.setEnabled(false);
-            binding.locationInputLayout.setEndIconVisible(false);
-            binding.meterUploadHint.setEnabled(false);
-            binding.meterImagePreview.setEnabled(false);
+            applyFormState(true, true);
         } else {
             currentMode = "leave";
             binding.statusText.setText(R.string.leave_status_ready);
             binding.confirmButton.setText(R.string.leave_confirm_go);
-            binding.confirmButton.setEnabled(true);
-            binding.meterReadingInput.setEnabled(true);
-            binding.locationInput.setEnabled(true);
-            binding.locationInputLayout.setEndIconVisible(true);
-            binding.meterUploadHint.setEnabled(true);
-            binding.meterImagePreview.setEnabled(true);
+            applyFormState(true, true);
         }
     }
 
@@ -283,6 +267,7 @@ public class LeaveRequestActivity extends AppCompatActivity {
         fetchedCoordinates = formatCoordinates(location);
         String fetchedLocation = buildLocationLabel(location);
         binding.locationInput.setText(fetchedLocation);
+        binding.locationInput.setSelection(fetchedLocation.length());
         binding.coordinatesText.setText(fetchedCoordinates);
         Toast.makeText(this, R.string.location_fetched_success, Toast.LENGTH_SHORT).show();
     }
@@ -438,10 +423,26 @@ public class LeaveRequestActivity extends AppCompatActivity {
 
     private void setLoading(boolean loading) {
         binding.loadingOverlay.setVisibility(loading ? View.VISIBLE : View.GONE);
-        binding.confirmButton.setEnabled(!loading && !"pending_join".equals(currentMode));
-        binding.locationInputLayout.setEnabled(!loading);
-        binding.meterUploadHint.setEnabled(!loading);
-        binding.meterImagePreview.setEnabled(!loading);
+        boolean allowEditing = !loading;
+        applyFormState(allowEditing, allowEditing);
+    }
+
+    private void applyFormState(boolean formEnabled, boolean allowEditing) {
+        binding.confirmButton.setEnabled(formEnabled);
+        binding.locationInputLayout.setEndIconVisible(formEnabled);
+        binding.meterUploadHint.setEnabled(formEnabled);
+        binding.meterImagePreview.setEnabled(formEnabled);
+        updateEditableState(binding.meterReadingInput, allowEditing);
+        updateEditableState(binding.locationInput, allowEditing);
+    }
+
+    private void updateEditableState(com.google.android.material.textfield.TextInputEditText input, boolean editable) {
+        input.setEnabled(editable);
+        input.setFocusable(editable);
+        input.setFocusableInTouchMode(editable);
+        input.setClickable(editable);
+        input.setLongClickable(editable);
+        input.setCursorVisible(editable);
     }
 
     private String getInput(com.google.android.material.textfield.TextInputEditText input) {
@@ -455,6 +456,12 @@ public class LeaveRequestActivity extends AppCompatActivity {
 
         binding.meterReadingInput.setText(savedInstanceState.getString(STATE_METER_READING, ""));
         binding.locationInput.setText(savedInstanceState.getString(STATE_LOCATION_TEXT, ""));
+        if (binding.meterReadingInput.getText() != null) {
+            binding.meterReadingInput.setSelection(binding.meterReadingInput.getText().length());
+        }
+        if (binding.locationInput.getText() != null) {
+            binding.locationInput.setSelection(binding.locationInput.getText().length());
+        }
         fetchedCoordinates = savedInstanceState.getString(STATE_COORDINATES);
         binding.coordinatesText.setText(fetchedCoordinates != null ? fetchedCoordinates : "");
 

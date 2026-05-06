@@ -1875,7 +1875,7 @@ const requestJoinAfterLeave = async (req, res) => {
 
         const leaveOverview = await getDriverLeaveOverview(driver_id);
         const activeLeave = leaveOverview?.activeLeave;
-        if (!activeLeave || activeLeave.status !== 'on_leave') {
+        if (!activeLeave || !LEAVE_ACTIVE_STATUSES.has(activeLeave.status)) {
             return res.status(400).json({ message: 'No active leave found to join from' });
         }
 
