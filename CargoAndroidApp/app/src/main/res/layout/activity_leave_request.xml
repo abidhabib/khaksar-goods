@@ -180,6 +180,8 @@
                             android:layout_marginTop="10dp"
                             android:adjustViewBounds="true"
                             android:background="@drawable/bg_image_placeholder"
+                            android:clickable="true"
+                            android:focusable="true"
                             android:scaleType="centerCrop"
                             android:visibility="gone" />
 
@@ -189,6 +191,8 @@
                             android:layout_height="wrap_content"
                             android:layout_marginTop="10dp"
                             android:background="@drawable/bg_upload_hint"
+                            android:clickable="true"
+                            android:focusable="true"
                             android:gravity="center"
                             android:minHeight="52dp"
                             android:paddingLeft="16dp"

@@ -89,6 +89,7 @@ Chalaan %5$s • Mandi Kaat %6$s • Reward %7$s • Bilty %8$s • Tyre %9$s</s
     <string name="manual_or_fetch_location">You can type manually or tap the location icon to auto-fill.</string>
     <string name="fetch_current_location">Fetch current location</string>
     <string name="location_permission_required">Location permission is required to fetch current location</string>
+    <string name="camera_permission_required">Camera permission is required to take meter photo</string>
     <string name="location_unavailable">Current location is unavailable right now</string>
     <string name="enable_location_services">Enable phone location services first</string>
     <string name="location_fetched_success">Current location fetched successfully</string>

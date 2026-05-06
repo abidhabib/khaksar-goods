@@ -44,6 +44,11 @@ import okhttp3.Callback;
 import okhttp3.Response;
 
 public class LeaveRequestActivity extends AppCompatActivity {
+    private static final String STATE_METER_READING = "state_meter_reading";
+    private static final String STATE_LOCATION_TEXT = "state_location_text";
+    private static final String STATE_COORDINATES = "state_coordinates";
+    private static final String STATE_IMAGE_URI = "state_image_uri";
+    private static final String STATE_PENDING_URI = "state_pending_uri";
 
     private ActivityLeaveRequestBinding binding;
     private SessionManager sessionManager;
@@ -66,14 +71,23 @@ public class LeaveRequestActivity extends AppCompatActivity {
             }
     );
 
+    private final ActivityResultLauncher<String> cameraPermissionLauncher = registerForActivityResult(
+            new ActivityResultContracts.RequestPermission(),
+            granted -> {
+                if (granted) {
+                    openCameraForMeterPhoto();
+                } else {
+                    Toast.makeText(this, R.string.camera_permission_required, Toast.LENGTH_SHORT).show();
+                }
+            }
+    );
+
     private final ActivityResultLauncher<Uri> takeMeterPhotoLauncher = registerForActivityResult(
             new ActivityResultContracts.TakePicture(),
             success -> {
                 if (success && pendingCameraUri != null) {
                     meterPhotoUri = pendingCameraUri;
-                    binding.meterImagePreview.setImageURI(meterPhotoUri);
-                    binding.meterImagePreview.setVisibility(View.VISIBLE);
-                    binding.meterUploadHint.setText(R.string.change_leave_meter_photo);
+                    bindMeterPhotoPreview();
                 } else {
                     pendingCameraUri = null;
                 }
@@ -91,15 +105,26 @@ public class LeaveRequestActivity extends AppCompatActivity {
         baseUrl = sessionManager.getBaseUrl();
 
         applyWindowInsets();
+        restoreTransientState(savedInstanceState);
         binding.backButton.setOnClickListener(v -> finish());
         binding.confirmButton.setOnClickListener(v -> submitCurrentAction());
-        binding.meterUploadHint.setOnClickListener(v -> openCameraForMeterPhoto());
-        binding.meterImagePreview.setOnClickListener(v -> openCameraForMeterPhoto());
+        binding.meterUploadHint.setOnClickListener(v -> ensureCameraPermissionAndOpen());
+        binding.meterImagePreview.setOnClickListener(v -> ensureCameraPermissionAndOpen());
 
         binding.locationInputLayout.setEndIconOnClickListener(v -> ensureLocationPermissionAndFetch());
 
         loadLeaveStatus();
         ensureLocationPermissionAndFetch();
+    }
+
+    @Override
+    protected void onSaveInstanceState(Bundle outState) {
+        super.onSaveInstanceState(outState);
+        outState.putString(STATE_METER_READING, getInput(binding.meterReadingInput));
+        outState.putString(STATE_LOCATION_TEXT, getInput(binding.locationInput));
+        outState.putString(STATE_COORDINATES, fetchedCoordinates);
+        outState.putString(STATE_IMAGE_URI, meterPhotoUri != null ? meterPhotoUri.toString() : null);
+        outState.putString(STATE_PENDING_URI, pendingCameraUri != null ? pendingCameraUri.toString() : null);
     }
 
     private void applyWindowInsets() {
@@ -321,6 +346,16 @@ public class LeaveRequestActivity extends AppCompatActivity {
         }
     }
 
+    private void ensureCameraPermissionAndOpen() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M
+                && ActivityCompat.checkSelfPermission(this, Manifest.permission.CAMERA) != PackageManager.PERMISSION_GRANTED) {
+            cameraPermissionLauncher.launch(Manifest.permission.CAMERA);
+            return;
+        }
+
+        openCameraForMeterPhoto();
+    }
+
     private Uri createTempImageUri(String prefix) throws IOException {
         File mediaDir = new File(getFilesDir(), "trip-media");
         if (!mediaDir.exists() && !mediaDir.mkdirs()) {
@@ -411,5 +446,40 @@ public class LeaveRequestActivity extends AppCompatActivity {
 
     private String getInput(com.google.android.material.textfield.TextInputEditText input) {
         return input.getText() != null ? input.getText().toString().trim() : "";
+    }
+
+    private void restoreTransientState(Bundle savedInstanceState) {
+        if (savedInstanceState == null) {
+            return;
+        }
+
+        binding.meterReadingInput.setText(savedInstanceState.getString(STATE_METER_READING, ""));
+        binding.locationInput.setText(savedInstanceState.getString(STATE_LOCATION_TEXT, ""));
+        fetchedCoordinates = savedInstanceState.getString(STATE_COORDINATES);
+        binding.coordinatesText.setText(fetchedCoordinates != null ? fetchedCoordinates : "");
+
+        String meterUriValue = savedInstanceState.getString(STATE_IMAGE_URI);
+        if (!TextUtils.isEmpty(meterUriValue)) {
+            meterPhotoUri = Uri.parse(meterUriValue);
+            bindMeterPhotoPreview();
+        }
+
+        String pendingUriValue = savedInstanceState.getString(STATE_PENDING_URI);
+        if (!TextUtils.isEmpty(pendingUriValue)) {
+            pendingCameraUri = Uri.parse(pendingUriValue);
+        }
+    }
+
+    private void bindMeterPhotoPreview() {
+        if (meterPhotoUri == null) {
+            binding.meterImagePreview.setImageDrawable(null);
+            binding.meterImagePreview.setVisibility(View.GONE);
+            binding.meterUploadHint.setText(R.string.open_camera_for_leave_meter);
+            return;
+        }
+
+        binding.meterImagePreview.setImageURI(meterPhotoUri);
+        binding.meterImagePreview.setVisibility(View.VISIBLE);
+        binding.meterUploadHint.setText(R.string.change_leave_meter_photo);
     }
 }

@@ -100,6 +100,7 @@
     <string name="fetch_current_location">موجودہ لوکیشن حاصل کریں</string>
 
     <string name="location_permission_required">موجودہ لوکیشن لینے کے لیے اجازت ضروری ہے</string>
+    <string name="camera_permission_required">میٹر کی تصویر لینے کے لیے کیمرا پرمیشن ضروری ہے</string>
     <string name="location_unavailable">اس وقت موجودہ لوکیشن دستیاب نہیں ہے</string>
     <string name="enable_location_services">پہلے فون کی لوکیشن سروس آن کریں</string>
     <string name="location_fetched_success">موجودہ لوکیشن   لے لی گئی</string>
