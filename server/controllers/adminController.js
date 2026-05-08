@@ -1,6 +1,11 @@
 const bcrypt = require('bcryptjs');
 const pool = require('../config/database');
-const { ensureDriverPaymentSubmissionsTable, ensureDriverLeaveRequestsTable } = require('../config/schema');
+const {
+    ensureDriverDailyExpenseEntriesTable,
+    ensureDriverDailyExpenseEntryColumns,
+    ensureDriverPaymentSubmissionsTable,
+    ensureDriverLeaveRequestsTable
+} = require('../config/schema');
 const {
     roundCurrency,
     syncDriverSalaryForDriver,
@@ -13,6 +18,30 @@ const {
 const PAYMENT_SUBMISSION_STATUSES = new Set(['pending', 'approved', 'rejected']);
 const LEAVE_REQUEST_ACTIONS = new Set(['approve', 'reject']);
 const ACCOUNT_REVIEW_STATUSES = new Set(['approved', 'rejected']);
+const PAYMENT_METHODS = new Set(['cash', 'account']);
+const DRIVER_BALANCE_TYPES = new Set(['available', 'commission']);
+const TRIP_EXPENSE_CATEGORIES = new Set([
+    'diesel',
+    'toll',
+    'food',
+    'police',
+    'chalaan',
+    'mandi_kaat',
+    'reward',
+    'tyre_puncture',
+    'bilty_commission'
+]);
+const DAILY_EXPENSE_CATEGORIES = new Set([
+    'cargo_service',
+    'mobile',
+    'moboil_change',
+    'vehicle_maintenance',
+    'mechanic',
+    'medical',
+    'food',
+    'cargo_security_guard',
+    'other'
+]);
 
 const toNullableString = (value) => {
     if (value === undefined || value === null) {
@@ -26,6 +55,83 @@ const toNullableString = (value) => {
 const toNonNegativeAmount = (value) => {
     const parsed = Number(value);
     return Number.isFinite(parsed) && parsed >= 0 ? roundCurrency(parsed) : 0;
+};
+
+const toOptionalDecimal = (value) => {
+    if (value === undefined || value === null || value === '') {
+        return null;
+    }
+
+    const parsed = Number(value);
+    if (!Number.isFinite(parsed) || parsed < 0) {
+        return null;
+    }
+
+    return parsed;
+};
+
+const syncCarCurrentMeterFromTrips = async (connection, carId) => {
+    if (!carId) {
+        return;
+    }
+
+    const [[ongoingTrip]] = await connection.execute(
+        'SELECT id FROM trips WHERE car_id = ? AND status = "ongoing" LIMIT 1',
+        [carId]
+    );
+
+    if (ongoingTrip?.id) {
+        return;
+    }
+
+    const [[latestCompletedTrip]] = await connection.execute(
+        `SELECT end_meter_reading
+         FROM trips
+         WHERE car_id = ? AND status = 'completed' AND end_meter_reading IS NOT NULL
+         ORDER BY COALESCE(ended_at, started_at) DESC, id DESC
+         LIMIT 1`,
+        [carId]
+    );
+
+    if (latestCompletedTrip?.end_meter_reading !== undefined && latestCompletedTrip?.end_meter_reading !== null) {
+        await connection.execute(
+            'UPDATE cars SET current_meter_reading = ? WHERE id = ?',
+            [latestCompletedTrip.end_meter_reading, carId]
+        );
+    }
+};
+
+const fetchTripWithExpensesById = async (tripId) => {
+    const [tripRows] = await pool.execute(
+        `SELECT
+            t.*,
+            u.username as driver_name,
+            u.phone as driver_phone,
+            d.license_number,
+            c.car_number,
+            COALESCE(exp.total_expenses, 0) as total_expenses,
+            (COALESCE(t.freight_charge, 0) - COALESCE(exp.total_expenses, 0)) as net_profit,
+            (COALESCE(t.end_meter_reading, 0) - COALESCE(t.start_meter_reading, 0)) as distance_km
+         FROM trips t
+         JOIN drivers d ON t.driver_id = d.id
+         JOIN users u ON d.user_id = u.id
+         JOIN cars c ON t.car_id = c.id
+         LEFT JOIN (
+             SELECT trip_id, SUM(amount) as total_expenses
+             FROM expenses
+             GROUP BY trip_id
+         ) exp ON exp.trip_id = t.id
+         WHERE t.id = ?
+         LIMIT 1`,
+        [tripId]
+    );
+
+    if (!tripRows.length) {
+        return null;
+    }
+
+    const [trip] = await attachExpensesToTrips(tripRows);
+    return trip;
 };
 
 const syncDriverHelperAssignment = async (connection, driverId, helperId) => {
@@ -1132,6 +1238,55 @@ const updateDriverCommissionRequestStatus = async (req, res) => {
     }
 };
 
+const updateDriverCommissionRequest = async (req, res) => {
+    try {
+        const requestId = Number(req.params.id);
+        const commissionPercentage = toNonNegativeAmount(req.body?.commission_percentage);
+        const netProfit = toNonNegativeAmount(req.body?.net_profit);
+        const submittedAmount = req.body?.commission_amount;
+        const commissionAmount = submittedAmount === undefined || submittedAmount === null || submittedAmount === ''
+            ? roundCurrency((netProfit * commissionPercentage) / 100)
+            : toNonNegativeAmount(submittedAmount);
+        const remarks = toNullableString(req.body?.remarks);
+
+        const [rows] = await pool.execute(
+            'SELECT id, status FROM driver_commission_requests WHERE id = ? LIMIT 1',
+            [requestId]
+        );
+
+        if (!rows.length) {
+            return res.status(404).json({ message: 'Commission request not found' });
+        }
+
+        if (rows[0].status !== 'pending') {
+            return res.status(400).json({ message: 'Only pending requests can be edited' });
+        }
+
+        if (!(commissionPercentage > 0)) {
+            return res.status(400).json({ message: 'Commission percentage must be greater than zero' });
+        }
+
+        if (!(netProfit >= 0)) {
+            return res.status(400).json({ message: 'Net profit is required' });
+        }
+
+        if (!(commissionAmount >= 0)) {
+            return res.status(400).json({ message: 'Commission amount is required' });
+        }
+
+        await pool.execute(
+            `UPDATE driver_commission_requests
+             SET commission_percentage = ?, net_profit = ?, commission_amount = ?, remarks = ?
+             WHERE id = ?`,
+            [commissionPercentage, netProfit, commissionAmount, remarks, requestId]
+        );
+
+        res.json({ success: true, message: 'Commission request updated successfully' });
+    } catch (error) {
+        res.status(500).json({ message: 'Server error', error: error.message });
+    }
+};
+
 const getDriverCashoutRequests = async (req, res) => {
     try {
         const { status = '', driver_id = '' } = req.query;
@@ -1238,6 +1393,83 @@ const updateDriverCashoutRequestStatus = async (req, res) => {
         res.json({ success: true, message: `Driver cashout request ${status}` });
     } catch (error) {
         await connection.rollback();
+        res.status(500).json({ message: 'Server error', error: error.message });
+    } finally {
+        connection.release();
+    }
+};
+
+const updateDriverCashoutRequest = async (req, res) => {
+    const connection = await pool.getConnection();
+    try {
+        const requestId = Number(req.params.id);
+        const balanceType = toNullableString(req.body?.balance_type);
+        const receiveMethod = toNullableString(req.body?.receive_method);
+        const amountValue = toNonNegativeAmount(req.body?.amount);
+        const accountNumber = toNullableString(req.body?.account_number);
+        const accountName = toNullableString(req.body?.account_name);
+        const bankName = toNullableString(req.body?.bank_name);
+        const remarks = toNullableString(req.body?.remarks);
+
+        const [rows] = await connection.execute(
+            'SELECT * FROM driver_cashout_requests WHERE id = ? LIMIT 1',
+            [requestId]
+        );
+
+        if (!rows.length) {
+            return res.status(404).json({ message: 'Driver cashout request not found' });
+        }
+
+        const request = rows[0];
+        if (request.status !== 'pending') {
+            return res.status(400).json({ message: 'Only pending requests can be edited' });
+        }
+
+        if (!DRIVER_BALANCE_TYPES.has(balanceType)) {
+            return res.status(400).json({ message: 'Invalid balance type' });
+        }
+
+        const validationError = validateReceiveMethodPayload({
+            receiveMethod,
+            amountValue,
+            accountNumber,
+            accountName,
+            bankName
+        });
+        if (validationError) {
+            return res.status(400).json({ message: validationError });
+        }
+
+        await syncDriverSalaryForDriver(connection, request.driver_id);
+        const balanceColumn = balanceType === 'commission' ? 'commission_balance' : 'available_balance';
+        const [balanceRows] = await connection.execute(
+            `SELECT ${balanceColumn} AS balance FROM drivers WHERE id = ? LIMIT 1`,
+            [request.driver_id]
+        );
+        const balance = Number(balanceRows[0]?.balance) || 0;
+
+        if (balance < amountValue) {
+            return res.status(400).json({ message: 'Requested amount exceeds available balance' });
+        }
+
+        await connection.execute(
+            `UPDATE driver_cashout_requests
+             SET balance_type = ?, amount = ?, receive_method = ?, account_number = ?, account_name = ?, bank_name = ?, remarks = ?
+             WHERE id = ?`,
+            [
+                balanceType,
+                amountValue,
+                receiveMethod,
+                receiveMethod === 'account' ? accountNumber : null,
+                receiveMethod === 'account' ? accountName : null,
+                receiveMethod === 'account' ? bankName : null,
+                remarks,
+                requestId
+            ]
+        );
+
+        res.json({ success: true, message: 'Driver cashout request updated successfully' });
+    } catch (error) {
         res.status(500).json({ message: 'Server error', error: error.message });
     } finally {
         connection.release();
@@ -1351,6 +1583,76 @@ const updateHelperCashoutRequestStatus = async (req, res) => {
         res.json({ success: true, message: `Helper cashout request ${status}` });
     } catch (error) {
         await connection.rollback();
+        res.status(500).json({ message: 'Server error', error: error.message });
+    } finally {
+        connection.release();
+    }
+};
+
+const updateHelperCashoutRequest = async (req, res) => {
+    const connection = await pool.getConnection();
+    try {
+        const requestId = Number(req.params.id);
+        const receiveMethod = toNullableString(req.body?.receive_method);
+        const amountValue = toNonNegativeAmount(req.body?.amount);
+        const accountNumber = toNullableString(req.body?.account_number);
+        const accountName = toNullableString(req.body?.account_name);
+        const bankName = toNullableString(req.body?.bank_name);
+        const remarks = toNullableString(req.body?.remarks);
+
+        const [rows] = await connection.execute(
+            'SELECT * FROM helper_cashout_requests WHERE id = ? LIMIT 1',
+            [requestId]
+        );
+
+        if (!rows.length) {
+            return res.status(404).json({ message: 'Helper cashout request not found' });
+        }
+
+        const request = rows[0];
+        if (request.status !== 'pending') {
+            return res.status(400).json({ message: 'Only pending requests can be edited' });
+        }
+
+        const validationError = validateReceiveMethodPayload({
+            receiveMethod,
+            amountValue,
+            accountNumber,
+            accountName,
+            bankName
+        });
+        if (validationError) {
+            return res.status(400).json({ message: validationError });
+        }
+
+        await syncHelperSalaryForHelper(connection, request.helper_id);
+        const [balanceRows] = await connection.execute(
+            'SELECT available_balance FROM helpers WHERE id = ? LIMIT 1',
+            [request.helper_id]
+        );
+        const balance = Number(balanceRows[0]?.available_balance) || 0;
+
+        if (balance < amountValue) {
+            return res.status(400).json({ message: 'Requested amount exceeds helper available balance' });
+        }
+
+        await connection.execute(
+            `UPDATE helper_cashout_requests
+             SET amount = ?, receive_method = ?, account_number = ?, account_name = ?, bank_name = ?, remarks = ?
+             WHERE id = ?`,
+            [
+                amountValue,
+                receiveMethod,
+                receiveMethod === 'account' ? accountNumber : null,
+                receiveMethod === 'account' ? accountName : null,
+                receiveMethod === 'account' ? bankName : null,
+                remarks,
+                requestId
+            ]
+        );
+
+        res.json({ success: true, message: 'Helper cashout request updated successfully' });
+    } catch (error) {
         res.status(500).json({ message: 'Server error', error: error.message });
     } finally {
         connection.release();
@@ -1491,6 +1793,9 @@ const getDriversExpenseReport = async (req, res) => {
                 de.driver_id,
                 de.category,
                 de.amount,
+                de.meter_reading,
+                de.note,
+                de.expense_image,
                 de.expense_date,
                 de.created_at,
                 u.username AS driver_name,
@@ -1794,6 +2099,330 @@ const updateDriverPaymentSubmissionStatus = async (req, res) => {
             message: `Payment submission ${nextStatus} successfully`,
             payment
         });
+    } catch (error) {
+        res.status(500).json({ message: 'Server error', error: error.message });
+    }
+};
+
+const updateDriverPaymentSubmission = async (req, res) => {
+    try {
+        const schemaConnection = await pool.getConnection();
+        try {
+            await ensureDriverPaymentSubmissionsTable(schemaConnection);
+        } finally {
+            schemaConnection.release();
+        }
+
+        const paymentId = Number(req.params.id);
+        const paymentMethod = toNullableString(req.body?.payment_method);
+        const amountValue = toNonNegativeAmount(req.body?.amount);
+        const sendingFee = toNonNegativeAmount(req.body?.sending_fee);
+        const handoverTo = toNullableString(req.body?.handover_to);
+
+        if (!PAYMENT_METHODS.has(paymentMethod)) {
+            return res.status(400).json({ message: 'Valid payment method is required' });
+        }
+
+        if (!(amountValue > 0)) {
+            return res.status(400).json({ message: 'Amount must be greater than zero' });
+        }
+
+        const [rows] = await pool.execute(
+            'SELECT id, status FROM driver_payment_submissions WHERE id = ? LIMIT 1',
+            [paymentId]
+        );
+
+        if (!rows.length) {
+            return res.status(404).json({ message: 'Payment submission not found' });
+        }
+
+        if (rows[0].status !== 'pending') {
+            return res.status(400).json({ message: 'Only pending payment submissions can be edited' });
+        }
+
+        await pool.execute(
+            `UPDATE driver_payment_submissions
+             SET payment_method = ?, amount = ?, sending_fee = ?, handover_to = ?
+             WHERE id = ?`,
+            [paymentMethod, amountValue, paymentMethod === 'cash' ? 0 : sendingFee, paymentMethod === 'cash' ? handoverTo : null, paymentId]
+        );
+
+        res.json({ success: true, message: 'Payment submission updated successfully' });
+    } catch (error) {
+        res.status(500).json({ message: 'Server error', error: error.message });
+    }
+};
+
+const updateTripCorrection = async (req, res) => {
+    const connection = await pool.getConnection();
+    try {
+        const tripId = Number(req.params.id);
+        const [rows] = await connection.execute(
+            'SELECT * FROM trips WHERE id = ? LIMIT 1',
+            [tripId]
+        );
+
+        if (!rows.length) {
+            return res.status(404).json({ message: 'Trip not found' });
+        }
+
+        const trip = rows[0];
+        const startMeterReading = toOptionalDecimal(req.body?.start_meter_reading);
+        const endMeterReading = req.body?.end_meter_reading === '' ? null : toOptionalDecimal(req.body?.end_meter_reading);
+        const freightCharge = toNonNegativeAmount(req.body?.freight_charge);
+        const fromLocation = toNullableString(req.body?.from_location);
+        const toLocation = toNullableString(req.body?.to_location);
+        const notes = toNullableString(req.body?.notes);
+
+        if (startMeterReading === null) {
+            return res.status(400).json({ message: 'Start meter reading is required' });
+        }
+
+        if (!fromLocation || !toLocation) {
+            return res.status(400).json({ message: 'From and to locations are required' });
+        }
+
+        if (!(freightCharge >= 0)) {
+            return res.status(400).json({ message: 'Freight charge is required' });
+        }
+
+        if (trip.status === 'completed' && endMeterReading === null) {
+            return res.status(400).json({ message: 'End meter reading is required for completed trips' });
+        }
+
+        if (endMeterReading !== null && endMeterReading < startMeterReading) {
+            return res.status(400).json({ message: 'End meter reading cannot be less than start meter reading' });
+        }
+
+        await connection.execute(
+            `UPDATE trips
+             SET start_meter_reading = ?, end_meter_reading = ?, freight_charge = ?, from_location = ?, to_location = ?, notes = ?
+             WHERE id = ?`,
+            [startMeterReading, endMeterReading, freightCharge, fromLocation, toLocation, notes, tripId]
+        );
+
+        await syncCarCurrentMeterFromTrips(connection, trip.car_id);
+        const updatedTrip = await fetchTripWithExpensesById(tripId);
+
+        res.json({
+            success: true,
+            message: 'Trip updated successfully',
+            trip: updatedTrip
+        });
+    } catch (error) {
+        res.status(500).json({ message: 'Server error', error: error.message });
+    } finally {
+        connection.release();
+    }
+};
+
+const addTripExpenseByAdmin = async (req, res) => {
+    try {
+        const tripId = Number(req.params.id);
+        const category = toNullableString(req.body?.category);
+        const amountValue = toNonNegativeAmount(req.body?.amount);
+        const litersValue = toOptionalDecimal(req.body?.liters);
+        const locationValue = toNullableString(req.body?.location);
+        const notesValue = toNullableString(req.body?.notes);
+
+        const [tripRows] = await pool.execute('SELECT id FROM trips WHERE id = ? LIMIT 1', [tripId]);
+        if (!tripRows.length) {
+            return res.status(404).json({ message: 'Trip not found' });
+        }
+
+        if (!TRIP_EXPENSE_CATEGORIES.has(category)) {
+            return res.status(400).json({ message: 'Invalid expense category' });
+        }
+
+        if (!(amountValue > 0)) {
+            return res.status(400).json({ message: 'Expense amount must be greater than zero' });
+        }
+
+        if (category === 'diesel' && litersValue === null) {
+            return res.status(400).json({ message: 'Liters are required for diesel expense' });
+        }
+
+        const [result] = await pool.execute(
+            `INSERT INTO expenses (trip_id, category, amount, liters, location, notes)
+             VALUES (?, ?, ?, ?, ?, ?)`,
+            [tripId, category, amountValue, litersValue, locationValue, notesValue]
+        );
+
+        const [[expense]] = await pool.execute(
+            `SELECT id, trip_id, category, amount, liters, location, receipt_image, notes, created_at
+             FROM expenses
+             WHERE id = ? LIMIT 1`,
+            [result.insertId]
+        );
+
+        res.json({
+            success: true,
+            message: 'Trip expense added successfully',
+            expense: {
+                ...expense,
+                amount: Number(expense.amount) || 0
+            }
+        });
+    } catch (error) {
+        res.status(500).json({ message: 'Server error', error: error.message });
+    }
+};
+
+const updateTripExpenseByAdmin = async (req, res) => {
+    try {
+        const expenseId = Number(req.params.id);
+        const category = toNullableString(req.body?.category);
+        const amountValue = toNonNegativeAmount(req.body?.amount);
+        const litersValue = req.body?.liters === '' ? null : toOptionalDecimal(req.body?.liters);
+        const locationValue = toNullableString(req.body?.location);
+        const notesValue = toNullableString(req.body?.notes);
+
+        const [rows] = await pool.execute('SELECT id FROM expenses WHERE id = ? LIMIT 1', [expenseId]);
+        if (!rows.length) {
+            return res.status(404).json({ message: 'Expense not found' });
+        }
+
+        if (!TRIP_EXPENSE_CATEGORIES.has(category)) {
+            return res.status(400).json({ message: 'Invalid expense category' });
+        }
+
+        if (!(amountValue > 0)) {
+            return res.status(400).json({ message: 'Expense amount must be greater than zero' });
+        }
+
+        if (category === 'diesel' && litersValue === null) {
+            return res.status(400).json({ message: 'Liters are required for diesel expense' });
+        }
+
+        await pool.execute(
+            `UPDATE expenses
+             SET category = ?, amount = ?, liters = ?, location = ?, notes = ?
+             WHERE id = ?`,
+            [category, amountValue, category === 'diesel' ? litersValue : null, locationValue, notesValue, expenseId]
+        );
+
+        const [[expense]] = await pool.execute(
+            `SELECT id, trip_id, category, amount, liters, location, receipt_image, notes, created_at
+             FROM expenses
+             WHERE id = ? LIMIT 1`,
+            [expenseId]
+        );
+
+        res.json({
+            success: true,
+            message: 'Trip expense updated successfully',
+            expense: {
+                ...expense,
+                amount: Number(expense.amount) || 0
+            }
+        });
+    } catch (error) {
+        res.status(500).json({ message: 'Server error', error: error.message });
+    }
+};
+
+const addDriverDailyExpenseByAdmin = async (req, res) => {
+    try {
+        const schemaConnection = await pool.getConnection();
+        try {
+            await ensureDriverDailyExpenseEntriesTable(schemaConnection);
+            const [[databaseRow]] = await schemaConnection.query('SELECT DATABASE() AS database_name');
+            await ensureDriverDailyExpenseEntryColumns(schemaConnection, databaseRow?.database_name);
+        } finally {
+            schemaConnection.release();
+        }
+
+        const driverId = Number(req.body?.driver_id);
+        const category = toNullableString(req.body?.category);
+        const amountValue = toNonNegativeAmount(req.body?.amount);
+        const meterReadingValue = req.body?.meter_reading === '' ? null : toOptionalDecimal(req.body?.meter_reading);
+        const noteValue = toNullableString(req.body?.note);
+        const expenseDate = toNullableString(req.body?.expense_date);
+
+        if (!driverId) {
+            return res.status(400).json({ message: 'Driver is required' });
+        }
+
+        if (!DAILY_EXPENSE_CATEGORIES.has(category)) {
+            return res.status(400).json({ message: 'Invalid daily expense category' });
+        }
+
+        if (!(amountValue > 0)) {
+            return res.status(400).json({ message: 'Expense amount must be greater than zero' });
+        }
+
+        if (category === 'moboil_change' && meterReadingValue === null) {
+            return res.status(400).json({ message: 'Meter reading is required for moboil change' });
+        }
+
+        const [driverRows] = await pool.execute('SELECT id FROM drivers WHERE id = ? LIMIT 1', [driverId]);
+        if (!driverRows.length) {
+            return res.status(404).json({ message: 'Driver not found' });
+        }
+
+        const [result] = await pool.execute(
+            `INSERT INTO driver_daily_expense_entries
+             (driver_id, category, amount, meter_reading, note, expense_date)
+             VALUES (?, ?, ?, ?, ?, COALESCE(?, CURDATE()))`,
+            [driverId, category, amountValue, meterReadingValue, noteValue, expenseDate]
+        );
+
+        res.json({
+            success: true,
+            message: 'Driver daily expense added successfully',
+            id: result.insertId
+        });
+    } catch (error) {
+        res.status(500).json({ message: 'Server error', error: error.message });
+    }
+};
+
+const updateDriverDailyExpenseByAdmin = async (req, res) => {
+    try {
+        const schemaConnection = await pool.getConnection();
+        try {
+            await ensureDriverDailyExpenseEntriesTable(schemaConnection);
+            const [[databaseRow]] = await schemaConnection.query('SELECT DATABASE() AS database_name');
+            await ensureDriverDailyExpenseEntryColumns(schemaConnection, databaseRow?.database_name);
+        } finally {
+            schemaConnection.release();
+        }
+
+        const entryId = Number(req.params.id);
+        const category = toNullableString(req.body?.category);
+        const amountValue = toNonNegativeAmount(req.body?.amount);
+        const meterReadingValue = req.body?.meter_reading === '' ? null : toOptionalDecimal(req.body?.meter_reading);
+        const noteValue = toNullableString(req.body?.note);
+        const expenseDate = toNullableString(req.body?.expense_date);
+
+        const [rows] = await pool.execute(
+            'SELECT id FROM driver_daily_expense_entries WHERE id = ? LIMIT 1',
+            [entryId]
+        );
+        if (!rows.length) {
+            return res.status(404).json({ message: 'Driver daily expense not found' });
+        }
+
+        if (!DAILY_EXPENSE_CATEGORIES.has(category)) {
+            return res.status(400).json({ message: 'Invalid daily expense category' });
+        }
+
+        if (!(amountValue > 0)) {
+            return res.status(400).json({ message: 'Expense amount must be greater than zero' });
+        }
+
+        if (category === 'moboil_change' && meterReadingValue === null) {
+            return res.status(400).json({ message: 'Meter reading is required for moboil change' });
+        }
+
+        await pool.execute(
+            `UPDATE driver_daily_expense_entries
+             SET category = ?, amount = ?, meter_reading = ?, note = ?, expense_date = COALESCE(?, expense_date)
+             WHERE id = ?`,
+            [category, amountValue, meterReadingValue, noteValue, expenseDate, entryId]
+        );
+
+        res.json({ success: true, message: 'Driver daily expense updated successfully' });
     } catch (error) {
         res.status(500).json({ message: 'Server error', error: error.message });
     }
@@ -2391,13 +3020,22 @@ module.exports = {
     getDriverReport,
     getDriversExpenseReport,
     getDriverCommissionRequests,
+    updateDriverCommissionRequest,
     updateDriverCommissionRequestStatus,
     getDriverCashoutRequests,
+    updateDriverCashoutRequest,
     updateDriverCashoutRequestStatus,
     getHelperCashoutRequests,
+    updateHelperCashoutRequest,
     updateHelperCashoutRequestStatus,
     getDriverPaymentSubmissions,
+    updateDriverPaymentSubmission,
     updateDriverPaymentSubmissionStatus,
+    updateTripCorrection,
+    addTripExpenseByAdmin,
+    updateTripExpenseByAdmin,
+    addDriverDailyExpenseByAdmin,
+    updateDriverDailyExpenseByAdmin,
     getDriverLeaveRequests,
     updateDriverLeaveRequestStatus,
     

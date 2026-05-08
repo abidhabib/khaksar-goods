@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
-import { CalendarDays, CheckCircle2, Eye, Truck, Wallet, XCircle } from 'lucide-react';
+import { CalendarDays, CheckCircle2, Eye, Pencil, Truck, Wallet, XCircle } from 'lucide-react';
 import { useApi } from '../hooks/useApi';
+import Modal from '../components/common/Modal';
 
 const formatCurrency = (value) => `Rs ${Number(value || 0).toLocaleString()}`;
 
@@ -25,6 +26,14 @@ const PaymentSubmissionsPage = () => {
     to_date: '',
   });
   const [submittingId, setSubmittingId] = useState(null);
+  const [editingPayment, setEditingPayment] = useState(null);
+  const [editForm, setEditForm] = useState({
+    amount: '',
+    payment_method: 'cash',
+    sending_fee: '',
+    handover_to: '',
+  });
+  const [savingEdit, setSavingEdit] = useState(false);
 
   const fetchDrivers = async () => {
     const result = await get('/admin/drivers');
@@ -64,6 +73,43 @@ const PaymentSubmissionsPage = () => {
       return;
     }
 
+    fetchPayments(filters);
+  };
+
+  const openEditModal = (payment) => {
+    setEditingPayment(payment);
+    setEditForm({
+      amount: payment.amount ?? '',
+      payment_method: payment.payment_method || 'cash',
+      sending_fee: payment.sending_fee ?? '',
+      handover_to: payment.handover_to || '',
+    });
+  };
+
+  const closeEditModal = () => {
+    setEditingPayment(null);
+    setEditForm({
+      amount: '',
+      payment_method: 'cash',
+      sending_fee: '',
+      handover_to: '',
+    });
+  };
+
+  const handleEditSave = async (e) => {
+    e.preventDefault();
+    if (!editingPayment) return;
+
+    setSavingEdit(true);
+    const result = await put(`/admin/payment-submissions/${editingPayment.id}`, editForm);
+    setSavingEdit(false);
+
+    if (!result.success) {
+      alert(result.error);
+      return;
+    }
+
+    closeEditModal();
     fetchPayments(filters);
   };
 
@@ -215,7 +261,16 @@ const PaymentSubmissionsPage = () => {
                 <td className="py-3 pr-4 text-sm text-cargo-muted">{formatDateTime(payment.status_updated_at)}</td>
                 <td className="py-3 pr-4 text-sm">
                   {payment.status === 'pending' ? (
-                    <div className="flex items-center gap-2">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={() => openEditModal(payment)}
+                        disabled={submittingId === payment.id}
+                        className="inline-flex items-center gap-1 rounded-lg bg-primary-500/15 px-3 py-2 text-primary-300 hover:bg-primary-500/25 disabled:opacity-50"
+                      >
+                        <Pencil className="w-4 h-4" />
+                        Edit
+                      </button>
                       <button
                         type="button"
                         onClick={() => handleStatusChange(payment.id, 'approved')}
@@ -250,6 +305,56 @@ const PaymentSubmissionsPage = () => {
           </tbody>
         </table>
       </div>
+
+      <Modal isOpen={Boolean(editingPayment)} onClose={closeEditModal} title="Edit Payment Submission">
+        <form onSubmit={handleEditSave} className="space-y-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+            <input
+              type="number"
+              min="0"
+              step="0.01"
+              value={editForm.amount}
+              onChange={(e) => setEditForm((prev) => ({ ...prev, amount: e.target.value }))}
+              className="input-field w-full"
+              placeholder="Amount"
+            />
+            <select
+              value={editForm.payment_method}
+              onChange={(e) => setEditForm((prev) => ({ ...prev, payment_method: e.target.value }))}
+              className="input-field w-full"
+            >
+              <option value="cash">Cash</option>
+              <option value="account">Account</option>
+            </select>
+            {editForm.payment_method === 'cash' ? (
+              <input
+                type="text"
+                value={editForm.handover_to}
+                onChange={(e) => setEditForm((prev) => ({ ...prev, handover_to: e.target.value }))}
+                className="input-field w-full md:col-span-2"
+                placeholder="Handover To"
+              />
+            ) : (
+              <input
+                type="number"
+                min="0"
+                step="0.01"
+                value={editForm.sending_fee}
+                onChange={(e) => setEditForm((prev) => ({ ...prev, sending_fee: e.target.value }))}
+                className="input-field w-full md:col-span-2"
+                placeholder="Sending Fee"
+              />
+            )}
+          </div>
+
+          <div className="flex gap-3">
+            <button type="button" onClick={closeEditModal} className="flex-1 btn-secondary">Cancel</button>
+            <button type="submit" disabled={savingEdit} className="flex-1 btn-primary">
+              {savingEdit ? 'Saving...' : 'Save Changes'}
+            </button>
+          </div>
+        </form>
+      </Modal>
     </div>
   );
 };

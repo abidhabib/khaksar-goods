@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
-import { FileText, Wallet, CalendarDays, Users } from 'lucide-react';
+import { FileText, Plus, Wallet, CalendarDays, Users, Pencil } from 'lucide-react';
 import { useApi } from '../hooks/useApi';
+import Modal from '../components/common/Modal';
 
 const formatCurrency = (value) => `Rs ${Number(value || 0).toLocaleString()}`;
 const formatDateTime = (value) => {
@@ -18,16 +19,41 @@ const getCategoryLabel = (category) => ({
   mechanic: 'Mechanic Cost',
   food: 'Food Cost',
   cargo_security_guard: 'Security Guard Fee',
+  medical: 'Medical Cost',
+  other: 'Other',
 }[category] || category);
 
+const expenseCategories = [
+  'cargo_service',
+  'mobile',
+  'moboil_change',
+  'vehicle_maintenance',
+  'mechanic',
+  'medical',
+  'food',
+  'cargo_security_guard',
+  'other',
+];
+
 const DriverExpensesReportPage = () => {
-  const { get, loading } = useApi();
+  const { get, post, put, loading } = useApi();
   const [drivers, setDrivers] = useState([]);
   const [reportData, setReportData] = useState({ rows: [], driverTotals: [], summary: {} });
   const [filters, setFilters] = useState({
     month: new Date().toISOString().slice(0, 7),
     driver_id: '',
   });
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [editingRow, setEditingRow] = useState(null);
+  const [form, setForm] = useState({
+    driver_id: '',
+    expense_date: new Date().toISOString().slice(0, 10),
+    category: 'cargo_service',
+    amount: '',
+    meter_reading: '',
+    note: '',
+  });
+  const [saving, setSaving] = useState(false);
 
   const fetchDrivers = async () => {
     const result = await get('/admin/drivers');
@@ -67,6 +93,55 @@ const DriverExpensesReportPage = () => {
     return acc;
   }, {}), [rows]);
 
+  const openAddModal = () => {
+    setEditingRow(null);
+    setForm({
+      driver_id: filters.driver_id || '',
+      expense_date: new Date().toISOString().slice(0, 10),
+      category: 'cargo_service',
+      amount: '',
+      meter_reading: '',
+      note: '',
+    });
+    setIsModalOpen(true);
+  };
+
+  const openEditModal = (row) => {
+    setEditingRow(row);
+    setForm({
+      driver_id: row.driver_id || '',
+      expense_date: row.expense_date?.slice(0, 10) || new Date().toISOString().slice(0, 10),
+      category: row.category || 'cargo_service',
+      amount: row.amount ?? '',
+      meter_reading: row.meter_reading ?? '',
+      note: row.note || '',
+    });
+    setIsModalOpen(true);
+  };
+
+  const closeModal = () => {
+    setIsModalOpen(false);
+    setEditingRow(null);
+  };
+
+  const handleSave = async (e) => {
+    e.preventDefault();
+    setSaving(true);
+    const request = editingRow
+      ? put(`/admin/drivers-expenses/${editingRow.id}`, form)
+      : post('/admin/drivers-expenses', form);
+    const result = await request;
+    setSaving(false);
+
+    if (!result.success) {
+      alert(result.error);
+      return;
+    }
+
+    closeModal();
+    fetchReport(filters);
+  };
+
   return (
     <div className="space-y-6">
       <div className="rounded-xl border border-cargo-border bg-gradient-to-r from-cargo-card to-cargo-dark p-5">
@@ -77,7 +152,7 @@ const DriverExpensesReportPage = () => {
         <p className="text-cargo-muted mt-1">Daily driver expense history with monthly filtering and totals</p>
       </div>
 
-      <div className="card grid grid-cols-1 md:grid-cols-3 gap-3">
+      <div className="card grid grid-cols-1 md:grid-cols-4 gap-3">
         <input
           type="month"
           value={filters.month}
@@ -96,6 +171,10 @@ const DriverExpensesReportPage = () => {
         </select>
         <button type="button" onClick={() => fetchReport(filters)} className="btn-primary">
           Apply Filter
+        </button>
+        <button type="button" onClick={openAddModal} className="btn-secondary flex items-center justify-center gap-2">
+          <Plus className="w-4 h-4" />
+          Add Expense
         </button>
       </div>
 
@@ -171,6 +250,9 @@ const DriverExpensesReportPage = () => {
               <th className="py-3 pr-4 text-xs uppercase tracking-wide text-cargo-muted">Date</th>
               <th className="py-3 pr-4 text-xs uppercase tracking-wide text-cargo-muted">Category</th>
               <th className="py-3 pr-4 text-xs uppercase tracking-wide text-cargo-muted">Amount</th>
+              <th className="py-3 pr-4 text-xs uppercase tracking-wide text-cargo-muted">Meter</th>
+              <th className="py-3 pr-4 text-xs uppercase tracking-wide text-cargo-muted">Note</th>
+              <th className="py-3 pr-4 text-xs uppercase tracking-wide text-cargo-muted">Action</th>
             </tr>
           </thead>
           <tbody>
@@ -182,15 +264,88 @@ const DriverExpensesReportPage = () => {
                 <td className="py-3 pr-4 text-sm text-cargo-text">{row.expense_date?.slice(0, 10)}</td>
                 <td className="py-3 pr-4 text-sm text-cargo-text">{getCategoryLabel(row.category)}</td>
                 <td className="py-3 pr-4 text-sm font-semibold text-primary-400">{formatCurrency(row.amount)}</td>
+                <td className="py-3 pr-4 text-sm text-cargo-text">{row.meter_reading ? Number(row.meter_reading).toLocaleString() : 'N/A'}</td>
+                <td className="py-3 pr-4 text-sm text-cargo-muted max-w-xs">{row.note || 'N/A'}</td>
+                <td className="py-3 pr-4 text-sm">
+                  <button type="button" onClick={() => openEditModal(row)} className="inline-flex items-center gap-1 rounded-lg bg-primary-500/15 px-3 py-2 text-primary-300">
+                    <Pencil className="w-4 h-4" />
+                    Edit
+                  </button>
+                </td>
               </tr>
             )) : (
               <tr>
-                <td colSpan="6" className="py-6 text-center text-cargo-muted">No rows found.</td>
+                <td colSpan="9" className="py-6 text-center text-cargo-muted">No rows found.</td>
               </tr>
             )}
           </tbody>
         </table>
       </div>
+
+      <Modal isOpen={isModalOpen} onClose={closeModal} title={editingRow ? 'Edit Driver Expense' : 'Add Driver Expense'}>
+        <form onSubmit={handleSave} className="space-y-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+            <select
+              value={form.driver_id}
+              onChange={(e) => setForm((prev) => ({ ...prev, driver_id: e.target.value }))}
+              className="input-field w-full"
+              disabled={Boolean(editingRow)}
+            >
+              <option value="">Select Driver</option>
+              {drivers.map((driver) => (
+                <option key={driver.id} value={driver.id}>{driver.username}</option>
+              ))}
+            </select>
+            <input
+              type="date"
+              value={form.expense_date}
+              onChange={(e) => setForm((prev) => ({ ...prev, expense_date: e.target.value }))}
+              className="input-field w-full"
+            />
+            <select
+              value={form.category}
+              onChange={(e) => setForm((prev) => ({ ...prev, category: e.target.value }))}
+              className="input-field w-full"
+            >
+              {expenseCategories.map((category) => (
+                <option key={category} value={category}>{getCategoryLabel(category)}</option>
+              ))}
+            </select>
+            <input
+              type="number"
+              min="0"
+              step="0.01"
+              value={form.amount}
+              onChange={(e) => setForm((prev) => ({ ...prev, amount: e.target.value }))}
+              className="input-field w-full"
+              placeholder="Amount"
+            />
+            <input
+              type="number"
+              min="0"
+              step="0.01"
+              value={form.meter_reading}
+              onChange={(e) => setForm((prev) => ({ ...prev, meter_reading: e.target.value }))}
+              className="input-field w-full md:col-span-2"
+              placeholder="Meter Reading"
+            />
+          </div>
+
+          <textarea
+            value={form.note}
+            onChange={(e) => setForm((prev) => ({ ...prev, note: e.target.value }))}
+            className="input-field w-full min-h-24"
+            placeholder="Note"
+          />
+
+          <div className="flex gap-3">
+            <button type="button" onClick={closeModal} className="flex-1 btn-secondary">Cancel</button>
+            <button type="submit" disabled={saving} className="flex-1 btn-primary">
+              {saving ? 'Saving...' : editingRow ? 'Save Changes' : 'Add Expense'}
+            </button>
+          </div>
+        </form>
+      </Modal>
     </div>
   );
 };
