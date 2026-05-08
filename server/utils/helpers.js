@@ -5,6 +5,159 @@ const generateUsername = (name, phone) => {
     return `${cleanName}_${last4Phone}`;
 };
 
+const toTimestampMs = (value, fallbackToEndOfDay = false) => {
+    if (!value) {
+        return null;
+    }
+
+    if (value instanceof Date) {
+        const time = value.getTime();
+        return Number.isNaN(time) ? null : time;
+    }
+
+    const normalized = String(value).trim();
+    if (!normalized) {
+        return null;
+    }
+
+    const sourceValue = fallbackToEndOfDay && /^\d{4}-\d{2}-\d{2}$/.test(normalized)
+        ? `${normalized}T23:59:59`
+        : normalized;
+    const parsed = new Date(sourceValue);
+    const time = parsed.getTime();
+    return Number.isNaN(time) ? null : time;
+};
+
+const attachBetweenTripDailyExpenses = (trips, timelineTrips = [], dailyExpenseEntries = []) => {
+    if (!Array.isArray(trips) || !trips.length) {
+        return Array.isArray(trips) ? trips : [];
+    }
+
+    const tripIds = new Set(trips.map((trip) => Number(trip.id)).filter(Number.isFinite));
+    const tripsByDriver = new Map();
+
+    for (const timelineTrip of timelineTrips) {
+        const tripId = Number(timelineTrip?.id);
+        const driverId = Number(timelineTrip?.driver_id);
+        if (!Number.isFinite(tripId) || !Number.isFinite(driverId)) {
+            continue;
+        }
+
+        if (!tripsByDriver.has(driverId)) {
+            tripsByDriver.set(driverId, []);
+        }
+
+        tripsByDriver.get(driverId).push({
+            id: tripId,
+            driver_id: driverId,
+            status: timelineTrip.status,
+            started_at_ms: toTimestampMs(timelineTrip.started_at),
+            ended_at_ms: toTimestampMs(timelineTrip.ended_at)
+        });
+    }
+
+    const allocationWindows = new Map();
+    for (const [driverId, driverTrips] of tripsByDriver.entries()) {
+        driverTrips.sort((left, right) => {
+            const leftStart = left.started_at_ms ?? Number.MIN_SAFE_INTEGER;
+            const rightStart = right.started_at_ms ?? Number.MIN_SAFE_INTEGER;
+            if (leftStart !== rightStart) {
+                return leftStart - rightStart;
+            }
+            return left.id - right.id;
+        });
+
+        const windows = [];
+        for (let index = 0; index < driverTrips.length; index += 1) {
+            const trip = driverTrips[index];
+            if (trip.status !== 'completed' || trip.ended_at_ms === null) {
+                continue;
+            }
+
+            let nextStartedAtMs = null;
+            for (let nextIndex = index + 1; nextIndex < driverTrips.length; nextIndex += 1) {
+                const nextTrip = driverTrips[nextIndex];
+                if (nextTrip.started_at_ms !== null && nextTrip.started_at_ms > trip.ended_at_ms) {
+                    nextStartedAtMs = nextTrip.started_at_ms;
+                    break;
+                }
+            }
+
+            const window = {
+                trip_id: trip.id,
+                start_ms: trip.ended_at_ms,
+                end_ms: nextStartedAtMs
+            };
+            windows.push(window);
+
+            if (tripIds.has(trip.id)) {
+                allocationWindows.set(trip.id, window);
+            }
+        }
+
+        tripsByDriver.set(driverId, windows);
+    }
+
+    const allocatedByTripId = new Map();
+    for (const entry of dailyExpenseEntries) {
+        const driverId = Number(entry?.driver_id);
+        const amount = Number(entry?.amount) || 0;
+        if (!Number.isFinite(driverId) || amount <= 0) {
+            continue;
+        }
+
+        const entryTimestamp = toTimestampMs(entry.created_at) ?? toTimestampMs(entry.expense_date, true);
+        if (entryTimestamp === null) {
+            continue;
+        }
+
+        const windows = tripsByDriver.get(driverId) || [];
+        const targetWindow = windows.find((window) =>
+            entryTimestamp >= window.start_ms &&
+            (window.end_ms === null || entryTimestamp < window.end_ms)
+        );
+
+        if (!targetWindow || !tripIds.has(targetWindow.trip_id)) {
+            continue;
+        }
+
+        if (!allocatedByTripId.has(targetWindow.trip_id)) {
+            allocatedByTripId.set(targetWindow.trip_id, []);
+        }
+
+        allocatedByTripId.get(targetWindow.trip_id).push({
+            ...entry,
+            amount
+        });
+    }
+
+    return trips.map((trip) => {
+        const tripId = Number(trip.id);
+        const tripExpenses = Array.isArray(trip.expenses) ? trip.expenses : [];
+        const dailyExpenses = allocatedByTripId.get(tripId) || [];
+        const baseTotalExpenses = Number(trip.total_expenses) || 0;
+        const betweenTripExpensesTotal = dailyExpenses.reduce((sum, entry) => sum + (Number(entry.amount) || 0), 0);
+        const combinedExpensesTotal = baseTotalExpenses + betweenTripExpensesTotal;
+        const freightCharge = Number(trip.freight_charge) || 0;
+
+        return {
+            ...trip,
+            freight_charge: freightCharge,
+            trip_expenses_total: baseTotalExpenses,
+            between_trip_expenses_total: betweenTripExpensesTotal,
+            total_expenses: combinedExpensesTotal,
+            net_profit: trip.net_profit !== undefined || trip.net_profit === null
+                ? freightCharge - combinedExpensesTotal
+                : trip.net_profit,
+            net_income: trip.net_income !== undefined || trip.net_income === null
+                ? freightCharge - combinedExpensesTotal
+                : trip.net_income,
+            daily_expenses: dailyExpenses,
+            expenses: tripExpenses
+        };
+    });
+};
+
 // Calculate financial summary
 const calculateSummary = (trips) => {
     return trips.reduce((acc, trip) => {
@@ -17,5 +170,6 @@ const calculateSummary = (trips) => {
 
 module.exports = {
     generateUsername,
-    calculateSummary
+    calculateSummary,
+    attachBetweenTripDailyExpenses
 };

@@ -14,6 +14,9 @@ const {
     syncAllHelperSalary,
     validateReceiveMethodPayload
 } = require('../services/accountService');
+const {
+    attachBetweenTripDailyExpenses
+} = require('../utils/helpers');
 
 const PAYMENT_SUBMISSION_STATUSES = new Set(['pending', 'approved', 'rejected']);
 const LEAVE_REQUEST_ACTIONS = new Set(['approve', 'reject']);
@@ -638,51 +641,42 @@ const getCarHistory = async (req, res) => {
         `, [id, ...tripDateFilter.params]);
         const tripsWithExpenses = await attachExpensesToTrips(trips);
 
-        // Financial summary by driver
-        const [driverStats] = await pool.execute(`
-            SELECT 
-                u.username as driver_name,
-                COUNT(trip_summary.id) as total_trips,
-                COALESCE(SUM(trip_summary.freight_charge), 0) as total_revenue,
-                COALESCE(SUM(trip_summary.total_expenses), 0) as total_expenses,
-                COALESCE(SUM(trip_summary.distance), 0) as total_distance
-            FROM (
-                SELECT 
-                    t.id,
-                    t.driver_id,
-                    t.freight_charge,
-                    COALESCE(SUM(e.amount), 0) as total_expenses,
-                    COALESCE(t.end_meter_reading - t.start_meter_reading, 0) as distance
-                FROM trips t
-                LEFT JOIN expenses e ON t.id = e.trip_id
-                WHERE t.car_id = ? AND t.status = 'completed' ${tripDateFilter.clause}
-                GROUP BY t.id, t.driver_id, t.freight_charge, t.end_meter_reading, t.start_meter_reading
-            ) trip_summary
-            JOIN drivers d ON trip_summary.driver_id = d.id
-            JOIN users u ON d.user_id = u.id
-            GROUP BY trip_summary.driver_id, u.username
-        `, [id, ...tripDateFilter.params]);
+        const completedTrips = tripsWithExpenses.filter((trip) => trip.status === 'completed');
+        const driverStatsMap = new Map();
+        for (const trip of completedTrips) {
+            const key = Number(trip.driver_id);
+            if (!driverStatsMap.has(key)) {
+                driverStatsMap.set(key, {
+                    driver_name: trip.driver_name || 'Unknown',
+                    total_trips: 0,
+                    total_revenue: 0,
+                    total_expenses: 0,
+                    total_distance: 0
+                });
+            }
 
-        const [summaryRows] = await pool.execute(`
-            SELECT
-                COUNT(trip_summary.id) as total_trips,
-                COALESCE(SUM(trip_summary.freight_charge), 0) as total_revenue,
-                COALESCE(SUM(trip_summary.total_expenses), 0) as total_expenses,
-                COALESCE(SUM(trip_summary.distance), 0) as total_distance,
-                COALESCE(SUM(trip_summary.total_diesel_liters), 0) as total_diesel_liters
-            FROM (
-                SELECT
-                    t.id,
-                    t.freight_charge,
-                    COALESCE(SUM(e.amount), 0) as total_expenses,
-                    COALESCE(SUM(CASE WHEN e.category = 'diesel' THEN COALESCE(e.liters, 0) ELSE 0 END), 0) as total_diesel_liters,
-                    COALESCE(t.end_meter_reading - t.start_meter_reading, 0) as distance
-                FROM trips t
-                LEFT JOIN expenses e ON e.trip_id = t.id
-                WHERE t.car_id = ? ${tripDateFilter.clause}
-                GROUP BY t.id, t.freight_charge, t.end_meter_reading, t.start_meter_reading
-            ) trip_summary
-        `, [id, ...tripDateFilter.params]);
+            const statsEntry = driverStatsMap.get(key);
+            statsEntry.total_trips += 1;
+            statsEntry.total_revenue += Number(trip.freight_charge) || 0;
+            statsEntry.total_expenses += Number(trip.total_expenses) || 0;
+            statsEntry.total_distance += Number(trip.end_meter_reading - trip.start_meter_reading) || 0;
+        }
+
+        const driverStats = Array.from(driverStatsMap.values());
+        const summaryTotals = tripsWithExpenses.reduce((acc, trip) => {
+            acc.total_trips += 1;
+            acc.total_revenue += Number(trip.freight_charge) || 0;
+            acc.total_expenses += Number(trip.total_expenses) || 0;
+            acc.total_distance += Number(trip.end_meter_reading - trip.start_meter_reading) || 0;
+            acc.total_diesel_liters += Number(trip.total_diesel_liters) || 0;
+            return acc;
+        }, {
+            total_trips: 0,
+            total_revenue: 0,
+            total_expenses: 0,
+            total_distance: 0,
+            total_diesel_liters: 0
+        });
 
         res.json({
             success: true,
@@ -697,16 +691,12 @@ const getCarHistory = async (req, res) => {
             trips: tripsWithExpenses,
             driverStats,
             summary: {
-                ...summaryRows[0],
-                total_expenses: Number(summaryRows[0].total_expenses) || 0,
-                total_revenue: Number(summaryRows[0].total_revenue) || 0,
-                total_distance: Number(summaryRows[0].total_distance) || 0,
-                total_diesel_liters: Number(summaryRows[0].total_diesel_liters) || 0,
+                ...summaryTotals,
                 overall_average_km_per_liter: computeAverageKmPerLiter(
-                    summaryRows[0].total_distance,
-                    summaryRows[0].total_diesel_liters
+                    summaryTotals.total_distance,
+                    summaryTotals.total_diesel_liters
                 ),
-                net_income: (Number(summaryRows[0].total_revenue) || 0) - (Number(summaryRows[0].total_expenses) || 0)
+                net_income: summaryTotals.total_revenue - summaryTotals.total_expenses
             }
         });
     } catch (error) {
@@ -1720,31 +1710,27 @@ const getDriverReport = async (req, res) => {
             }]))[0]
             : null;
 
-        // Summary statistics
-        const [stats] = await pool.execute(`
-            SELECT 
-                COUNT(trip_summary.id) as total_trips,
-                SUM(CASE WHEN trip_summary.status = 'ongoing' THEN 1 ELSE 0 END) as ongoing_trips,
-                SUM(CASE WHEN trip_summary.status = 'completed' THEN 1 ELSE 0 END) as completed_trips,
-                COALESCE(SUM(trip_summary.freight_charge), 0) as total_revenue,
-                COALESCE(SUM(trip_summary.total_expenses), 0) as total_expenses,
-                COALESCE(SUM(trip_summary.freight_charge), 0) - COALESCE(SUM(trip_summary.total_expenses), 0) as net_profit,
-                COALESCE(SUM(trip_summary.distance), 0) as total_distance,
-                COALESCE(SUM(trip_summary.total_diesel_liters), 0) as total_diesel_liters
-            FROM (
-                SELECT
-                    t.id,
-                    t.status,
-                    t.freight_charge,
-                    COALESCE(SUM(e.amount), 0) as total_expenses,
-                    COALESCE(SUM(CASE WHEN e.category = 'diesel' THEN COALESCE(e.liters, 0) ELSE 0 END), 0) as total_diesel_liters,
-                    COALESCE(t.end_meter_reading - t.start_meter_reading, 0) as distance
-                FROM trips t
-                LEFT JOIN expenses e ON t.id = e.trip_id
-                WHERE t.driver_id = ? ${dateFilter.clause}
-                GROUP BY t.id, t.status, t.freight_charge, t.end_meter_reading, t.start_meter_reading
-            ) trip_summary
-        `, [id, ...dateFilter.params]);
+        const stats = [tripsWithExpenses.reduce((acc, trip) => {
+            const distance = Number(trip.end_meter_reading - trip.start_meter_reading) || 0;
+            acc.total_trips += 1;
+            acc.ongoing_trips += trip.status === 'ongoing' ? 1 : 0;
+            acc.completed_trips += trip.status === 'completed' ? 1 : 0;
+            acc.total_revenue += Number(trip.freight_charge) || 0;
+            acc.total_expenses += Number(trip.total_expenses) || 0;
+            acc.total_distance += distance;
+            acc.total_diesel_liters += Number(trip.total_diesel_liters) || 0;
+            return acc;
+        }, {
+            total_trips: 0,
+            ongoing_trips: 0,
+            completed_trips: 0,
+            total_revenue: 0,
+            total_expenses: 0,
+            total_distance: 0,
+            total_diesel_liters: 0,
+            net_profit: 0
+        })];
+        stats[0].net_profit = stats[0].total_revenue - stats[0].total_expenses;
 
         const driverPayload = driver[0];
         driverPayload.overall_average_km_per_liter = computeAverageKmPerLiter(
@@ -2703,6 +2689,11 @@ const attachExpensesToTrips = async (trips) => {
 
     const tripIds = trips.map((trip) => trip.id);
     const placeholders = tripIds.map(() => '?').join(', ');
+    const driverIds = [...new Set(
+        trips
+            .map((trip) => Number(trip.driver_id))
+            .filter(Number.isFinite)
+    )];
 
     const [expenseRows] = await pool.execute(
         `SELECT id, trip_id, category, amount, liters, location, receipt_image, notes, created_at
@@ -2724,7 +2715,7 @@ const attachExpensesToTrips = async (trips) => {
         return map;
     }, new Map());
 
-    return trips.map((trip) => {
+    const tripsWithExpenses = trips.map((trip) => {
         const expenses = expenseMap.get(trip.id) || [];
         const totalDieselLiters = expenses
             .filter((expense) => expense.category === 'diesel')
@@ -2744,6 +2735,30 @@ const attachExpensesToTrips = async (trips) => {
         expenses
         };
     });
+
+    if (!driverIds.length) {
+        return tripsWithExpenses;
+    }
+
+    const driverPlaceholders = driverIds.map(() => '?').join(', ');
+    const [timelineTrips, dailyExpenseRows] = await Promise.all([
+        pool.execute(
+            `SELECT id, driver_id, status, started_at, ended_at
+             FROM trips
+             WHERE driver_id IN (${driverPlaceholders})
+             ORDER BY driver_id ASC, started_at ASC, id ASC`,
+            driverIds
+        ),
+        pool.execute(
+            `SELECT id, driver_id, category, amount, meter_reading, note, expense_image, expense_date, created_at
+             FROM driver_daily_expense_entries
+             WHERE driver_id IN (${driverPlaceholders})
+             ORDER BY driver_id ASC, created_at ASC, id ASC`,
+            driverIds
+        )
+    ]);
+
+    return attachBetweenTripDailyExpenses(tripsWithExpenses, timelineTrips[0], dailyExpenseRows[0]);
 };
 
 const getDashboardStats = async (req, res) => {
@@ -2869,74 +2884,100 @@ const getReportsData = async (req, res) => {
         previousStart.setDate(previousStart.getDate() - previousDays);
         const previousRange = { start: previousStart, end: previousEnd };
 
-        const tripSummaryQuery = `
-            SELECT
-                t.id,
-                t.started_at,
-                t.freight_charge,
-                COALESCE(SUM(e.amount), 0) as total_expenses
-            FROM trips t
-            LEFT JOIN expenses e ON e.trip_id = t.id
-            WHERE t.status = 'completed' AND t.started_at >= ? AND t.started_at < ?
-            GROUP BY t.id, t.started_at, t.freight_charge
-        `;
+        const loadTripsForRange = async ({ start, end }) => {
+            const [trips] = await pool.execute(`
+                SELECT
+                    t.id,
+                    t.driver_id,
+                    t.from_location as source,
+                    t.to_location as destination,
+                    t.started_at,
+                    t.ended_at as completed_at,
+                    t.ended_at,
+                    t.freight_charge,
+                    u.username as driver_name,
+                    c.car_number,
+                    COALESCE(SUM(e.amount), 0) as total_expenses
+                FROM trips t
+                JOIN drivers d ON d.id = t.driver_id
+                JOIN users u ON u.id = d.user_id
+                JOIN cars c ON c.id = t.car_id
+                LEFT JOIN expenses e ON e.trip_id = t.id
+                WHERE t.status = 'completed' AND t.started_at >= ? AND t.started_at < ?
+                GROUP BY
+                    t.id, t.driver_id, t.from_location, t.to_location, t.started_at,
+                    t.ended_at, t.freight_charge, u.username, c.car_number
+                ORDER BY t.started_at DESC
+            `, [start, end]);
 
-        const [summaryRows] = await pool.execute(`
-            SELECT
-                COUNT(*) as total_trips,
-                COALESCE(SUM(freight_charge), 0) as total_revenue,
-                COALESCE(SUM(total_expenses), 0) as total_expenses
-            FROM (${tripSummaryQuery}) trip_summary
-        `, [currentRange.start, currentRange.end]);
+            return attachExpensesToTrips(trips);
+        };
 
-        const [previousSummaryRows] = await pool.execute(`
-            SELECT
-                COUNT(*) as total_trips,
-                COALESCE(SUM(freight_charge), 0) as total_revenue,
-                COALESCE(SUM(total_expenses), 0) as total_expenses
-            FROM (${tripSummaryQuery}) trip_summary
-        `, [previousRange.start, previousRange.end]);
+        const currentTrips = await loadTripsForRange(currentRange);
+        const previousTrips = await loadTripsForRange(previousRange);
 
-        const summary = summaryRows[0];
-        const previousSummary = previousSummaryRows[0];
-        const totalRevenue = Number(summary.total_revenue) || 0;
-        const totalExpenses = Number(summary.total_expenses) || 0;
-        const totalTrips = Number(summary.total_trips) || 0;
+        const summarizeTrips = (trips) => trips.reduce((acc, trip) => {
+            acc.totalRevenue += Number(trip.freight_charge) || 0;
+            acc.totalExpenses += Number(trip.total_expenses) || 0;
+            acc.totalTrips += 1;
+            return acc;
+        }, {
+            totalRevenue: 0,
+            totalExpenses: 0,
+            totalTrips: 0
+        });
+
+        const summary = summarizeTrips(currentTrips);
+        const previousSummary = summarizeTrips(previousTrips);
+        const totalRevenue = summary.totalRevenue;
+        const totalExpenses = summary.totalExpenses;
+        const totalTrips = summary.totalTrips;
         const netProfit = totalRevenue - totalExpenses;
-        const previousNetProfit =
-            (Number(previousSummary.total_revenue) || 0) - (Number(previousSummary.total_expenses) || 0);
+        const previousNetProfit = previousSummary.totalRevenue - previousSummary.totalExpenses;
 
-        const bucketSelect = bucket === 'month'
-            ? `DATE_FORMAT(started_at, '%Y-%m') as bucket_key, DATE_FORMAT(started_at, '%b') as label`
-            : `DATE(started_at) as bucket_key, DATE_FORMAT(started_at, '%a') as label`;
+        const trendAccumulator = new Map();
+        for (const trip of currentTrips) {
+            const tripDate = new Date(trip.started_at);
+            const bucketKey = bucket === 'month'
+                ? `${tripDate.getFullYear()}-${String(tripDate.getMonth() + 1).padStart(2, '0')}`
+                : tripDate.toISOString().slice(0, 10);
 
-        const [trendRows] = await pool.execute(`
-            SELECT
-                ${bucketSelect},
-                COUNT(*) as trips,
-                COALESCE(SUM(freight_charge), 0) as revenue,
-                COALESCE(SUM(total_expenses), 0) as expenses
-            FROM (${tripSummaryQuery}) trip_summary
-            GROUP BY bucket_key, label
-            ORDER BY bucket_key ASC
-        `, [currentRange.start, currentRange.end]);
+            if (!trendAccumulator.has(bucketKey)) {
+                trendAccumulator.set(bucketKey, {
+                    bucket_key: bucketKey,
+                    label: formatBucketLabel(tripDate, bucket),
+                    trips: 0,
+                    revenue: 0,
+                    expenses: 0
+                });
+            }
 
-        const [expenseBreakdown] = await pool.execute(`
-            SELECT
-                e.category,
-                COALESCE(SUM(e.amount), 0) as amount
-            FROM expenses e
-            JOIN trips t ON t.id = e.trip_id
-            WHERE t.status = 'completed' AND t.started_at >= ? AND t.started_at < ?
-            GROUP BY e.category
-            ORDER BY amount DESC
-        `, [currentRange.start, currentRange.end]);
+            const entry = trendAccumulator.get(bucketKey);
+            entry.trips += 1;
+            entry.revenue += Number(trip.freight_charge) || 0;
+            entry.expenses += Number(trip.total_expenses) || 0;
+        }
 
-        const totalExpenseAmount = expenseBreakdown.reduce(
-            (sum, item) => sum + (Number(item.amount) || 0),
-            0
+        const trendRows = Array.from(trendAccumulator.values()).sort((left, right) =>
+            String(left.bucket_key).localeCompare(String(right.bucket_key))
         );
 
+        const expenseBreakdownMap = new Map();
+        for (const trip of currentTrips) {
+            for (const expense of trip.expenses || []) {
+                const key = expense.category || 'other';
+                expenseBreakdownMap.set(key, (expenseBreakdownMap.get(key) || 0) + (Number(expense.amount) || 0));
+            }
+            for (const expense of trip.daily_expenses || []) {
+                const key = expense.category || 'other';
+                expenseBreakdownMap.set(key, (expenseBreakdownMap.get(key) || 0) + (Number(expense.amount) || 0));
+            }
+        }
+
+        const expenseBreakdown = Array.from(expenseBreakdownMap.entries())
+            .map(([category, amount]) => ({ category, amount }))
+            .sort((left, right) => right.amount - left.amount);
+        const totalExpenseAmount = expenseBreakdown.reduce((sum, item) => sum + item.amount, 0);
         const formattedExpenseBreakdown = expenseBreakdown.map((item) => ({
             category: item.category,
             amount: Number(item.amount) || 0,
@@ -2945,27 +2986,10 @@ const getReportsData = async (req, res) => {
                 : 0
         }));
 
-        const [recentTrips] = await pool.execute(`
-            SELECT
-                t.id,
-                t.from_location as source,
-                t.to_location as destination,
-                t.started_at,
-                t.ended_at as completed_at,
-                t.freight_charge,
-                u.username as driver_name,
-                c.car_number,
-                COALESCE(SUM(e.amount), 0) as total_expenses
-            FROM trips t
-            JOIN drivers d ON d.id = t.driver_id
-            JOIN users u ON u.id = d.user_id
-            JOIN cars c ON c.id = t.car_id
-            LEFT JOIN expenses e ON e.trip_id = t.id
-            WHERE t.status = 'completed' AND t.started_at >= ? AND t.started_at < ?
-            GROUP BY t.id, t.from_location, t.to_location, t.started_at, t.ended_at, t.freight_charge, u.username, c.car_number
-            ORDER BY t.started_at DESC
-            LIMIT 10
-        `, [currentRange.start, currentRange.end]);
+        const recentTrips = currentTrips
+            .slice()
+            .sort((left, right) => new Date(right.started_at) - new Date(left.started_at))
+            .slice(0, 10);
 
         res.json({
             success: true,
@@ -2977,10 +3001,10 @@ const getReportsData = async (req, res) => {
                 totalTrips
             },
             comparison: {
-                revenueChange: calculateChange(totalRevenue, previousSummary.total_revenue),
-                expensesChange: calculateChange(totalExpenses, previousSummary.total_expenses),
+                revenueChange: calculateChange(totalRevenue, previousSummary.totalRevenue),
+                expensesChange: calculateChange(totalExpenses, previousSummary.totalExpenses),
                 netProfitChange: calculateChange(netProfit, previousNetProfit),
-                tripsChange: calculateChange(totalTrips, previousSummary.total_trips)
+                tripsChange: calculateChange(totalTrips, previousSummary.totalTrips)
             },
             trend: buildTrendSeries(trendRows, {
                 start: currentRange.start,
@@ -2992,7 +3016,7 @@ const getReportsData = async (req, res) => {
                 ...trip,
                 freight_charge: Number(trip.freight_charge) || 0,
                 total_expenses: Number(trip.total_expenses) || 0,
-                net_profit: (Number(trip.freight_charge) || 0) - (Number(trip.total_expenses) || 0)
+                net_profit: Number(trip.net_profit) || ((Number(trip.freight_charge) || 0) - (Number(trip.total_expenses) || 0))
             }))
         });
     } catch (error) {

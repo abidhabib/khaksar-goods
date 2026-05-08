@@ -64,6 +64,18 @@ const tripExpenseCategories = [
   'bilty_commission',
 ];
 
+const dailyExpenseCategories = [
+  'cargo_service',
+  'mobile',
+  'moboil_change',
+  'vehicle_maintenance',
+  'mechanic',
+  'medical',
+  'food',
+  'cargo_security_guard',
+  'other',
+];
+
 /* ─── Image Modal ─── */
 const ImageModal = ({ src, alt, isOpen, onClose }) => {
   useEffect(() => {
@@ -88,7 +100,7 @@ const ImageModal = ({ src, alt, isOpen, onClose }) => {
       onClick={onClose}
     >
       <div
-        className="relative max-w-5xl w-[90vw] max-h-[90vh]"
+        className="relative flex max-w-5xl w-[90vw] max-h-[90vh] items-center justify-center"
         onClick={(e) => e.stopPropagation()}
       >
         <button
@@ -100,7 +112,7 @@ const ImageModal = ({ src, alt, isOpen, onClose }) => {
         <img
           src={src}
           alt={alt}
-          className="w-full h-full object-contain rounded-lg shadow-2xl border border-white/10"
+          className="block max-w-full max-h-[90vh] object-contain object-center rounded-lg shadow-2xl border border-white/10"
         />
         {alt && (
           <p className="absolute bottom-0 left-0 right-0 bg-black/60 text-white text-sm px-4 py-2 rounded-b-lg backdrop-blur-sm">
@@ -153,7 +165,7 @@ const MeterImageCard = ({ label, src, alt }) => (
 
 const ExpenseBreakdown = ({ trip, onEditExpense, onAddExpense }) => {
   const expenses = trip.expenses || [];
-  const totalExpenses = Number(trip.total_expenses ?? trip.current_expenses ?? 0);
+  const totalExpenses = Number(trip.trip_expenses_total ?? trip.current_expenses ?? trip.total_expenses ?? 0);
 
   return (
     <div className="rounded-xl border border-cargo-border bg-cargo-dark/30 p-4 space-y-4">
@@ -215,6 +227,77 @@ const ExpenseBreakdown = ({ trip, onEditExpense, onAddExpense }) => {
   );
 };
 
+const BetweenTripExpenseBreakdown = ({ trip, onEditDailyExpense, onAddDailyExpense }) => {
+  const expenses = trip.daily_expenses || [];
+  const totalExpenses = Number(trip.between_trip_expenses_total ?? 0);
+
+  return (
+    <div className="rounded-xl border border-cargo-border bg-cargo-dark/30 p-4 space-y-4">
+      <div className="flex items-center justify-between">
+        <p className="text-sm text-cargo-text font-semibold flex items-center gap-2">
+          <Receipt className="w-4 h-4 text-cargo-muted" />
+          While Looking For Next Trip
+        </p>
+        <div className="flex items-center gap-3">
+          <p className="text-sm text-cargo-muted font-medium">Total: {formatCurrency(totalExpenses)}</p>
+          <button type="button" onClick={() => onAddDailyExpense(trip)} className="inline-flex items-center gap-1 rounded-lg bg-primary-500/15 px-3 py-2 text-primary-300">
+            <Plus className="w-4 h-4" />
+            Add Expense
+          </button>
+        </div>
+      </div>
+
+      <p className="text-xs text-cargo-muted">
+        Expenses added after this trip ended and before the next trip started.
+      </p>
+
+      {expenses.length ? (
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+          {expenses.map((expense) => (
+            <div
+              key={`daily-${expense.id}`}
+              className="rounded-lg border border-cargo-border/60 bg-cargo-card/40 p-3 hover:border-cargo-border transition-colors"
+            >
+              <div className="flex items-center justify-between gap-3">
+                <div className="flex items-center gap-2">
+                  <div className="w-2 h-2 rounded-full bg-cargo-success/60" />
+                  <p className="text-sm text-cargo-text font-medium">{formatCategoryLabel(expense.category)}</p>
+                </div>
+                <div className="flex items-center gap-2">
+                  <p className="text-sm text-cargo-text font-semibold">{formatCurrency(expense.amount)}</p>
+                  <button type="button" onClick={() => onEditDailyExpense(trip, expense)} className="inline-flex items-center gap-1 rounded-lg bg-primary-500/15 px-2.5 py-1.5 text-xs text-primary-300">
+                    <Pencil className="w-3.5 h-3.5" />
+                    Edit
+                  </button>
+                </div>
+              </div>
+              <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs text-cargo-muted">
+                <span>{formatDate(expense.created_at)}</span>
+                {expense.expense_date ? <span>Expense Date: {formatDate(expense.expense_date, 'PPP')}</span> : null}
+                {expense.meter_reading ? <span>Meter: {Number(expense.meter_reading).toLocaleString()}</span> : null}
+              </div>
+              {expense.note ? (
+                <p className="mt-2 text-xs text-cargo-muted">{expense.note}</p>
+              ) : null}
+              {expense.expense_image ? (
+                <div className="mt-3">
+                  <ClickableImage
+                    src={expense.expense_image}
+                    alt={`${expense.category} expense`}
+                    className="h-28"
+                  />
+                </div>
+              ) : null}
+            </div>
+          ))}
+        </div>
+      ) : (
+        <p className="text-sm text-cargo-muted">No between-trip expenses linked to this trip.</p>
+      )}
+    </div>
+  );
+};
+
 const StatBadge = ({ children, variant = 'default' }) => {
   const variants = {
     ongoing: 'bg-cargo-accent/15 text-cargo-accent border-cargo-accent/20',
@@ -229,7 +312,7 @@ const StatBadge = ({ children, variant = 'default' }) => {
   );
 };
 
-const TripCard = ({ trip, status = 'completed', onEditTrip, onEditExpense, onAddExpense }) => {
+const TripCard = ({ trip, status = 'completed', onEditTrip, onEditExpense, onAddExpense, onEditDailyExpense, onAddDailyExpense }) => {
   const isOngoing = status === 'ongoing';
   const totalExpenses = Number(trip.total_expenses ?? trip.current_expenses ?? 0);
   const net = Number(trip.net_profit ?? (Number(trip.freight_charge || 0) - totalExpenses));
@@ -360,6 +443,9 @@ const TripCard = ({ trip, status = 'completed', onEditTrip, onEditExpense, onAdd
       </div>
 
       <ExpenseBreakdown trip={trip} onEditExpense={onEditExpense} onAddExpense={onAddExpense} />
+      {!isOngoing ? (
+        <BetweenTripExpenseBreakdown trip={trip} onEditDailyExpense={onEditDailyExpense} onAddDailyExpense={onAddDailyExpense} />
+      ) : null}
 
       {trip.notes ? (
         <div className="rounded-lg border border-cargo-border bg-cargo-dark/20 p-4">
@@ -411,13 +497,15 @@ const DriverReportPage = () => {
     to_location: '',
     notes: '',
   });
-  const [expenseModal, setExpenseModal] = useState({ isOpen: false, tripId: null, expenseId: null });
+  const [expenseModal, setExpenseModal] = useState({ isOpen: false, tripId: null, expenseId: null, type: 'trip', driverId: null });
   const [expenseForm, setExpenseForm] = useState({
     category: 'diesel',
     amount: '',
     liters: '',
     location: '',
     notes: '',
+    expense_date: '',
+    meter_reading: '',
   });
   const [savingTrip, setSavingTrip] = useState(false);
   const [savingExpense, setSavingExpense] = useState(false);
@@ -494,37 +582,85 @@ const DriverReportPage = () => {
   };
 
   const openExpenseAddModal = (trip) => {
-    setExpenseModal({ isOpen: true, tripId: trip.id, expenseId: null });
+    setExpenseModal({ isOpen: true, tripId: trip.id, expenseId: null, type: 'trip', driverId: trip.driver_id ?? reportData?.driver?.id ?? null });
     setExpenseForm({
       category: 'diesel',
       amount: '',
       liters: '',
       location: '',
       notes: '',
+      expense_date: '',
+      meter_reading: '',
     });
   };
 
   const openExpenseEditModal = (trip, expense) => {
-    setExpenseModal({ isOpen: true, tripId: trip.id, expenseId: expense.id });
+    setExpenseModal({ isOpen: true, tripId: trip.id, expenseId: expense.id, type: 'trip', driverId: trip.driver_id ?? reportData?.driver?.id ?? null });
     setExpenseForm({
       category: expense.category || 'diesel',
       amount: expense.amount ?? '',
       liters: expense.liters ?? '',
       location: expense.location || '',
       notes: expense.notes || '',
+      expense_date: '',
+      meter_reading: '',
+    });
+  };
+
+  const openDailyExpenseAddModal = (trip) => {
+    setExpenseModal({ isOpen: true, tripId: trip.id, expenseId: null, type: 'daily', driverId: trip.driver_id ?? reportData?.driver?.id ?? null });
+    setExpenseForm({
+      category: 'food',
+      amount: '',
+      liters: '',
+      location: '',
+      notes: '',
+      expense_date: '',
+      meter_reading: '',
+    });
+  };
+
+  const openDailyExpenseEditModal = (trip, expense) => {
+    setExpenseModal({ isOpen: true, tripId: trip.id, expenseId: expense.id, type: 'daily', driverId: trip.driver_id ?? reportData?.driver?.id ?? null });
+    setExpenseForm({
+      category: expense.category || 'food',
+      amount: expense.amount ?? '',
+      liters: '',
+      location: '',
+      notes: expense.note || '',
+      expense_date: expense.expense_date ? String(expense.expense_date).slice(0, 10) : '',
+      meter_reading: expense.meter_reading ?? '',
     });
   };
 
   const closeExpenseModal = () => {
-    setExpenseModal({ isOpen: false, tripId: null, expenseId: null });
+    setExpenseModal({ isOpen: false, tripId: null, expenseId: null, type: 'trip', driverId: null });
   };
 
   const handleExpenseSave = async (e) => {
     e.preventDefault();
     setSavingExpense(true);
-    const result = expenseModal.expenseId
-      ? await put(`/admin/trip-expenses/${expenseModal.expenseId}`, expenseForm)
-      : await post(`/admin/trips/${expenseModal.tripId}/expenses`, expenseForm);
+    const payload = expenseModal.type === 'daily'
+      ? {
+        driver_id: expenseModal.driverId,
+        category: expenseForm.category,
+        amount: expenseForm.amount,
+        note: expenseForm.notes,
+        expense_date: expenseForm.expense_date,
+        meter_reading: expenseForm.meter_reading,
+      }
+      : expenseForm;
+    const result = expenseModal.type === 'daily'
+      ? (
+        expenseModal.expenseId
+          ? await put(`/admin/drivers-expenses/${expenseModal.expenseId}`, payload)
+          : await post('/admin/drivers-expenses', payload)
+      )
+      : (
+        expenseModal.expenseId
+          ? await put(`/admin/trip-expenses/${expenseModal.expenseId}`, payload)
+          : await post(`/admin/trips/${expenseModal.tripId}/expenses`, payload)
+      );
     setSavingExpense(false);
 
     if (!result.success) {
@@ -679,6 +815,8 @@ const DriverReportPage = () => {
                   onEditTrip={openTripModal}
                   onEditExpense={openExpenseEditModal}
                   onAddExpense={openExpenseAddModal}
+                  onEditDailyExpense={openDailyExpenseEditModal}
+                  onAddDailyExpense={openDailyExpenseAddModal}
                 />
               ))
             ) : (
@@ -701,6 +839,8 @@ const DriverReportPage = () => {
                   onEditTrip={openTripModal}
                   onEditExpense={openExpenseEditModal}
                   onAddExpense={openExpenseAddModal}
+                  onEditDailyExpense={openDailyExpenseEditModal}
+                  onAddDailyExpense={openDailyExpenseAddModal}
                 />
               ))
             ) : (
@@ -770,7 +910,7 @@ const DriverReportPage = () => {
         </form>
       </Modal>
 
-      <Modal isOpen={expenseModal.isOpen} onClose={closeExpenseModal} title={expenseModal.expenseId ? 'Edit Trip Expense' : 'Add Trip Expense'}>
+      <Modal isOpen={expenseModal.isOpen} onClose={closeExpenseModal} title={expenseModal.type === 'daily' ? (expenseModal.expenseId ? 'Edit While Looking For Next Trip Expense' : 'Add While Looking For Next Trip Expense') : (expenseModal.expenseId ? 'Edit Trip Expense' : 'Add Trip Expense')}>
         <form onSubmit={handleExpenseSave} className="space-y-4">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
             <select
@@ -778,7 +918,7 @@ const DriverReportPage = () => {
               onChange={(e) => setExpenseForm((prev) => ({ ...prev, category: e.target.value }))}
               className="input-field w-full"
             >
-              {tripExpenseCategories.map((category) => (
+              {(expenseModal.type === 'daily' ? dailyExpenseCategories : tripExpenseCategories).map((category) => (
                 <option key={category} value={category}>{formatCategoryLabel(category)}</option>
               ))}
             </select>
@@ -791,28 +931,50 @@ const DriverReportPage = () => {
               className="input-field w-full"
               placeholder="Amount"
             />
-            <input
-              type="number"
-              min="0"
-              step="0.01"
-              value={expenseForm.liters}
-              onChange={(e) => setExpenseForm((prev) => ({ ...prev, liters: e.target.value }))}
-              className="input-field w-full"
-              placeholder="Liters"
-            />
-            <input
-              type="text"
-              value={expenseForm.location}
-              onChange={(e) => setExpenseForm((prev) => ({ ...prev, location: e.target.value }))}
-              className="input-field w-full"
-              placeholder="Location"
-            />
+            {expenseModal.type === 'daily' ? (
+              <>
+                <input
+                  type="date"
+                  value={expenseForm.expense_date}
+                  onChange={(e) => setExpenseForm((prev) => ({ ...prev, expense_date: e.target.value }))}
+                  className="input-field w-full"
+                />
+                <input
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  value={expenseForm.meter_reading}
+                  onChange={(e) => setExpenseForm((prev) => ({ ...prev, meter_reading: e.target.value }))}
+                  className="input-field w-full"
+                  placeholder="Meter Reading"
+                />
+              </>
+            ) : (
+              <>
+                <input
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  value={expenseForm.liters}
+                  onChange={(e) => setExpenseForm((prev) => ({ ...prev, liters: e.target.value }))}
+                  className="input-field w-full"
+                  placeholder="Liters"
+                />
+                <input
+                  type="text"
+                  value={expenseForm.location}
+                  onChange={(e) => setExpenseForm((prev) => ({ ...prev, location: e.target.value }))}
+                  className="input-field w-full"
+                  placeholder="Location"
+                />
+              </>
+            )}
           </div>
           <textarea
             value={expenseForm.notes}
             onChange={(e) => setExpenseForm((prev) => ({ ...prev, notes: e.target.value }))}
             className="input-field w-full min-h-24"
-            placeholder="Notes"
+            placeholder={expenseModal.type === 'daily' ? 'Name / Notes' : 'Notes'}
           />
           <div className="flex gap-3">
             <button type="button" onClick={closeExpenseModal} className="flex-1 btn-secondary">Cancel</button>

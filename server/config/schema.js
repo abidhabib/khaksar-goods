@@ -73,29 +73,7 @@ const ensureTripColumns = async (connection, databaseName) => {
     await ensureColumns(connection, databaseName, 'trips', TRIP_COLUMNS);
 };
 
-const ensureDriverDailyExpensesTable = async (connection) => {
-    await connection.query(`
-        CREATE TABLE IF NOT EXISTS driver_daily_expenses (
-            id INT AUTO_INCREMENT PRIMARY KEY,
-            driver_id INT NOT NULL,
-            expense_date DATE NOT NULL,
-            cargo_service_cost DECIMAL(10,2) NOT NULL DEFAULT 0.00,
-            mobile_cost DECIMAL(10,2) NOT NULL DEFAULT 0.00,
-            moboil_change_cost DECIMAL(10,2) NOT NULL DEFAULT 0.00,
-            mechanic_cost DECIMAL(10,2) NOT NULL DEFAULT 0.00,
-            food_cost DECIMAL(10,2) NOT NULL DEFAULT 0.00,
-            cargo_security_guard_fee DECIMAL(10,2) NOT NULL DEFAULT 0.00,
-            other_cost DECIMAL(10,2) NOT NULL DEFAULT 0.00,
-            notes TEXT NULL,
-            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-            UNIQUE KEY uniq_driver_daily_expense (driver_id, expense_date),
-            CONSTRAINT fk_driver_daily_expenses_driver
-                FOREIGN KEY (driver_id) REFERENCES drivers(id)
-                ON DELETE CASCADE
-        )
-    `);
-};
+
 
 const ensureDriverDailyExpenseEntriesTable = async (connection) => {
     await connection.query(`
@@ -458,7 +436,6 @@ const ensureSchema = async () => {
         await ensureTripColumns(connection, databaseName);
         await ensureExpensesCategoryColumn(connection, databaseName);
         await ensureExpenseColumns(connection, databaseName);
-        await ensureDriverDailyExpensesTable(connection);
         await ensureDriverDailyExpenseEntriesTable(connection);
         await ensureDriverDailyExpenseEntryColumns(connection, databaseName);
         await ensureDriverPaymentSubmissionsTable(connection);

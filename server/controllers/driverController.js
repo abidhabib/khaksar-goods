@@ -14,6 +14,9 @@ const {
     syncHelperSalaryForHelper,
     validateReceiveMethodPayload
 } = require('../services/accountService');
+const {
+    attachBetweenTripDailyExpenses
+} = require('../utils/helpers');
 const getAuthenticatedDriverId = (req) => {
     const driverId = req?.user?.driver_id;
     return driverId !== undefined && driverId !== null ? Number(driverId) : null;
@@ -277,6 +280,42 @@ const computeAverageKmPerLiter = (distance, liters) => {
     return +(d / l).toFixed(2);
 };
 
+const attachDriverTimelineExpensesToTrips = async (trips) => {
+    if (!Array.isArray(trips) || !trips.length) {
+        return Array.isArray(trips) ? trips : [];
+    }
+
+    const driverIds = [...new Set(
+        trips
+            .map((trip) => Number(trip.driver_id))
+            .filter(Number.isFinite)
+    )];
+
+    if (!driverIds.length) {
+        return trips;
+    }
+
+    const placeholders = driverIds.map(() => '?').join(', ');
+    const [timelineRows, dailyExpenseRows] = await Promise.all([
+        pool.execute(
+            `SELECT id, driver_id, status, started_at, ended_at
+             FROM trips
+             WHERE driver_id IN (${placeholders})
+             ORDER BY driver_id ASC, started_at ASC, id ASC`,
+            driverIds
+        ),
+        pool.execute(
+            `SELECT id, driver_id, category, amount, meter_reading, note, expense_image, expense_date, created_at
+             FROM driver_daily_expense_entries
+             WHERE driver_id IN (${placeholders})
+             ORDER BY driver_id ASC, created_at ASC, id ASC`,
+            driverIds
+        )
+    ]);
+
+    return attachBetweenTripDailyExpenses(trips, timelineRows[0], dailyExpenseRows[0]);
+};
+
 // Get driver's dashboard data
 const getDashboard = async (req, res) => {
     try {
@@ -391,35 +430,51 @@ const [lastMoboilRows] = await pool.execute(`
             ORDER BY t.ended_at DESC
             LIMIT 5
         `, [driver_id]);
+        const recentTripsWithDailyExpenses = await attachDriverTimelineExpensesToTrips(recentTrips);
 
-        // Lifetime stats
-        const [[lifetimeStats]] = await pool.execute(`
-            SELECT 
-    COUNT(CASE 
-        WHEN t.ended_at >= DATE_FORMAT(CURRENT_DATE(), '%Y-%m-01')
-         AND t.ended_at < DATE_FORMAT(CURRENT_DATE() + INTERVAL 1 MONTH, '%Y-%m-01')
-        THEN 1 
-    END) as total_trips,
-
-    COALESCE(SUM(t.freight_charge), 0) as total_revenue,
-    COALESCE(SUM(exp.total_expenses), 0) as total_expenses,
-    COALESCE(SUM(t.freight_charge), 0) - COALESCE(SUM(exp.total_expenses), 0) as net_earnings,
-    COALESCE(SUM(t.end_meter_reading - t.start_meter_reading), 0) as total_distance,
-    COALESCE(SUM(exp.total_diesel_liters), 0) as total_diesel_liters
-
-FROM trips t
-LEFT JOIN (
-    SELECT
-        trip_id,
-        SUM(amount) as total_expenses,
-        SUM(CASE WHEN category = 'diesel' THEN COALESCE(liters, 0) ELSE 0 END) as total_diesel_liters
-    FROM expenses
-    GROUP BY trip_id
-) exp ON t.id = exp.trip_id
-WHERE 
-    t.driver_id = ?
-    AND t.status = 'completed'
+        const [lifetimeTripRows] = await pool.execute(`
+            SELECT
+                t.*,
+                COALESCE(exp.total_expenses, 0) as total_expenses,
+                COALESCE(exp.total_diesel_liters, 0) as total_diesel_liters
+            FROM trips t
+            LEFT JOIN (
+                SELECT
+                    trip_id,
+                    SUM(amount) as total_expenses,
+                    SUM(CASE WHEN category = 'diesel' THEN COALESCE(liters, 0) ELSE 0 END) as total_diesel_liters
+                FROM expenses
+                GROUP BY trip_id
+            ) exp ON t.id = exp.trip_id
+            WHERE t.driver_id = ? AND t.status = 'completed'
         `, [driver_id]);
+        const lifetimeTrips = await attachDriverTimelineExpensesToTrips(lifetimeTripRows);
+        const currentMonthStart = new Date();
+        currentMonthStart.setDate(1);
+        currentMonthStart.setHours(0, 0, 0, 0);
+        const nextMonthStart = new Date(currentMonthStart);
+        nextMonthStart.setMonth(nextMonthStart.getMonth() + 1);
+        const lifetimeStats = lifetimeTrips.reduce((acc, trip) => {
+            const endedAt = trip.ended_at ? new Date(trip.ended_at) : null;
+            const endedAtMs = endedAt && !Number.isNaN(endedAt.getTime()) ? endedAt.getTime() : null;
+            if (endedAtMs !== null && endedAtMs >= currentMonthStart.getTime() && endedAtMs < nextMonthStart.getTime()) {
+                acc.total_trips += 1;
+            }
+
+            acc.total_revenue += Number(trip.freight_charge) || 0;
+            acc.total_expenses += Number(trip.total_expenses) || 0;
+            acc.total_distance += Number(trip.end_meter_reading - trip.start_meter_reading) || 0;
+            acc.total_diesel_liters += Number(trip.total_diesel_liters) || 0;
+            return acc;
+        }, {
+            total_trips: 0,
+            total_revenue: 0,
+            total_expenses: 0,
+            net_earnings: 0,
+            total_distance: 0,
+            total_diesel_liters: 0
+        });
+        lifetimeStats.net_earnings = lifetimeStats.total_revenue - lifetimeStats.total_expenses;
 
         const profilePayload = profile[0];
 const lastMoboilChange = lastMoboilRows[0] || null;
@@ -471,7 +526,7 @@ profilePayload.overall_average_km_per_liter = computeAverageKmPerLiter(
             profile: profilePayload,
             ongoingTrip: ongoingTrip[0] || null,
             todayStats,
-            recentTrips,
+            recentTrips: recentTripsWithDailyExpenses,
             lifetimeStats,
             leaveStatus: leaveOverview?.activeLeave || null,
             leaveSummary: leaveOverview?.summary || null
@@ -1004,9 +1059,11 @@ const getTripHistory = async (req, res) => {
             [driver_id]
         );
 
+        const tripsWithDailyExpenses = await attachDriverTimelineExpensesToTrips(trips);
+
         res.json({
             success: true,
-            trips: trips.map((trip) => {
+            trips: tripsWithDailyExpenses.map((trip) => {
                 const distanceKm = Number(trip.distance_km) || 0;
                 const totalDieselLiters = Number(trip.total_diesel_liters) || 0;
                 return {
@@ -1052,10 +1109,15 @@ const getTripDetails = async (req, res) => {
             'SELECT * FROM expenses WHERE trip_id = ? ORDER BY created_at DESC, id DESC',
             [trip_id]
         );
+        const [tripWithDailyExpenses] = await attachDriverTimelineExpensesToTrips([{
+            ...trip[0],
+            total_expenses: expenses.reduce((sum, expense) => sum + (Number(expense.amount) || 0), 0),
+            expenses
+        }]);
 
         res.json({
             success: true,
-            trip: trip[0],
+            trip: tripWithDailyExpenses,
             expenses
         });
     } catch (error) {

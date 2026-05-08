@@ -71,7 +71,7 @@ const ImageModal = ({ src, alt, isOpen, onClose }) => {
       onClick={onClose}
     >
       <div
-        className="relative max-w-5xl w-[90vw] max-h-[90vh]"
+        className="relative flex max-w-2xl w-[90vw] max-h-[90vh] items-center justify-center"
         onClick={(e) => e.stopPropagation()}
       >
         <button
