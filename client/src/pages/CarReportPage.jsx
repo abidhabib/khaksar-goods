@@ -45,6 +45,21 @@ const formatAverage = (value) => {
   return numericValue > 0 ? `${numericValue.toFixed(2)} km/L` : 'N/A';
 };
 
+const formatVariancePercent = (value) => {
+  const numericValue = Number(value);
+  if (!Number.isFinite(numericValue)) {
+    return 'N/A';
+  }
+
+  return `${numericValue > 0 ? '+' : ''}${numericValue.toFixed(2)}%`;
+};
+
+const getVarianceTone = (direction) => {
+  if (direction === 'up') return 'text-cargo-success';
+  if (direction === 'down') return 'text-cargo-danger';
+  return 'text-cargo-muted';
+};
+
 const formatCategoryLabel = (value) =>
   String(value || '')
     .replace(/_/g, ' ')
@@ -314,6 +329,7 @@ const TripCard = ({ trip, status = 'completed', onEditTrip, onEditExpense, onAdd
   const isOngoing = status === 'ongoing';
   const actualEndLocation = trip.end_location || trip.end_live_location;
   const loadSummary = [trip.load_name, trip.load_weight].filter(Boolean).join(' • ');
+  const varianceTone = getVarianceTone(trip.freight_variance_direction);
 
   return (
     <article className="rounded-xl border border-cargo-border bg-cargo-card/50 p-5 space-y-5 hover:border-cargo-border/80 transition-all duration-200 shadow-sm">
@@ -351,6 +367,7 @@ const TripCard = ({ trip, status = 'completed', onEditTrip, onEditExpense, onAdd
           { label: 'Started', value: formatDate(trip.started_at), icon: Calendar },
           { label: 'Ended', value: isOngoing ? 'In progress' : formatDate(trip.ended_at), icon: Clock3 },
           { label: 'Freight', value: formatCurrency(trip.freight_charge), icon: Wallet },
+          { label: 'Rent Up/Down', value: formatVariancePercent(trip.freight_variance_percentage), icon: trip.freight_variance_direction === 'down' ? TrendingDown : TrendingUp, tone: varianceTone },
           { label: 'Expenses', value: formatCurrency(trip.total_expenses), icon: TrendingDown },
           { label: 'Net', value: formatCurrency(trip.net_income), icon: TrendingUp, highlight: true },
           { label: 'Distance', value: `${Math.max((trip.end_meter_reading || 0) - (trip.start_meter_reading || 0), 0).toLocaleString()} km`, icon: Activity },
@@ -363,7 +380,7 @@ const TripCard = ({ trip, status = 'completed', onEditTrip, onEditExpense, onAdd
               <item.icon className="w-3 h-3" />
               {item.label}
             </p>
-            <p className={`text-sm font-semibold mt-1.5 ${item.highlight ? 'text-cargo-success' : 'text-cargo-text'}`}>
+            <p className={`text-sm font-semibold mt-1.5 ${item.highlight ? 'text-cargo-success' : item.tone || 'text-cargo-text'}`}>
               {item.value}
             </p>
           </div>
@@ -410,6 +427,14 @@ const TripCard = ({ trip, status = 'completed', onEditTrip, onEditExpense, onAdd
           <div className="mt-2">
             <ClickableImage src={trip.load_photo} alt="Load photo" className="h-28" />
           </div>
+        </div>
+        <div className="rounded-lg border border-cargo-border bg-cargo-dark/20 p-3">
+          <p className="text-[11px] text-cargo-muted uppercase tracking-wider font-medium">Expected Freight</p>
+          <p className="text-sm text-cargo-text font-semibold mt-1.5">{trip.expected_freight_charge ? formatCurrency(trip.expected_freight_charge) : 'N/A'}</p>
+        </div>
+        <div className="rounded-lg border border-cargo-border bg-cargo-dark/20 p-3">
+          <p className="text-[11px] text-cargo-muted uppercase tracking-wider font-medium">Variance Amount</p>
+          <p className={`text-sm font-semibold mt-1.5 ${varianceTone}`}>{trip.freight_variance_amount !== null && trip.freight_variance_amount !== undefined ? formatCurrency(trip.freight_variance_amount) : 'N/A'}</p>
         </div>
       </div>
 

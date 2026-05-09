@@ -20,6 +20,7 @@ const {
     getHelperAccount,
     createHelperCashoutRequest,
     getLeaveStatus,
+    getFreightRateEstimate,
     requestLeave,
     requestJoinAfterLeave,
     saveCurrentLocation
@@ -29,6 +30,7 @@ const upload = multer({ storage: meterStorage });
 
 // Driver dashboard
 router.get('/dashboard', authMiddleware, driverOnly, getDashboard);
+router.get('/freight-rates/estimate', authMiddleware, driverOnly, getFreightRateEstimate);
 
 // Trip operations
 router.post(

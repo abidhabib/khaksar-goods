@@ -218,6 +218,23 @@
     <string name="load_location_required">لوڈ لوکیشن ضروری ہے</string>
     <string name="load_coordinates_required">محفوظ کرنے سے پہلے موجودہ لوکیشن لیں</string>
     <string name="load_photo_only_required">لوڈ کی تصویر ضروری ہے</string>
+    <string name="get_rate">ریٹ معلوم کریں</string>
+    <string name="get_rate_subtitle">ٹن اور کلومیٹر درج کریں اور کرایہ دیکھیں</string>
+    <string name="freight_rate_title">فریٹ ریٹ</string>
+    <string name="freight_rate_screen_subtitle">محفوظ شدہ رینٹ اسٹی میشن کے مطابق وزن اور فاصلے کا کرایہ دیکھیں۔</string>
+    <string name="freight_weight_hint">وزن ٹن میں</string>
+    <string name="freight_distance_hint">فاصلہ کلومیٹر میں</string>
+    <string name="freight_calculate_button">ریٹ چیک کریں</string>
+    <string name="freight_weight_required">وزن درج کریں</string>
+    <string name="freight_distance_required">فاصلہ درج کریں</string>
+    <string name="freight_result_rate">لاگو ریٹ: %1$s روپے فی کلومیٹر</string>
+    <string name="freight_result_total">کل کرایہ: %1$s روپے</string>
+    <string name="freight_result_mode">موڈ: %1$s</string>
+    <string name="freight_result_summary">%1$s ٹن • %2$s کلومیٹر</string>
+    <string name="freight_calculation_loading">ریٹ چیک کیا جا رہا ہے...</string>
+    <string name="freight_load_failed">فریٹ ریٹ چیک نہیں ہو سکا</string>
+    <string name="freight_invalid_response">فریٹ ریٹ کا جواب درست نہیں</string>
+    <string name="freight_no_saved_rate">محفوظ شدہ ریٹ نہیں ملا</string>
     <string name="unable_to_save_load_details">لوڈ تفصیل محفوظ نہیں ہو سکی</string>
 
     <string name="unable_to_open_camera">کیمرا نہیں کھل سکا</string>

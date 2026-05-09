@@ -143,6 +143,11 @@
             android:exported="false"
             android:windowSoftInputMode="adjustResize"
             android:theme="@style/Theme.IshaqCargo" />
+        <activity
+            android:name=".FreightRateActivity"
+            android:exported="false"
+            android:windowSoftInputMode="adjustResize"
+            android:theme="@style/Theme.IshaqCargo" />
 
         <activity
             android:name=".LoginActivity"

@@ -37,12 +37,22 @@ const {
     getDriverLeaveRequests,
     updateDriverLeaveRequestStatus,
     getDashboardStats,
-    getReportsData
+    getReportsData,
+    getFreightRateCards,
+    addFreightRateCard,
+    updateFreightRateCard,
+    deleteFreightRateCard,
+    calculateFreightRateEstimate
 } = require('../controllers/adminController');
 
 // Dashboard
 router.get('/dashboard', authMiddleware, adminOnly, getDashboardStats);
 router.get('/reports', authMiddleware, adminOnly, getReportsData);
+router.get('/freight-rates', authMiddleware, adminOnly, getFreightRateCards);
+router.post('/freight-rates', authMiddleware, adminOnly, addFreightRateCard);
+router.put('/freight-rates/:id', authMiddleware, adminOnly, updateFreightRateCard);
+router.delete('/freight-rates/:id', authMiddleware, adminOnly, deleteFreightRateCard);
+router.get('/freight-rates/calculate', authMiddleware, adminOnly, calculateFreightRateEstimate);
 
 // Cars
 router.get('/cars', authMiddleware, adminOnly, getAllCars);

@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { User, Phone, Car, Activity, MoreVertical, MapPin, HandHelping } from 'lucide-react';
+import { User, Phone, Car, Activity, MoreVertical, MapPin, HandHelping, Wallet, Coins, CalendarDays, IdCard } from 'lucide-react';
 import { formatLocationAgo, formatLocationSummary } from '../../utils/location';
 
 const DriverCard = ({ driver, onEdit, onAssign, onViewReport }) => {
@@ -17,10 +17,11 @@ const DriverCard = ({ driver, onEdit, onAssign, onViewReport }) => {
       : 'No trip history yet';
   const lastLocationAgo = formatLocationAgo(driver.last_location_at);
   const hasLocation = driver.last_location_latitude != null && driver.last_location_longitude != null;
+  const formatCurrency = (value) => `Rs ${Number(value || 0).toLocaleString()}`;
 
   return (
     <div className="card hover:border-primary-500/50 transition-all group">
-      <div className="flex items-start justify-between mb-4">
+      <div className="flex items-start justify-between mb-4 gap-3">
         <div className="flex items-center gap-3">
           <div className="w-12 h-12 bg-cargo-border rounded-full flex items-center justify-center">
             <User className="w-6 h-6 text-cargo-muted" />
@@ -80,42 +81,91 @@ const DriverCard = ({ driver, onEdit, onAssign, onViewReport }) => {
         </div>
       </div>
 
-      <div className="space-y-3 mb-4">
-        <div className="flex items-center gap-2 text-sm">
-          <Phone className="w-4 h-4 text-cargo-muted" />
-          <span className="text-cargo-text">{driver.phone || 'N/A'}</span>
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mb-4">
+        <div className="rounded-lg border border-cargo-border bg-cargo-dark/30 p-3">
+          <p className="text-[11px] uppercase tracking-wide text-cargo-muted flex items-center gap-1">
+            <Phone className="w-3.5 h-3.5" />
+            Phone
+          </p>
+          <p className="text-sm text-cargo-text font-semibold mt-1.5">{driver.phone || 'N/A'}</p>
         </div>
-        
-        <div className="flex items-center gap-2 text-sm">
-          <Car className="w-4 h-4 text-cargo-muted" />
-          {driver.car_number ? (
-            <span className="text-cargo-text">{driver.car_number}</span>
-          ) : (
-            <span className="text-cargo-muted">No cargo assigned</span>
-          )}
+        <div className="rounded-lg border border-cargo-border bg-cargo-dark/30 p-3">
+          <p className="text-[11px] uppercase tracking-wide text-cargo-muted flex items-center gap-1">
+            <Car className="w-3.5 h-3.5" />
+            Car
+          </p>
+          <p className="text-sm text-cargo-text font-semibold mt-1.5">{driver.car_number || 'No cargo assigned'}</p>
         </div>
-        
-        <div className="flex items-center gap-2 text-sm">
-          <Activity className="w-4 h-4 text-cargo-muted" />
-          <span className="text-cargo-text">
-            {driver.license_number || 'License: N/A'}
-          </span>
+        <div className="rounded-lg border border-cargo-border bg-cargo-dark/30 p-3">
+          <p className="text-[11px] uppercase tracking-wide text-cargo-muted flex items-center gap-1">
+            <IdCard className="w-3.5 h-3.5" />
+            License
+          </p>
+          <p className="text-sm text-cargo-text font-semibold mt-1.5">{driver.license_number || 'N/A'}</p>
         </div>
-
-        <div className="flex items-center gap-2 text-sm">
-          <HandHelping className="w-4 h-4 text-cargo-muted" />
-          <span className="text-cargo-text">
+        <div className="rounded-lg border border-cargo-border bg-cargo-dark/30 p-3">
+          <p className="text-[11px] uppercase tracking-wide text-cargo-muted flex items-center gap-1">
+            <HandHelping className="w-3.5 h-3.5" />
+            Helper
+          </p>
+          <p className="text-sm text-cargo-text font-semibold mt-1.5">
             {driver.helper_name ? `${driver.helper_name}${driver.helper_phone_number ? ` • ${driver.helper_phone_number}` : ''}` : 'No helper assigned'}
-          </span>
+          </p>
+        </div>
+        <div className="rounded-lg border border-cargo-border bg-cargo-dark/30 p-3">
+          <p className="text-[11px] uppercase tracking-wide text-cargo-muted flex items-center gap-1">
+            <Wallet className="w-3.5 h-3.5" />
+            Available Balance
+          </p>
+          <p className="text-sm text-primary-300 font-semibold mt-1.5">{formatCurrency(driver.available_balance)}</p>
+        </div>
+        <div className="rounded-lg border border-cargo-border bg-cargo-dark/30 p-3">
+          <p className="text-[11px] uppercase tracking-wide text-cargo-muted flex items-center gap-1">
+            <Coins className="w-3.5 h-3.5" />
+            Commission Balance
+          </p>
+          <p className="text-sm text-primary-300 font-semibold mt-1.5">{formatCurrency(driver.commission_balance)}</p>
+        </div>
+        <div className="rounded-lg border border-cargo-border bg-cargo-dark/30 p-3">
+          <p className="text-[11px] uppercase tracking-wide text-cargo-muted flex items-center gap-1">
+            <Activity className="w-3.5 h-3.5" />
+            Salary / Commission
+          </p>
+          <p className="text-sm text-cargo-text font-semibold mt-1.5">
+            {formatCurrency(driver.salary_amount)} / {Number(driver.commission_percentage || 0)}%
+          </p>
+        </div>
+        <div className="rounded-lg border border-cargo-border bg-cargo-dark/30 p-3">
+          <p className="text-[11px] uppercase tracking-wide text-cargo-muted flex items-center gap-1">
+            <CalendarDays className="w-3.5 h-3.5" />
+            Joined Date
+          </p>
+          <p className="text-sm text-cargo-text font-semibold mt-1.5">{driver.joined_date ? String(driver.joined_date).slice(0, 10) : 'N/A'}</p>
+        </div>
+        <div className="rounded-lg border border-cargo-border bg-cargo-dark/30 p-3">
+          <p className="text-[11px] uppercase tracking-wide text-cargo-muted">Driver / User ID</p>
+          <p className="text-sm text-cargo-text font-semibold mt-1.5">{driver.id} / {driver.user_id}</p>
+        </div>
+        <div className="rounded-lg border border-cargo-border bg-cargo-dark/30 p-3">
+          <p className="text-[11px] uppercase tracking-wide text-cargo-muted">Assigned IDs</p>
+          <p className="text-sm text-cargo-text font-semibold mt-1.5">
+            Car: {driver.assigned_car_id || '-'} • Helper: {driver.helper_id || '-'}
+          </p>
+        </div>
+        <div className="rounded-lg border border-cargo-border bg-cargo-dark/30 p-3">
+          <p className="text-[11px] uppercase tracking-wide text-cargo-muted">Next Salary Credit</p>
+          <p className="text-sm text-cargo-text font-semibold mt-1.5">
+            {driver.next_salary_credit_date ? String(driver.next_salary_credit_date).slice(0, 10) : 'N/A'}
+          </p>
         </div>
 
-        <div className="rounded-lg bg-cargo-dark/70 border border-cargo-border px-3 py-2">
+        <div className="rounded-lg bg-cargo-dark/70 border border-cargo-border px-3 py-2 md:col-span-2">
           <p className={`text-xs font-medium ${driver.trip_status === 'ongoing' ? 'text-amber-500' : 'text-cargo-muted'}`}>
             {tripStatusLabel}
           </p>
         </div>
 
-        <div className="rounded-lg bg-cargo-dark/70 border border-cargo-border px-3 py-3">
+        <div className="rounded-lg bg-cargo-dark/70 border border-cargo-border px-3 py-3 md:col-span-2">
           <div className="flex items-start gap-2">
             <MapPin className="w-4 h-4 text-primary-400 mt-0.5" />
             <div className="min-w-0">

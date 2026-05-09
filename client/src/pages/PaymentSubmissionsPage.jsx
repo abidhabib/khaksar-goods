@@ -123,7 +123,6 @@ const PaymentSubmissionsPage = () => {
           <Wallet className="w-6 h-6 text-primary-400" />
           Payment Submissions
         </h1>
-        <p className="text-cargo-muted mt-1">Track deposits, approve requests, and compare received payments against cargo income.</p>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">

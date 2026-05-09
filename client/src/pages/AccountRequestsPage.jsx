@@ -4,6 +4,14 @@ import { useApi } from '../hooks/useApi';
 import Modal from '../components/common/Modal';
 
 const formatCurrency = (value) => `Rs ${Number(value || 0).toLocaleString()}`;
+const formatVariancePercent = (value) => {
+  const numericValue = Number(value);
+  if (!Number.isFinite(numericValue)) {
+    return 'N/A';
+  }
+
+  return `${numericValue > 0 ? '+' : ''}${numericValue.toFixed(2)}%`;
+};
 const bankOptions = ['Easypaisa', 'JazzCash', 'HBL', 'OTHER'];
 const tabs = [
   { key: 'commissions', label: 'Commission Requests', icon: Coins },
@@ -120,8 +128,7 @@ const AccountRequestsPage = () => {
     <>
       <div className="space-y-6">
         <div>
-          <h1 className="text-2xl font-bold text-cargo-text">Driver & Helper Accounts</h1>
-          <p className="text-cargo-muted mt-1">Approve commission requests and manage driver/helper cashout workflows from one place.</p>
+          <h1 className="text-2xl font-bold text-cargo-text">Driver & Helper and Commission</h1>
         </div>
 
         <div className="flex flex-wrap gap-2">
@@ -138,13 +145,15 @@ const AccountRequestsPage = () => {
         </div>
 
         <div className="card overflow-x-auto">
-          <table className="w-full min-w-[1100px]">
+          <table className="w-full min-w-[1320px]">
             <thead>
               <tr className="border-b border-cargo-border text-left">
                 <th className="py-3 pr-4 text-xs uppercase tracking-wide text-cargo-muted">Name</th>
                 <th className="py-3 pr-4 text-xs uppercase tracking-wide text-cargo-muted">Car</th>
                 <th className="py-3 pr-4 text-xs uppercase tracking-wide text-cargo-muted">Details</th>
                 <th className="py-3 pr-4 text-xs uppercase tracking-wide text-cargo-muted">Amount</th>
+                <th className="py-3 pr-4 text-xs uppercase tracking-wide text-cargo-muted">Freight</th>
+                <th className="py-3 pr-4 text-xs uppercase tracking-wide text-cargo-muted">Rent Up/Down %</th>
                 <th className="py-3 pr-4 text-xs uppercase tracking-wide text-cargo-muted">Status</th>
                 <th className="py-3 pr-4 text-xs uppercase tracking-wide text-cargo-muted">Created</th>
                 <th className="py-3 pr-4 text-xs uppercase tracking-wide text-cargo-muted">Action</th>
@@ -169,6 +178,12 @@ const AccountRequestsPage = () => {
                     </td>
                     <td className="py-3 pr-4 text-sm font-semibold text-primary-400">
                       {activeTab === 'commissions' ? formatCurrency(row.commission_amount) : formatCurrency(row.amount)}
+                    </td>
+                    <td className="py-3 pr-4 text-sm text-cargo-text">
+                      {activeTab === 'commissions' ? formatCurrency(row.freight_charge) : 'N/A'}
+                    </td>
+                    <td className={`py-3 pr-4 text-sm font-semibold ${row.freight_variance_direction === 'up' ? 'text-cargo-success' : row.freight_variance_direction === 'down' ? 'text-cargo-danger' : 'text-cargo-muted'}`}>
+                      {activeTab === 'commissions' ? formatVariancePercent(row.freight_variance_percentage) : 'N/A'}
                     </td>
                     <td className="py-3 pr-4 text-sm capitalize text-cargo-text">{row.status}</td>
                     <td className="py-3 pr-4 text-sm text-cargo-muted">{new Date(row.created_at).toLocaleString()}</td>
@@ -209,7 +224,7 @@ const AccountRequestsPage = () => {
               })}
               {!currentRows.length ? (
                 <tr>
-                  <td colSpan="7" className="py-8 text-center text-cargo-muted">No rows found in this queue.</td>
+                  <td colSpan="9" className="py-8 text-center text-cargo-muted">No rows found in this queue.</td>
                 </tr>
               ) : null}
             </tbody>

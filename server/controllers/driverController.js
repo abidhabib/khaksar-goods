@@ -6,7 +6,8 @@ const {
     ensureDriverDailyExpenseEntryColumns,
     ensureDriverPaymentSubmissionsTable,
     ensureDriverLocationLogsTable,
-    ensureDriverLeaveRequestsTable
+    ensureDriverLeaveRequestsTable,
+    ensureFreightRateCardsTable
 } = require('../config/schema');
 const {
     roundCurrency,
@@ -17,6 +18,7 @@ const {
 const {
     attachBetweenTripDailyExpenses
 } = require('../utils/helpers');
+const { calculateFreightEstimate } = require('../services/freightRateService');
 const getAuthenticatedDriverId = (req) => {
     const driverId = req?.user?.driver_id;
     return driverId !== undefined && driverId !== null ? Number(driverId) : null;
@@ -2080,6 +2082,29 @@ const saveCurrentLocation = async (req, res) => {
     }
 };
 
+const getFreightRateEstimate = async (req, res) => {
+    try {
+        const schemaConnection = await pool.getConnection();
+        try {
+            await ensureFreightRateCardsTable(schemaConnection);
+        } finally {
+            schemaConnection.release();
+        }
+
+        const estimate = await calculateFreightEstimate({
+            weightTon: req.query?.weight_ton,
+            distanceKm: req.query?.distance_km
+        });
+
+        res.json({ estimate });
+    } catch (error) {
+        const statusCode = error.message === 'No freight rates saved yet' || error.message === 'Weight and distance must be greater than zero'
+            ? 400
+            : 500;
+        res.status(statusCode).json({ message: error.message || 'Server error' });
+    }
+};
+
 module.exports = {
     getDashboard,
     startTrip,
@@ -2097,6 +2122,7 @@ module.exports = {
     getHelperAccount,
     createHelperCashoutRequest,
     getLeaveStatus,
+    getFreightRateEstimate,
     requestLeave,
     requestJoinAfterLeave,
     saveCurrentLocation

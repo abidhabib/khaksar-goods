@@ -13,6 +13,9 @@ const defaultForm = {
   license_number: '',
   salary_amount: '',
   commission_percentage: '',
+  available_balance: '',
+  commission_balance: '',
+  joined_date: '',
   car_id: '',
   helper_id: '',
   status: 'active',
@@ -76,6 +79,9 @@ const DriversManagement = () => {
       license_number: formData.license_number,
       salary_amount: formData.salary_amount,
       commission_percentage: formData.commission_percentage,
+      available_balance: formData.available_balance,
+      commission_balance: formData.commission_balance,
+      joined_date: formData.joined_date,
       car_id: formData.car_id,
       helper_id: formData.helper_id,
     });
@@ -118,6 +124,9 @@ const DriversManagement = () => {
       license_number: formData.license_number,
       salary_amount: formData.salary_amount,
       commission_percentage: formData.commission_percentage,
+      available_balance: formData.available_balance,
+      commission_balance: formData.commission_balance,
+      joined_date: formData.joined_date,
       car_id: formData.car_id,
       helper_id: formData.helper_id,
     };
@@ -153,6 +162,9 @@ const DriversManagement = () => {
       license_number: driver.license_number || '',
       salary_amount: driver.salary_amount || '',
       commission_percentage: driver.commission_percentage || '',
+      available_balance: driver.available_balance || '',
+      commission_balance: driver.commission_balance || '',
+      joined_date: driver.joined_date ? String(driver.joined_date).slice(0, 10) : '',
       car_id: driver.car_id ? String(driver.car_id) : '',
       helper_id: driver.helper_id ? String(driver.helper_id) : '',
       status: driver.status || 'active',
@@ -241,6 +253,28 @@ const DriversManagement = () => {
           />
         </div>
         <div>
+          <label className="block text-sm font-medium text-cargo-text mb-2">Available Balance</label>
+          <input
+            type="number"
+            min="0"
+            step="0.01"
+            value={formData.available_balance}
+            onChange={(e) => setFormData((prev) => ({ ...prev, available_balance: e.target.value }))}
+            className="input-field w-full"
+          />
+        </div>
+        <div>
+          <label className="block text-sm font-medium text-cargo-text mb-2">Commission Balance</label>
+          <input
+            type="number"
+            min="0"
+            step="0.01"
+            value={formData.commission_balance}
+            onChange={(e) => setFormData((prev) => ({ ...prev, commission_balance: e.target.value }))}
+            className="input-field w-full"
+          />
+        </div>
+        <div>
           <label className="block text-sm font-medium text-cargo-text mb-2">Assign Cargo</label>
           <select
             value={formData.car_id}
@@ -265,6 +299,15 @@ const DriversManagement = () => {
               <option key={helper.id} value={helper.id}>{helper.helper_name}</option>
             ))}
           </select>
+        </div>
+        <div>
+          <label className="block text-sm font-medium text-cargo-text mb-2">Joined Date</label>
+          <input
+            type="date"
+            value={formData.joined_date}
+            onChange={(e) => setFormData((prev) => ({ ...prev, joined_date: e.target.value }))}
+            className="input-field w-full"
+          />
         </div>
       </div>
 
@@ -300,7 +343,6 @@ const DriversManagement = () => {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold text-cargo-text">Driver Management</h1>
-          <p className="text-cargo-muted mt-1">Manage driver accounts, salaries, commission rates, cargo assignments, and helpers.</p>
         </div>
         <button onClick={() => setIsAddModalOpen(true)} className="btn-primary flex items-center gap-2">
           <Plus className="w-5 h-5" />

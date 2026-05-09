@@ -21,6 +21,7 @@ import java.util.Map;
 import okhttp3.Call;
 import okhttp3.Callback;
 import okhttp3.FormBody;
+import okhttp3.HttpUrl;
 import okhttp3.MediaType;
 import okhttp3.MultipartBody;
 import okhttp3.OkHttpClient;
@@ -59,6 +60,28 @@ public class ApiClient {
     public static void getDriverDashboard(String baseUrl, String token, Callback callback) {
         Request request = new Request.Builder()
                 .url(baseUrl + "/driver/dashboard")
+                .get()
+                .header("Authorization", "Bearer " + token)
+                .build();
+
+        CLIENT.newCall(request).enqueue(callback);
+    }
+
+    public static void getFreightRateEstimate(
+            String baseUrl,
+            String token,
+            String weightTon,
+            String distanceKm,
+            Callback callback
+    ) {
+        HttpUrl url = HttpUrl.parse(baseUrl + "/driver/freight-rates/estimate")
+                .newBuilder()
+                .addQueryParameter("weight_ton", weightTon)
+                .addQueryParameter("distance_km", distanceKm)
+                .build();
+
+        Request request = new Request.Builder()
+                .url(url)
                 .get()
                 .header("Authorization", "Bearer " + token)
                 .build();

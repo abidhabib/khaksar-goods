@@ -14,6 +14,7 @@ import LeaveRequestsPage from './pages/LeaveRequestsPage'
 import TripMonitor from './pages/TripMonitor'
 import TripReportPage from './pages/TripReportPage'
 import Reports from './pages/Reports'
+import FreightRateEstimation from './pages/FreightRateEstimation'
 import ProtectedRoute from './components/common/ProtectedRoute'
 import Layout from './components/common/Layout'
 
@@ -39,6 +40,7 @@ function App() {
           <Route path="/trips" element={<TripMonitor />} />
           <Route path="/trips/:id/report" element={<TripReportPage />} />
           <Route path="/reports" element={<Reports />} />
+          <Route path="/rent-estimation" element={<FreightRateEstimation />} />
         </Route>
       </Route>
 

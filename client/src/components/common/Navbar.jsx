@@ -1,19 +1,26 @@
 
 import { useAuth } from '../../hooks/useAuth';
-import { Truck, Bell, User, LogOut } from 'lucide-react';
+import { Truck, Bell, User, LogOut, PanelLeftClose, PanelLeftOpen } from 'lucide-react';
 
-const Navbar = () => {
+const Navbar = ({ sidebarCollapsed = false, onToggleSidebar }) => {
   const { user, logout } = useAuth();
 
   return (
     <nav className="fixed top-0 left-0 right-0 h-16 bg-cargo-card border-b border-cargo-border z-50 flex items-center justify-between px-6">
       <div className="flex items-center gap-3">
+        <button
+          type="button"
+          onClick={onToggleSidebar}
+          className="p-2 rounded-lg text-cargo-muted hover:text-cargo-text hover:bg-cargo-border transition-colors"
+          title={sidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+        >
+          {sidebarCollapsed ? <PanelLeftOpen className="w-5 h-5" /> : <PanelLeftClose className="w-5 h-5" />}
+        </button>
         <div className="w-10 h-10 bg-primary-600 rounded-lg flex items-center justify-center">
           <Truck className="w-6 h-6 text-white" />
         </div>
         <div>
-          <h1 className="text-lg font-bold text-cargo-text">Cargo Tracker</h1>
-          <p className="text-xs text-cargo-muted">Admin Panel</p>
+          <h1 className="text-lg font-bold text-cargo-text">Khaksar Goods </h1>
         </div>
       </div>
 

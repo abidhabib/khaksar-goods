@@ -114,6 +114,10 @@ public class DriverDashboardActivity extends AppCompatActivity {
                     startActivity(new Intent(this, PaymentSubmissionActivity.class));
                 }
         );
+        binding.getRateCard.setOnClickListener(v -> {
+            if (ensureLeaveAccess()) return;
+            startActivity(new Intent(this, FreightRateActivity.class));
+        });
         binding.driverAccount.setOnClickListener(v -> {
             if (ensureLeaveAccess()) return;
             startActivity(new Intent(this, DriverAccountActivity.class));
@@ -354,6 +358,7 @@ public class DriverDashboardActivity extends AppCompatActivity {
         binding.tripHistoryCard.setEnabled(!loading);
         binding.dailyExpenseCard.setEnabled(!loading);
         binding.paymentCard.setEnabled(!loading);
+        binding.getRateCard.setEnabled(!loading);
         // REMOVED: binding.dashboardSwipeRefresh.setEnabled(!loading);
         // The scroll listener now controls SwipeRefresh enable state
         binding.startTripButton.setEnabled(!loading && (ongoingTrip == null || ongoingTrip.length() == 0));

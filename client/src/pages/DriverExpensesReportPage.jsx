@@ -149,7 +149,6 @@ const DriverExpensesReportPage = () => {
           <FileText className="w-6 h-6 text-primary-400" />
           Drivers Expenses
         </h1>
-        <p className="text-cargo-muted mt-1">Daily driver expense history with monthly filtering and totals</p>
       </div>
 
       <div className="card grid grid-cols-1 md:grid-cols-4 gap-3">

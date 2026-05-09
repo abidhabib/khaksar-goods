@@ -126,7 +126,6 @@ const HelpersManagement = () => {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold text-cargo-text">Helper Management</h1>
-          <p className="text-cargo-muted mt-1">Create helpers, set monthly salary, and review which driver and car each helper is working with.</p>
         </div>
         <button onClick={() => setIsAddOpen(true)} className="btn-primary flex items-center gap-2">
           <Plus className="w-5 h-5" />

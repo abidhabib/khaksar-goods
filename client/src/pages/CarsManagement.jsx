@@ -154,7 +154,6 @@ const CarsManagement = () => {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold text-cargo-text">Cargo Management</h1>
-          <p className="text-cargo-muted mt-1">Manage cargo, assignments, and detailed trip history</p>
         </div>
         <button
           onClick={() => setIsAddModalOpen(true)}

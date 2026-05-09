@@ -342,4 +342,21 @@ Medical %6$s • Food %7$s • Guard %8$s</string>
     <string name="lorem_ipsum">Placeholder</string>
     <string name="driver_name_value">%1$s</string>
     <string name="car_number_value">%1$s</string>
+    <string name="get_rate">Get Rate</string>
+    <string name="get_rate_subtitle">Enter ton and km to check Karaya </string>
+    <string name="freight_rate_title">Get Karaya </string>
+    <string name="freight_rate_screen_subtitle">Check Karya  Estimation .</string>
+    <string name="freight_weight_hint">Weight in ton</string>
+    <string name="freight_distance_hint">Distance in km</string>
+    <string name="freight_calculate_button">Check Rate</string>
+    <string name="freight_weight_required">Weight is required</string>
+    <string name="freight_distance_required">Distance is required</string>
+    <string name="freight_result_rate">Applied rate: Rs %1$s / km</string>
+    <string name="freight_result_total">Total freight: Rs %1$s</string>
+    <string name="freight_result_mode">Mode: %1$s</string>
+    <string name="freight_result_summary">%1$s ton • %2$s km</string>
+    <string name="freight_calculation_loading">Checking freight rate...</string>
+    <string name="freight_load_failed">Unable to check freight rate</string>
+    <string name="freight_invalid_response">Invalid freight rate response</string>
+    <string name="freight_no_saved_rate">No saved rate matched</string>
 </resources>

@@ -4,7 +4,8 @@ const {
     ensureDriverDailyExpenseEntriesTable,
     ensureDriverDailyExpenseEntryColumns,
     ensureDriverPaymentSubmissionsTable,
-    ensureDriverLeaveRequestsTable
+    ensureDriverLeaveRequestsTable,
+    ensureFreightRateCardsTable
 } = require('../config/schema');
 const {
     roundCurrency,
@@ -17,6 +18,13 @@ const {
 const {
     attachBetweenTripDailyExpenses
 } = require('../utils/helpers');
+const {
+    getFreightRates,
+    calculateFreightEstimate,
+    calculateFreightEstimateFromRates,
+    parsePositiveNumber,
+    roundTo
+} = require('../services/freightRateService');
 
 const PAYMENT_SUBMISSION_STATUSES = new Set(['pending', 'approved', 'rejected']);
 const LEAVE_REQUEST_ACTIONS = new Set(['approve', 'reject']);
@@ -271,6 +279,70 @@ const getTimestampFilter = ({ month, fromDate, toDate }, column = 'ps.submitted_
         clause: conditions.length ? `AND ${conditions.join(' AND ')}` : '',
         params
     };
+};
+
+const extractNumericWeightTon = (value) => {
+    if (value === undefined || value === null) {
+        return null;
+    }
+
+    const parsed = Number.parseFloat(String(value).replace(/[^0-9.]/g, ''));
+    return Number.isFinite(parsed) && parsed > 0 ? parsed : null;
+};
+
+const extractTripDistanceKm = (trip) => {
+    const distanceFromField = Number(trip?.distance_km);
+    if (Number.isFinite(distanceFromField) && distanceFromField > 0) {
+        return distanceFromField;
+    }
+
+    const startMeter = Number(trip?.start_meter_reading);
+    const endMeter = Number(trip?.end_meter_reading);
+    const distanceFromMeters = endMeter - startMeter;
+    return Number.isFinite(distanceFromMeters) && distanceFromMeters > 0 ? distanceFromMeters : null;
+};
+
+const withFreightVariance = (trip, rates) => {
+    const weightTon = extractNumericWeightTon(trip?.load_weight);
+    const distanceKm = extractTripDistanceKm(trip);
+    const actualFreight = Number(trip?.freight_charge);
+
+    if (!weightTon || !distanceKm || !Number.isFinite(actualFreight) || actualFreight <= 0 || !rates.length) {
+        return {
+            ...trip,
+            expected_freight_charge: null,
+            freight_variance_amount: null,
+            freight_variance_percentage: null,
+            freight_variance_direction: null,
+            expected_rate_per_km: null
+        };
+    }
+
+    try {
+        const estimate = calculateFreightEstimateFromRates({ weightTon, distanceKm, rates });
+        const varianceAmount = roundTo(actualFreight - estimate.total_freight_charge);
+        const variancePercentage = estimate.total_freight_charge > 0
+            ? roundTo((varianceAmount / estimate.total_freight_charge) * 100)
+            : null;
+
+        return {
+            ...trip,
+            expected_freight_charge: estimate.total_freight_charge,
+            expected_rate_per_km: estimate.applied_rate_per_km,
+            freight_variance_amount: varianceAmount,
+            freight_variance_percentage: variancePercentage,
+            freight_variance_direction: varianceAmount > 0 ? 'up' : varianceAmount < 0 ? 'down' : 'equal'
+        };
+    } catch (error) {
+        return {
+            ...trip,
+            expected_freight_charge: null,
+            freight_variance_amount: null,
+            freight_variance_percentage: null,
+            freight_variance_direction: null,
+            expected_rate_per_km: null
+        };
+    }
 };
 
 const computeAverageKmPerLiter = (distance, liters) => {
@@ -640,8 +712,10 @@ const getCarHistory = async (req, res) => {
             ORDER BY t.started_at DESC
         `, [id, ...tripDateFilter.params]);
         const tripsWithExpenses = await attachExpensesToTrips(trips);
+        const freightRates = await getFreightRates().catch(() => []);
+        const tripsWithVariance = tripsWithExpenses.map((trip) => withFreightVariance(trip, freightRates));
 
-        const completedTrips = tripsWithExpenses.filter((trip) => trip.status === 'completed');
+        const completedTrips = tripsWithVariance.filter((trip) => trip.status === 'completed');
         const driverStatsMap = new Map();
         for (const trip of completedTrips) {
             const key = Number(trip.driver_id);
@@ -663,7 +737,7 @@ const getCarHistory = async (req, res) => {
         }
 
         const driverStats = Array.from(driverStatsMap.values());
-        const summaryTotals = tripsWithExpenses.reduce((acc, trip) => {
+        const summaryTotals = tripsWithVariance.reduce((acc, trip) => {
             acc.total_trips += 1;
             acc.total_revenue += Number(trip.freight_charge) || 0;
             acc.total_expenses += Number(trip.total_expenses) || 0;
@@ -688,7 +762,7 @@ const getCarHistory = async (req, res) => {
                 )
             },
             assignments,
-            trips: tripsWithExpenses,
+            trips: tripsWithVariance,
             driverStats,
             summary: {
                 ...summaryTotals,
@@ -736,11 +810,13 @@ const getTripReport = async (req, res) => {
         }
 
         const [tripWithExpenses] = await attachExpensesToTrips(tripRows);
+        const freightRates = await getFreightRates().catch(() => []);
+        const tripWithVariance = withFreightVariance(tripWithExpenses, freightRates);
 
         res.json({
             success: true,
-            trip: tripWithExpenses,
-            expenses: tripWithExpenses.expenses || []
+            trip: tripWithVariance,
+            expenses: tripWithVariance.expenses || []
         });
     } catch (error) {
         console.error('Trip report error:', error);
@@ -832,7 +908,10 @@ const addDriver = async (req, res) => {
             car_id,
             helper_id,
             salary_amount,
-            commission_percentage
+            commission_percentage,
+            available_balance,
+            commission_balance,
+            joined_date
         } = req.body;
 
         const fullName = toNullableString(name);
@@ -840,6 +919,9 @@ const addDriver = async (req, res) => {
         const helperId = helper_id ? Number(helper_id) : null;
         const salaryAmount = toNonNegativeAmount(salary_amount);
         const commissionPercentage = toNonNegativeAmount(commission_percentage);
+        const availableBalance = toNonNegativeAmount(available_balance);
+        const commissionBalance = toNonNegativeAmount(commission_balance);
+        const joinedDate = toNullableString(joined_date);
 
         if (!fullName || !normalizedUsername || !password) {
             return res.status(400).json({ message: 'Driver name, username, and password are required' });
@@ -866,9 +948,9 @@ const addDriver = async (req, res) => {
 
         const [driverResult] = await connection.execute(
             `INSERT INTO drivers
-                (user_id, full_name, license_number, salary_amount, commission_percentage, assigned_car_id, helper_id, available_balance, commission_balance, next_salary_credit_date)
-             VALUES (?, ?, ?, ?, ?, NULL, NULL, 0.00, 0.00, DATE_ADD(CURDATE(), INTERVAL 1 DAY))`,
-            [user_id, fullName, toNullableString(license_number), salaryAmount, commissionPercentage]
+                (user_id, full_name, license_number, salary_amount, commission_percentage, assigned_car_id, helper_id, available_balance, commission_balance, next_salary_credit_date, joined_date)
+             VALUES (?, ?, ?, ?, ?, NULL, NULL, ?, ?, DATE_ADD(CURDATE(), INTERVAL 1 DAY), ?)`,
+            [user_id, fullName, toNullableString(license_number), salaryAmount, commissionPercentage, availableBalance, commissionBalance, joinedDate]
         );
 
         if (car_id) {
@@ -945,7 +1027,10 @@ const updateDriver = async (req, res) => {
             car_id,
             helper_id,
             salary_amount,
-            commission_percentage
+            commission_percentage,
+            available_balance,
+            commission_balance,
+            joined_date
         } = req.body;
 
         await connection.beginTransaction();
@@ -982,13 +1067,19 @@ const updateDriver = async (req, res) => {
              SET full_name = COALESCE(?, full_name),
                  license_number = ?,
                  salary_amount = ?,
-                 commission_percentage = ?
+                 commission_percentage = ?,
+                 available_balance = ?,
+                 commission_balance = ?,
+                 joined_date = ?
              WHERE id = ?`,
             [
                 toNullableString(full_name),
                 toNullableString(license_number),
                 toNonNegativeAmount(salary_amount),
                 toNonNegativeAmount(commission_percentage),
+                toNonNegativeAmount(available_balance),
+                toNonNegativeAmount(commission_balance),
+                toNullableString(joined_date),
                 id
             ]
         );
@@ -1149,6 +1240,9 @@ const getDriverCommissionRequests = async (req, res) => {
                     c.car_number,
                     t.from_location,
                     t.to_location,
+                    t.freight_charge,
+                    t.load_weight,
+                    (COALESCE(t.end_meter_reading, 0) - COALESCE(t.start_meter_reading, 0)) AS distance_km,
                     reviewer.username AS reviewed_by_username
              FROM driver_commission_requests cr
              JOIN drivers d ON cr.driver_id = d.id
@@ -1161,7 +1255,20 @@ const getDriverCommissionRequests = async (req, res) => {
             params
         );
 
-        res.json({ success: true, requests });
+        const freightRates = await getFreightRates().catch(() => []);
+        const requestsWithVariance = requests.map((request) => {
+            const enrichedTrip = withFreightVariance(request, freightRates);
+            return {
+                ...request,
+                expected_freight_charge: enrichedTrip.expected_freight_charge,
+                expected_rate_per_km: enrichedTrip.expected_rate_per_km,
+                freight_variance_amount: enrichedTrip.freight_variance_amount,
+                freight_variance_percentage: enrichedTrip.freight_variance_percentage,
+                freight_variance_direction: enrichedTrip.freight_variance_direction
+            };
+        });
+
+        res.json({ success: true, requests: requestsWithVariance });
     } catch (error) {
         res.status(500).json({ message: 'Server error', error: error.message });
     }
@@ -1703,14 +1810,19 @@ const getDriverReport = async (req, res) => {
             ORDER BY t.started_at DESC
         `, [id, ...dateFilter.params]);
         const tripsWithExpenses = await attachExpensesToTrips(trips);
+        const freightRates = await getFreightRates().catch(() => []);
+        const tripsWithVariance = tripsWithExpenses.map((trip) => withFreightVariance(trip, freightRates));
         const currentTripWithExpenses = currentTrip[0]
             ? (await attachExpensesToTrips([{
                 ...currentTrip[0],
                 total_expenses: currentTrip[0].current_expenses || 0
             }]))[0]
             : null;
+        const currentTripWithVariance = currentTripWithExpenses
+            ? withFreightVariance(currentTripWithExpenses, freightRates)
+            : null;
 
-        const stats = [tripsWithExpenses.reduce((acc, trip) => {
+        const stats = [tripsWithVariance.reduce((acc, trip) => {
             const distance = Number(trip.end_meter_reading - trip.start_meter_reading) || 0;
             acc.total_trips += 1;
             acc.ongoing_trips += trip.status === 'ongoing' ? 1 : 0;
@@ -1745,8 +1857,8 @@ const getDriverReport = async (req, res) => {
         res.json({
             success: true,
             driver: driverPayload,
-            currentTrip: currentTripWithExpenses,
-            trips: tripsWithExpenses,
+            currentTrip: currentTripWithVariance,
+            trips: tripsWithVariance,
             stats: stats[0]
         });
     } catch (error) {
@@ -3024,6 +3136,177 @@ const getReportsData = async (req, res) => {
     }
 };
 
+const getFreightRateCards = async (req, res) => {
+    try {
+        const schemaConnection = await pool.getConnection();
+        try {
+            await ensureFreightRateCardsTable(schemaConnection);
+        } finally {
+            schemaConnection.release();
+        }
+
+        const rates = await getFreightRates();
+        res.json({ rates });
+    } catch (error) {
+        res.status(500).json({ message: 'Server error', error: error.message });
+    }
+};
+
+const addFreightRateCard = async (req, res) => {
+    try {
+        const schemaConnection = await pool.getConnection();
+        try {
+            await ensureFreightRateCardsTable(schemaConnection);
+        } finally {
+            schemaConnection.release();
+        }
+
+        const weightTon = parsePositiveNumber(req.body?.weight_ton);
+        const ratePerKm = parsePositiveNumber(req.body?.rate_per_km);
+        const notes = toNullableString(req.body?.notes);
+
+        if (!weightTon || !ratePerKm) {
+            return res.status(400).json({ message: 'Weight ton and rate per km must be greater than zero' });
+        }
+
+        const [existingRows] = await pool.execute(
+            'SELECT id FROM freight_rate_cards WHERE ABS(weight_ton - ?) < 0.0001 LIMIT 1',
+            [weightTon]
+        );
+
+        if (existingRows.length) {
+            return res.status(409).json({ message: 'A freight rate for this weight already exists' });
+        }
+
+        const [result] = await pool.execute(
+            'INSERT INTO freight_rate_cards (weight_ton, rate_per_km, notes) VALUES (?, ?, ?)',
+            [roundTo(weightTon), roundTo(ratePerKm), notes]
+        );
+
+        const [rows] = await pool.execute(
+            `SELECT id, weight_ton, rate_per_km, notes, created_at, updated_at
+             FROM freight_rate_cards
+             WHERE id = ?`,
+            [result.insertId]
+        );
+
+        res.status(201).json({
+            message: 'Freight rate added successfully',
+            rate: rows[0]
+        });
+    } catch (error) {
+        res.status(500).json({ message: 'Server error', error: error.message });
+    }
+};
+
+const updateFreightRateCard = async (req, res) => {
+    try {
+        const schemaConnection = await pool.getConnection();
+        try {
+            await ensureFreightRateCardsTable(schemaConnection);
+        } finally {
+            schemaConnection.release();
+        }
+
+        const { id } = req.params;
+        const weightTon = parsePositiveNumber(req.body?.weight_ton);
+        const ratePerKm = parsePositiveNumber(req.body?.rate_per_km);
+        const notes = toNullableString(req.body?.notes);
+
+        if (!weightTon || !ratePerKm) {
+            return res.status(400).json({ message: 'Weight ton and rate per km must be greater than zero' });
+        }
+
+        const [existingRows] = await pool.execute(
+            'SELECT id FROM freight_rate_cards WHERE id = ? LIMIT 1',
+            [id]
+        );
+
+        if (!existingRows.length) {
+            return res.status(404).json({ message: 'Freight rate not found' });
+        }
+
+        const [duplicateRows] = await pool.execute(
+            'SELECT id FROM freight_rate_cards WHERE ABS(weight_ton - ?) < 0.0001 AND id != ? LIMIT 1',
+            [weightTon, id]
+        );
+
+        if (duplicateRows.length) {
+            return res.status(409).json({ message: 'Another freight rate already uses this weight' });
+        }
+
+        await pool.execute(
+            `UPDATE freight_rate_cards
+             SET weight_ton = ?, rate_per_km = ?, notes = ?
+             WHERE id = ?`,
+            [roundTo(weightTon), roundTo(ratePerKm), notes, id]
+        );
+
+        const [rows] = await pool.execute(
+            `SELECT id, weight_ton, rate_per_km, notes, created_at, updated_at
+             FROM freight_rate_cards
+             WHERE id = ?`,
+            [id]
+        );
+
+        res.json({
+            message: 'Freight rate updated successfully',
+            rate: rows[0]
+        });
+    } catch (error) {
+        res.status(500).json({ message: 'Server error', error: error.message });
+    }
+};
+
+const deleteFreightRateCard = async (req, res) => {
+    try {
+        const schemaConnection = await pool.getConnection();
+        try {
+            await ensureFreightRateCardsTable(schemaConnection);
+        } finally {
+            schemaConnection.release();
+        }
+
+        const { id } = req.params;
+        const [existingRows] = await pool.execute(
+            'SELECT id FROM freight_rate_cards WHERE id = ? LIMIT 1',
+            [id]
+        );
+
+        if (!existingRows.length) {
+            return res.status(404).json({ message: 'Freight rate not found' });
+        }
+
+        await pool.execute('DELETE FROM freight_rate_cards WHERE id = ?', [id]);
+        res.json({ message: 'Freight rate deleted successfully' });
+    } catch (error) {
+        res.status(500).json({ message: 'Server error', error: error.message });
+    }
+};
+
+const calculateFreightRateEstimate = async (req, res) => {
+    try {
+        const schemaConnection = await pool.getConnection();
+        try {
+            await ensureFreightRateCardsTable(schemaConnection);
+        } finally {
+            schemaConnection.release();
+        }
+
+        const estimate = await calculateFreightEstimate({
+            weightTon: req.body?.weight_ton ?? req.query?.weight_ton,
+            distanceKm: req.body?.distance_km ?? req.query?.distance_km
+        });
+
+        res.json({ estimate });
+    } catch (error) {
+        const statusCode = error.message === 'No freight rates saved yet' || error.message === 'Weight and distance must be greater than zero'
+            ? 400
+            : 500;
+        res.status(statusCode).json({ message: error.message || 'Server error' });
+    }
+};
+
 module.exports = {
     // Cars
     getAllCars,
@@ -3065,5 +3348,12 @@ module.exports = {
     
     // Dashboard
     getDashboardStats,
-    getReportsData
+    getReportsData,
+
+    // Freight rates
+    getFreightRateCards,
+    addFreightRateCard,
+    updateFreightRateCard,
+    deleteFreightRateCard,
+    calculateFreightRateEstimate
 };

@@ -419,6 +419,20 @@ const ensureHelperCashoutRequestsTable = async (connection) => {
     `);
 };
 
+const ensureFreightRateCardsTable = async (connection) => {
+    await connection.query(`
+        CREATE TABLE IF NOT EXISTS freight_rate_cards (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            weight_ton DECIMAL(10,2) NOT NULL,
+            rate_per_km DECIMAL(10,2) NOT NULL,
+            notes VARCHAR(255) NULL,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+            UNIQUE KEY uniq_freight_rate_weight (weight_ton)
+        )
+    `);
+};
+
 const ensureSchema = async () => {
     const connection = await pool.getConnection();
 
@@ -446,6 +460,7 @@ const ensureSchema = async () => {
         await ensureDriverCommissionRequestsTable(connection);
         await ensureDriverCashoutRequestsTable(connection);
         await ensureHelperCashoutRequestsTable(connection);
+        await ensureFreightRateCardsTable(connection);
         await connection.query(`
             CREATE UNIQUE INDEX IF NOT EXISTS uniq_driver_salary_cycle
             ON driver_account_transactions (driver_id, balance_type, transaction_type, source_type, source_id)
@@ -471,5 +486,6 @@ module.exports = {
     ensureDriverDailyExpenseEntryColumns,
     ensureDriverPaymentSubmissionsTable,
     ensureDriverLocationLogsTable,
-    ensureDriverLeaveRequestsTable
+    ensureDriverLeaveRequestsTable,
+    ensureFreightRateCardsTable
 };
