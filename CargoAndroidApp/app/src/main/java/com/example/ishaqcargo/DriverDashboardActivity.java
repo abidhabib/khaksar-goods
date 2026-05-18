@@ -71,6 +71,14 @@ public class DriverDashboardActivity extends AppCompatActivity {
                 }
             }
     );
+    private final ActivityResultLauncher<Intent> moboilChangeLauncher = registerForActivityResult(
+            new ActivityResultContracts.StartActivityForResult(),
+            result -> {
+                if (result.getResultCode() == RESULT_OK) {
+                    fetchDashboard();
+                }
+            }
+    );
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -125,6 +133,13 @@ public class DriverDashboardActivity extends AppCompatActivity {
         binding.helperAccount.setOnClickListener(v -> {
             if (ensureLeaveAccess()) return;
             startActivity(new Intent(this, HelperAccountActivity.class));
+        });
+        binding.moboilAlertWidget.setOnClickListener(v -> {
+            if (ensureLeaveAccess()) return;
+            Intent intent = new Intent(this, MoboilChangeActivity.class);
+            intent.putExtra(MoboilChangeActivity.EXTRA_CAR_NUMBER, currentCarNumber);
+            intent.putExtra(MoboilChangeActivity.EXTRA_CURRENT_METER, currentCarMeterReading);
+            moboilChangeLauncher.launch(intent);
         });
         binding.leaveToHomeCard.setOnClickListener(v -> {
             startActivity(new Intent(this, LeaveRequestActivity.class));
@@ -337,7 +352,20 @@ public class DriverDashboardActivity extends AppCompatActivity {
 
         // Moboil countdown widget
         JSONObject moboilStatus = profile != null ? profile.optJSONObject("moboil_status") : null;
-        if (moboilStatus != null) {
+        Double localMoboilBaseline = sessionManager.getMoboilBaseline(currentCarNumber);
+        if (localMoboilBaseline != null && currentCarMeterReading >= localMoboilBaseline) {
+            double kmSinceChange = Math.max(0, currentCarMeterReading - localMoboilBaseline);
+            double remainingKm = Math.max(0, 5000d - kmSinceChange);
+            boolean needsChange = remainingKm <= 0;
+
+            if (needsChange) {
+                binding.moboilAlertValueWidget.setText(formatPlainNumber(remainingKm) + " km");
+                binding.moboilAlertValueWidget.setTextColor(getColor(R.color.red));
+            } else {
+                binding.moboilAlertValueWidget.setText(formatPlainNumber(remainingKm) + " km");
+                binding.moboilAlertValueWidget.setTextColor(getColor(R.color.km_widget_text));
+            }
+        } else if (moboilStatus != null) {
             double remainingKm = moboilStatus.optDouble("remaining_km", 0);
             boolean needsChange = moboilStatus.optBoolean("needs_change", false);
             

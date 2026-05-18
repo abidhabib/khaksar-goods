@@ -20,11 +20,11 @@ const DriverCard = ({ driver, onEdit, onAssign, onViewReport }) => {
   const formatCurrency = (value) => `Rs ${Number(value || 0).toLocaleString()}`;
 
   return (
-    <div className="card hover:border-primary-500/50 transition-all group">
-      <div className="flex items-start justify-between mb-4 gap-3">
+    <div className="rounded-lg border border-cargo-border bg-cargo-card p-4 hover:border-primary-500/50 transition-all group">
+      <div className="flex items-start justify-between mb-3 gap-3">
         <div className="flex items-center gap-3">
-          <div className="w-12 h-12 bg-cargo-border rounded-full flex items-center justify-center">
-            <User className="w-6 h-6 text-cargo-muted" />
+          <div className="w-10 h-10 bg-cargo-border rounded-full flex items-center justify-center">
+            <User className="w-5 h-5 text-cargo-muted" />
           </div>
           <div>
             <h3 className="font-semibold text-cargo-text">{driver.full_name || driver.username}</h3>
@@ -81,29 +81,29 @@ const DriverCard = ({ driver, onEdit, onAssign, onViewReport }) => {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mb-4">
-        <div className="rounded-lg border border-cargo-border bg-cargo-dark/30 p-3">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-2.5 mb-3">
+        <div className="rounded-lg border border-cargo-border bg-cargo-dark/30 p-2.5">
           <p className="text-[11px] uppercase tracking-wide text-cargo-muted flex items-center gap-1">
             <Phone className="w-3.5 h-3.5" />
             Phone
           </p>
           <p className="text-sm text-cargo-text font-semibold mt-1.5">{driver.phone || 'N/A'}</p>
         </div>
-        <div className="rounded-lg border border-cargo-border bg-cargo-dark/30 p-3">
+        <div className="rounded-lg border border-cargo-border bg-cargo-dark/30 p-2.5">
           <p className="text-[11px] uppercase tracking-wide text-cargo-muted flex items-center gap-1">
             <Car className="w-3.5 h-3.5" />
             Car
           </p>
           <p className="text-sm text-cargo-text font-semibold mt-1.5">{driver.car_number || 'No cargo assigned'}</p>
         </div>
-        <div className="rounded-lg border border-cargo-border bg-cargo-dark/30 p-3">
+        <div className="rounded-lg border border-cargo-border bg-cargo-dark/30 p-2.5">
           <p className="text-[11px] uppercase tracking-wide text-cargo-muted flex items-center gap-1">
             <IdCard className="w-3.5 h-3.5" />
             License
           </p>
           <p className="text-sm text-cargo-text font-semibold mt-1.5">{driver.license_number || 'N/A'}</p>
         </div>
-        <div className="rounded-lg border border-cargo-border bg-cargo-dark/30 p-3">
+        <div className="rounded-lg border border-cargo-border bg-cargo-dark/30 p-2.5">
           <p className="text-[11px] uppercase tracking-wide text-cargo-muted flex items-center gap-1">
             <HandHelping className="w-3.5 h-3.5" />
             Helper
@@ -112,21 +112,21 @@ const DriverCard = ({ driver, onEdit, onAssign, onViewReport }) => {
             {driver.helper_name ? `${driver.helper_name}${driver.helper_phone_number ? ` • ${driver.helper_phone_number}` : ''}` : 'No helper assigned'}
           </p>
         </div>
-        <div className="rounded-lg border border-cargo-border bg-cargo-dark/30 p-3">
+        <div className="rounded-lg border border-cargo-border bg-cargo-dark/30 p-2.5">
           <p className="text-[11px] uppercase tracking-wide text-cargo-muted flex items-center gap-1">
             <Wallet className="w-3.5 h-3.5" />
-            Available Balance
+            Helper Number
           </p>
-          <p className="text-sm text-primary-300 font-semibold mt-1.5">{formatCurrency(driver.available_balance)}</p>
+          <p className="text-sm text-cargo-text font-semibold mt-1.5">{driver.helper_phone_number || 'N/A'}</p>
         </div>
-        <div className="rounded-lg border border-cargo-border bg-cargo-dark/30 p-3">
+        <div className="rounded-lg border border-cargo-border bg-cargo-dark/30 p-2.5">
           <p className="text-[11px] uppercase tracking-wide text-cargo-muted flex items-center gap-1">
             <Coins className="w-3.5 h-3.5" />
-            Commission Balance
+            Company Amount
           </p>
-          <p className="text-sm text-primary-300 font-semibold mt-1.5">{formatCurrency(driver.commission_balance)}</p>
+          <p className="text-sm text-primary-300 font-semibold mt-1.5">{formatCurrency(driver.company_amount)}</p>
         </div>
-        <div className="rounded-lg border border-cargo-border bg-cargo-dark/30 p-3">
+        <div className="rounded-lg border border-cargo-border bg-cargo-dark/30 p-2.5">
           <p className="text-[11px] uppercase tracking-wide text-cargo-muted flex items-center gap-1">
             <Activity className="w-3.5 h-3.5" />
             Salary / Commission
@@ -135,28 +135,12 @@ const DriverCard = ({ driver, onEdit, onAssign, onViewReport }) => {
             {formatCurrency(driver.salary_amount)} / {Number(driver.commission_percentage || 0)}%
           </p>
         </div>
-        <div className="rounded-lg border border-cargo-border bg-cargo-dark/30 p-3">
+        <div className="rounded-lg border border-cargo-border bg-cargo-dark/30 p-2.5">
           <p className="text-[11px] uppercase tracking-wide text-cargo-muted flex items-center gap-1">
             <CalendarDays className="w-3.5 h-3.5" />
             Joined Date
           </p>
           <p className="text-sm text-cargo-text font-semibold mt-1.5">{driver.joined_date ? String(driver.joined_date).slice(0, 10) : 'N/A'}</p>
-        </div>
-        <div className="rounded-lg border border-cargo-border bg-cargo-dark/30 p-3">
-          <p className="text-[11px] uppercase tracking-wide text-cargo-muted">Driver / User ID</p>
-          <p className="text-sm text-cargo-text font-semibold mt-1.5">{driver.id} / {driver.user_id}</p>
-        </div>
-        <div className="rounded-lg border border-cargo-border bg-cargo-dark/30 p-3">
-          <p className="text-[11px] uppercase tracking-wide text-cargo-muted">Assigned IDs</p>
-          <p className="text-sm text-cargo-text font-semibold mt-1.5">
-            Car: {driver.assigned_car_id || '-'} • Helper: {driver.helper_id || '-'}
-          </p>
-        </div>
-        <div className="rounded-lg border border-cargo-border bg-cargo-dark/30 p-3">
-          <p className="text-[11px] uppercase tracking-wide text-cargo-muted">Next Salary Credit</p>
-          <p className="text-sm text-cargo-text font-semibold mt-1.5">
-            {driver.next_salary_credit_date ? String(driver.next_salary_credit_date).slice(0, 10) : 'N/A'}
-          </p>
         </div>
 
         <div className="rounded-lg bg-cargo-dark/70 border border-cargo-border px-3 py-2 md:col-span-2">
@@ -190,7 +174,7 @@ const DriverCard = ({ driver, onEdit, onAssign, onViewReport }) => {
         </div>
       </div>
 
-      <div className="flex gap-2 pt-4 border-t border-cargo-border">
+      <div className="flex gap-2 pt-3 border-t border-cargo-border">
         <button 
           onClick={() => onViewReport(driver.id)}
           className="flex-1 btn-secondary text-sm py-2"

@@ -22,11 +22,11 @@ const CarCard = ({ car, onEdit, onDelete, onAssign, onViewHistory }) => {
   const hasLocation = car.last_location_latitude != null && car.last_location_longitude != null;
 
   return (
-    <div className="card hover:border-primary-500/50 transition-all group">
-      <div className="flex items-start justify-between mb-4 gap-3">
+    <div className="rounded-lg border border-cargo-border bg-cargo-card p-4 hover:border-primary-500/50 transition-all group">
+      <div className="flex items-start justify-between mb-3 gap-3">
         <div className="flex items-center gap-3">
-          <div className="w-12 h-12 bg-primary-600/20 rounded-xl flex items-center justify-center">
-            <Car className="w-6 h-6 text-primary-400" />
+          <div className="w-10 h-10 bg-primary-600/20 rounded-lg flex items-center justify-center">
+            <Car className="w-5 h-5 text-primary-400" />
           </div>
           <div>
             <h3 className="font-semibold text-cargo-text">{car.car_number}</h3>
@@ -58,7 +58,7 @@ const CarCard = ({ car, onEdit, onDelete, onAssign, onViewHistory }) => {
         </div>
       </div>
 
-      <div className="grid grid-cols-2 gap-4 mb-4">
+      <div className="grid grid-cols-2 gap-3 mb-3">
         <div className="flex items-center gap-2 text-sm">
           <Gauge className="w-4 h-4 text-cargo-muted" />
           <span className="text-cargo-text">{car.current_meter_reading?.toLocaleString()} km</span>
@@ -73,7 +73,7 @@ const CarCard = ({ car, onEdit, onDelete, onAssign, onViewHistory }) => {
         </div>
       </div>
 
-      <div className="border-t border-cargo-border pt-4 space-y-3">
+      <div className="border-t border-cargo-border pt-3 space-y-3">
         {car.assigned_driver ? (
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
@@ -102,13 +102,13 @@ const CarCard = ({ car, onEdit, onDelete, onAssign, onViewHistory }) => {
           </div>
         )}
 
-        <div className="rounded-lg bg-cargo-dark/70 border border-cargo-border px-3 py-2">
+        <div className="rounded-lg bg-cargo-dark/70 border border-cargo-border px-2.5 py-2">
           <p className={`text-xs font-medium ${car.trip_status === 'ongoing' ? 'text-cargo-success' : 'text-cargo-muted'}`}>
             {tripStatusLabel}
           </p>
         </div>
 
-        <div className="rounded-lg bg-cargo-dark/70 border border-cargo-border px-3 py-3">
+        <div className="rounded-lg bg-cargo-dark/70 border border-cargo-border px-2.5 py-2.5">
           <div className="flex items-start gap-2">
             <MapPin className="w-4 h-4 text-primary-400 mt-0.5" />
             <div className="min-w-0">

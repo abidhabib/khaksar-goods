@@ -7,7 +7,7 @@ import ExpenseBreakdown from '../components/admin/ExpenseBreakdown';
 import { 
   Car, 
   Users, 
-  Route, 
+  HandHelping,
   DollarSign,
   Activity
 } from 'lucide-react';
@@ -19,6 +19,7 @@ const AdminDashboard = () => {
   const [stats, setStats] = useState(null);
   const [recentTrips, setRecentTrips] = useState([]);
   const [revenueData, setRevenueData] = useState([]);
+  const [expenseBreakdown, setExpenseBreakdown] = useState([]);
 
   useEffect(() => {
     const fetchDashboardData = async () => {
@@ -27,6 +28,7 @@ const AdminDashboard = () => {
         setStats(result.data.stats);
         setRecentTrips(result.data.recentTrips);
         setRevenueData(result.data.revenueChart || []);
+        setExpenseBreakdown(result.data.expenseBreakdown || []);
       }
     };
 
@@ -42,7 +44,7 @@ const AdminDashboard = () => {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4 ">
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-bold text-cargo-text">Dashboard</h1>
         <div className="flex items-center gap-2 text-sm text-cargo-muted">
@@ -52,101 +54,56 @@ const AdminDashboard = () => {
       </div>
 
       {/* Stats Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+      <div className="grid grid-cols-3 gap-3 max-w-3xl">
         <StatCard
           title="Active Cargo"
           value={stats.active_cars}
-          subtitle="Total fleet vehicles"
+          subtitle="Total fleet"
           icon={Car}
           color="blue"
         />
         <StatCard
           title="Active Drivers"
-          value={stats.active_drivers}
-          subtitle="Currently working"
+          value={stats.active_drivers || 0}
+          subtitle="Working now"
           icon={Users}
           color="green"
         />
         <StatCard
-          title="Ongoing Trips"
-          value={stats.ongoing_trips}
-          subtitle="In progress now"
-          icon={Route}
+          title="Active Helpers"
+          value={stats.active_helpers || 0}
+          subtitle="Assigned staff"
+          icon={HandHelping}
           color="amber"
         />
         <StatCard
-          title="Today's Revenue"
-          value={`${stats.today_revenue?.toLocaleString()}`}
-          subtitle={`Net: ${stats.net_today?.toLocaleString()}`}
-          trend="+12%"
-          trendUp={true}
+          title="Monthly Freight"
+          value={stats.monthly_freight?.toLocaleString() || 0}
+          subtitle="Current month"
           icon={DollarSign}
-          color="purple"
+          color="blue"
+        />
+        <StatCard
+          title="Monthly Expenses"
+          value={stats.monthly_expenses?.toLocaleString() || 0}
+          subtitle="Trip + daily + bilty"
+          icon={DollarSign}
+          color="red"
+        />
+        <StatCard
+          title="Monthly Net Income"
+          value={stats.monthly_net_income?.toLocaleString() || 0}
+          subtitle="After approved cashout"
+          icon={DollarSign}
+          color="green"
         />
       </div>
 
       {/* Charts Row */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <div className="card lg:col-span-2">
-          <div className="flex items-center justify-between mb-6">
-            <h3 className="text-lg font-semibold text-cargo-text">Revenue vs Expenses</h3>
-            <div className="flex items-center gap-4 text-sm">
-              <div className="flex items-center gap-2">
-                <div className="w-3 h-3 bg-primary-500 rounded-full" />
-                <span className="text-cargo-muted">Revenue</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <div className="w-3 h-3 bg-cargo-danger rounded-full" />
-                <span className="text-cargo-muted">Expenses</span>
-              </div>
-            </div>
-          </div>
+         
           
-          <div className="h-64">
-            <ResponsiveContainer width="100%" height="100%">
-              <AreaChart data={revenueData}>
-                <defs>
-                  <linearGradient id="colorRevenue" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.3}/>
-                    <stop offset="95%" stopColor="#3b82f6" stopOpacity={0}/>
-                  </linearGradient>
-                  <linearGradient id="colorExpenses" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="#ef4444" stopOpacity={0.3}/>
-                    <stop offset="95%" stopColor="#ef4444" stopOpacity={0}/>
-                  </linearGradient>
-                </defs>
-                <CartesianGrid strokeDasharray="3 3" stroke="#334155" />
-                <XAxis dataKey="name" stroke="#64748b" fontSize={12} />
-                <YAxis stroke="#64748b" fontSize={12} />
-                <Tooltip 
-                  contentStyle={{ 
-                    backgroundColor: '#1e293b', 
-                    border: '1px solid #334155',
-                    borderRadius: '8px'
-                  }}
-                  labelStyle={{ color: '#94a3b8' }}
-                />
-                <Area 
-                  type="monotone" 
-                  dataKey="revenue" 
-                  stroke="#3b82f6" 
-                  fillOpacity={1} 
-                  fill="url(#colorRevenue)" 
-                />
-                <Area 
-                  type="monotone" 
-                  dataKey="expenses" 
-                  stroke="#ef4444" 
-                  fillOpacity={1} 
-                  fill="url(#colorExpenses)" 
-                />
-              </AreaChart>
-            </ResponsiveContainer>
-          </div>
-        </div>
-
-        <ExpenseBreakdown />
-      </div>
+     
+        <ExpenseBreakdown data={expenseBreakdown} />
 
       {/* Recent Trips Table */}
       <TripTable 

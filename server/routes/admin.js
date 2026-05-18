@@ -34,8 +34,7 @@ const {
     updateTripExpenseByAdmin,
     addDriverDailyExpenseByAdmin,
     updateDriverDailyExpenseByAdmin,
-    getDriverLeaveRequests,
-    updateDriverLeaveRequestStatus,
+    
     getDashboardStats,
     getReportsData,
     getFreightRateCards,
@@ -92,7 +91,5 @@ router.put('/payment-submissions/:id/status', authMiddleware, adminOnly, updateD
 router.put('/trips/:id', authMiddleware, adminOnly, updateTripCorrection);
 router.post('/trips/:id/expenses', authMiddleware, adminOnly, addTripExpenseByAdmin);
 router.put('/trip-expenses/:id', authMiddleware, adminOnly, updateTripExpenseByAdmin);
-router.get('/leave-requests', authMiddleware, adminOnly, getDriverLeaveRequests);
-router.put('/leave-requests/:id/status', authMiddleware, adminOnly, updateDriverLeaveRequestStatus);
 
 module.exports = router;

@@ -188,6 +188,8 @@
                         android:layout_height="wrap_content"
                         android:layout_marginStart="6dp"
                         android:layout_weight="1"
+                        android:clickable="true"
+                        android:focusable="true"
                         app:cardBackgroundColor="@color/trips_widget_bg"
                         app:cardCornerRadius="22dp"
                         app:cardElevation="0dp">

@@ -3,6 +3,7 @@ import { format } from 'date-fns';
 import { useNavigate, useParams } from 'react-router-dom';
 import {
   ArrowLeft,
+  ArrowUpRight,
   User,
   Car,
   Phone,
@@ -30,460 +31,16 @@ import Modal from '../components/common/Modal';
 
 const formatCurrency = (value) => `Rs ${Number(value || 0).toLocaleString()}`;
 
-const formatDate = (value, pattern = 'PPP p') => {
-  if (!value) {
-    return 'N/A';
-  }
 
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) {
-    return 'N/A';
-  }
-
-  return format(date, pattern);
-};
 const formatAverage = (value) => {
   const numericValue = Number(value || 0);
   return numericValue > 0 ? `${numericValue.toFixed(2)} km/L` : 'N/A';
 };
 
-const formatVariancePercent = (value) => {
-  const numericValue = Number(value);
-  if (!Number.isFinite(numericValue)) {
-    return 'N/A';
-  }
 
-  return `${numericValue > 0 ? '+' : ''}${numericValue.toFixed(2)}%`;
-};
 
-const getVarianceTone = (direction) => {
-  if (direction === 'up') return 'text-cargo-success';
-  if (direction === 'down') return 'text-cargo-danger';
-  return 'text-cargo-muted';
-};
 
-const formatCategoryLabel = (value) =>
-  String(value || '')
-    .replace(/_/g, ' ')
-    .replace(/\b\w/g, (char) => char.toUpperCase());
 
-const tripExpenseCategories = [
-  'diesel',
-  'toll',
-  'food',
-  'police',
-  'chalaan',
-  'mandi_kaat',
-  'reward',
-  'tyre_puncture',
-  'bilty_commission',
-];
-
-const dailyExpenseCategories = [
-  'cargo_service',
-  'mobile',
-  'moboil_change',
-  'vehicle_maintenance',
-  'mechanic',
-  'medical',
-  'food',
-  'cargo_security_guard',
-  'other',
-];
-
-/* ─── Image Modal ─── */
-const ImageModal = ({ src, alt, isOpen, onClose }) => {
-  useEffect(() => {
-    const handleEsc = (e) => {
-      if (e.key === 'Escape') onClose();
-    };
-    if (isOpen) {
-      document.addEventListener('keydown', handleEsc);
-      document.body.style.overflow = 'hidden';
-    }
-    return () => {
-      document.removeEventListener('keydown', handleEsc);
-      document.body.style.overflow = 'unset';
-    };
-  }, [isOpen, onClose]);
-
-  if (!isOpen || !src) return null;
-
-  return (
-    <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm"
-      onClick={onClose}
-    >
-      <div
-        className="relative flex max-w-5xl w-[90vw] max-h-[90vh] items-center justify-center"
-        onClick={(e) => e.stopPropagation()}
-      >
-        <button
-          onClick={onClose}
-          className="absolute -top-12 right-0 p-2 rounded-full bg-white/10 hover:bg-white/20 text-white transition-colors"
-        >
-          <X className="w-5 h-5" />
-        </button>
-        <img
-          src={src}
-          alt={alt}
-          className="block max-w-full max-h-[90vh] object-contain object-center rounded-lg shadow-2xl border border-white/10"
-        />
-        {alt && (
-          <p className="absolute bottom-0 left-0 right-0 bg-black/60 text-white text-sm px-4 py-2 rounded-b-lg backdrop-blur-sm">
-            {alt}
-          </p>
-        )}
-      </div>
-    </div>
-  );
-};
-
-/* ─── Clickable Image Card ─── */
-const ClickableImage = ({ src, alt, className = '' }) => {
-  const [isOpen, setIsOpen] = useState(false);
-
-  if (!src) {
-    return (
-      <div className={`rounded-lg border border-dashed border-cargo-border flex items-center justify-center text-xs text-cargo-muted bg-cargo-dark/20 ${className}`}>
-        No image
-      </div>
-    );
-  }
-
-  return (
-    <>
-      <div
-        className={`relative group cursor-pointer overflow-hidden rounded-lg border border-cargo-border ${className}`}
-        onClick={() => setIsOpen(true)}
-      >
-        <img
-          src={src}
-          alt={alt}
-          className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
-        />
-        <div className="absolute inset-0 bg-black/0 group-hover:bg-black/30 transition-colors duration-200 flex items-center justify-center">
-          <ZoomIn className="w-6 h-6 text-white opacity-0 group-hover:opacity-100 transition-opacity duration-200 drop-shadow-lg" />
-        </div>
-      </div>
-      <ImageModal src={src} alt={alt} isOpen={isOpen} onClose={() => setIsOpen(false)} />
-    </>
-  );
-};
-
-const MeterImageCard = ({ label, src, alt }) => (
-  <div>
-    <p className="text-xs text-cargo-muted mb-2 font-medium tracking-wide uppercase">{label}</p>
-    <ClickableImage src={src} alt={alt} className="h-36" />
-  </div>
-);
-
-const ExpenseBreakdown = ({ trip, onEditExpense, onAddExpense }) => {
-  const expenses = trip.expenses || [];
-  const totalExpenses = Number(trip.trip_expenses_total ?? trip.current_expenses ?? trip.total_expenses ?? 0);
-
-  return (
-    <div className="rounded-xl border border-cargo-border bg-cargo-dark/30 p-4 space-y-4">
-      <div className="flex items-center justify-between">
-        <p className="text-sm text-cargo-text font-semibold flex items-center gap-2">
-          <Receipt className="w-4 h-4 text-cargo-muted" />
-          Expense Breakdown
-        </p>
-        <div className="flex items-center gap-3">
-          <p className="text-sm text-cargo-muted font-medium">Total: {formatCurrency(totalExpenses)}</p>
-          <button type="button" onClick={() => onAddExpense(trip)} className="inline-flex items-center gap-1 rounded-lg bg-primary-500/15 px-3 py-2 text-primary-300">
-            <Plus className="w-4 h-4" />
-            Add Expense
-          </button>
-        </div>
-      </div>
-
-      {expenses.length ? (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-          {expenses.map((expense) => (
-            <div
-              key={expense.id}
-              className="rounded-lg border border-cargo-border/60 bg-cargo-card/40 p-3 hover:border-cargo-border transition-colors"
-            >
-              <div className="flex items-center justify-between gap-3">
-                <div className="flex items-center gap-2">
-                  <div className="w-2 h-2 rounded-full bg-cargo-accent/60" />
-                  <p className="text-sm text-cargo-text font-medium">{formatCategoryLabel(expense.category)}</p>
-                </div>
-                <div className="flex items-center gap-2">
-                  <p className="text-sm text-cargo-text font-semibold">{formatCurrency(expense.amount)}</p>
-                  <button type="button" onClick={() => onEditExpense(trip, expense)} className="inline-flex items-center gap-1 rounded-lg bg-primary-500/15 px-2.5 py-1.5 text-xs text-primary-300">
-                    <Pencil className="w-3.5 h-3.5" />
-                    Edit
-                  </button>
-                </div>
-              </div>
-              <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs text-cargo-muted">
-                <span>{formatDate(expense.created_at)}</span>
-                {expense.liters ? <span>Liters: {Number(expense.liters).toLocaleString()}</span> : null}
-                {expense.location ? <span>Location: {expense.location}</span> : null}
-              </div>
-              {expense.receipt_image ? (
-                <div className="mt-3">
-                  <ClickableImage
-                    src={expense.receipt_image}
-                    alt={`${expense.category} receipt`}
-                    className="h-28"
-                  />
-                </div>
-              ) : null}
-            </div>
-          ))}
-        </div>
-      ) : (
-        <p className="text-sm text-cargo-muted">No expense entries on this trip.</p>
-      )}
-    </div>
-  );
-};
-
-const BetweenTripExpenseBreakdown = ({ trip, onEditDailyExpense, onAddDailyExpense }) => {
-  const expenses = trip.daily_expenses || [];
-  const totalExpenses = Number(trip.between_trip_expenses_total ?? 0);
-
-  return (
-    <div className="rounded-xl border border-cargo-border bg-cargo-dark/30 p-4 space-y-4">
-      <div className="flex items-center justify-between">
-        <p className="text-sm text-cargo-text font-semibold flex items-center gap-2">
-          <Receipt className="w-4 h-4 text-cargo-muted" />
-          While Looking For Next Trip
-        </p>
-        <div className="flex items-center gap-3">
-          <p className="text-sm text-cargo-muted font-medium">Total: {formatCurrency(totalExpenses)}</p>
-          <button type="button" onClick={() => onAddDailyExpense(trip)} className="inline-flex items-center gap-1 rounded-lg bg-primary-500/15 px-3 py-2 text-primary-300">
-            <Plus className="w-4 h-4" />
-            Add Expense
-          </button>
-        </div>
-      </div>
-
-      <p className="text-xs text-cargo-muted">
-        Expenses added after this trip ended and before the next trip started.
-      </p>
-
-      {expenses.length ? (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-          {expenses.map((expense) => (
-            <div
-              key={`daily-${expense.id}`}
-              className="rounded-lg border border-cargo-border/60 bg-cargo-card/40 p-3 hover:border-cargo-border transition-colors"
-            >
-              <div className="flex items-center justify-between gap-3">
-                <div className="flex items-center gap-2">
-                  <div className="w-2 h-2 rounded-full bg-cargo-success/60" />
-                  <p className="text-sm text-cargo-text font-medium">{formatCategoryLabel(expense.category)}</p>
-                </div>
-                <div className="flex items-center gap-2">
-                  <p className="text-sm text-cargo-text font-semibold">{formatCurrency(expense.amount)}</p>
-                  <button type="button" onClick={() => onEditDailyExpense(trip, expense)} className="inline-flex items-center gap-1 rounded-lg bg-primary-500/15 px-2.5 py-1.5 text-xs text-primary-300">
-                    <Pencil className="w-3.5 h-3.5" />
-                    Edit
-                  </button>
-                </div>
-              </div>
-              <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs text-cargo-muted">
-                <span>{formatDate(expense.created_at)}</span>
-                {expense.expense_date ? <span>Expense Date: {formatDate(expense.expense_date, 'PPP')}</span> : null}
-                {expense.meter_reading ? <span>Meter: {Number(expense.meter_reading).toLocaleString()}</span> : null}
-              </div>
-              {expense.note ? (
-                <p className="mt-2 text-xs text-cargo-muted">{expense.note}</p>
-              ) : null}
-              {expense.expense_image ? (
-                <div className="mt-3">
-                  <ClickableImage
-                    src={expense.expense_image}
-                    alt={`${expense.category} expense`}
-                    className="h-28"
-                  />
-                </div>
-              ) : null}
-            </div>
-          ))}
-        </div>
-      ) : (
-        <p className="text-sm text-cargo-muted">No between-trip expenses linked to this trip.</p>
-      )}
-    </div>
-  );
-};
-
-const StatBadge = ({ children, variant = 'default' }) => {
-  const variants = {
-    ongoing: 'bg-cargo-accent/15 text-cargo-accent border-cargo-accent/20',
-    completed: 'bg-cargo-success/15 text-cargo-success border-cargo-success/20',
-    default: 'bg-cargo-dark/40 text-cargo-muted border-cargo-border/60',
-  };
-
-  return (
-    <span className={`inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold border ${variants[variant]}`}>
-      {children}
-    </span>
-  );
-};
-
-const TripCard = ({ trip, status = 'completed', onEditTrip, onEditExpense, onAddExpense, onEditDailyExpense, onAddDailyExpense }) => {
-  const isOngoing = status === 'ongoing';
-  const totalExpenses = Number(trip.total_expenses ?? trip.current_expenses ?? 0);
-  const net = Number(trip.net_profit ?? (Number(trip.freight_charge || 0) - totalExpenses));
-  const actualEndLocation = trip.end_location || trip.end_live_location;
-  const loadSummary = [trip.load_name, trip.load_weight].filter(Boolean).join(' • ');
-  const varianceTone = getVarianceTone(trip.freight_variance_direction);
-
-  return (
-    <article className="rounded-xl border border-cargo-border bg-cargo-card/50 p-5 space-y-5 hover:border-cargo-border/80 transition-all duration-200 shadow-sm">
-      {/* Header */}
-      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
-        <div className="flex items-start gap-3">
-          <div className={`mt-1 p-2 rounded-lg ${isOngoing ? 'bg-cargo-accent/10' : 'bg-cargo-success/10'}`}>
-            <Route className={`w-4 h-4 ${isOngoing ? 'text-cargo-accent' : 'text-cargo-success'}`} />
-          </div>
-          <div>
-            <p className="text-cargo-text font-bold text-base">
-              {trip.from_location} <span className="text-cargo-muted font-normal mx-1">→</span> {trip.to_location}
-            </p>
-            <p className="text-xs text-cargo-muted mt-1 flex items-center gap-1">
-              <Car className="w-3 h-3" />
-              Car: {trip.car_number || 'N/A'}
-            </p>
-          </div>
-        </div>
-        <StatBadge variant={isOngoing ? 'ongoing' : 'completed'}>
-          {isOngoing ? 'Ongoing' : 'Completed'}
-        </StatBadge>
-      </div>
-
-      <div className="flex justify-end">
-        <button type="button" onClick={() => onEditTrip(trip)} className="inline-flex items-center gap-2 rounded-lg bg-primary-500/15 px-3 py-2 text-sm text-primary-300">
-          <Pencil className="w-4 h-4" />
-          Edit Trip
-        </button>
-      </div>
-
-      {/* Primary Stats */}
-      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
-        {[
-          { label: 'Started', value: formatDate(trip.started_at), icon: Calendar },
-          { label: 'Ended', value: isOngoing ? 'In progress' : formatDate(trip.ended_at), icon: Clock3 },
-          { label: 'Freight', value: formatCurrency(trip.freight_charge), icon: Wallet },
-          { label: 'Rent Up/Down', value: formatVariancePercent(trip.freight_variance_percentage), icon: trip.freight_variance_direction === 'down' ? TrendingDown : TrendingUp, tone: varianceTone },
-          { label: 'Expenses', value: formatCurrency(totalExpenses), icon: TrendingDown },
-          { label: 'Net', value: formatCurrency(net), icon: TrendingUp, highlight: true },
-          { label: 'Distance', value: `${Math.max((trip.end_meter_reading || 0) - (trip.start_meter_reading || 0), 0).toLocaleString()} km`, icon: Activity },
-        ].map((item) => (
-          <div
-            key={item.label}
-            className={`rounded-lg border p-3 ${item.highlight ? 'border-cargo-success/30 bg-cargo-success/5' : 'border-cargo-border bg-cargo-dark/20'}`}
-          >
-            <p className="text-[11px] text-cargo-muted uppercase tracking-wider font-medium flex items-center gap-1">
-              <item.icon className="w-3 h-3" />
-              {item.label}
-            </p>
-            <p className={`text-sm font-semibold mt-1.5 ${item.highlight ? 'text-cargo-success' : item.tone || 'text-cargo-text'}`}>
-              {item.value}
-            </p>
-          </div>
-        ))}
-      </div>
-
-      {/* Secondary Stats */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
-        <div className="rounded-lg border border-cargo-border bg-cargo-dark/20 p-3">
-          <p className="text-[11px] text-cargo-muted uppercase tracking-wider font-medium flex items-center gap-1">
-            <Gauge className="w-3 h-3" />Start Meter
-          </p>
-          <p className="text-sm text-cargo-text font-semibold mt-1.5">{(trip.start_meter_reading || 0).toLocaleString()}</p>
-        </div>
-        <div className="rounded-lg border border-cargo-border bg-cargo-dark/20 p-3">
-          <p className="text-[11px] text-cargo-muted uppercase tracking-wider font-medium flex items-center gap-1">
-            <Gauge className="w-3 h-3" />End Meter
-          </p>
-          <p className="text-sm text-cargo-text font-semibold mt-1.5">
-            {trip.end_meter_reading ? trip.end_meter_reading.toLocaleString() : isOngoing ? 'Pending' : 'N/A'}
-          </p>
-        </div>
-        <div className="rounded-lg border border-cargo-border bg-cargo-dark/20 p-3">
-          <p className="text-[11px] text-cargo-muted uppercase tracking-wider font-medium flex items-center gap-1">
-            <MapPin className="w-3 h-3" />Live Start
-          </p>
-          <p className="text-sm text-cargo-text font-semibold mt-1.5">{trip.start_live_location || trip.from_location || 'N/A'}</p>
-        </div>
-        <div className="rounded-lg border border-cargo-border bg-cargo-dark/20 p-3">
-          <p className="text-[11px] text-cargo-muted uppercase tracking-wider font-medium flex items-center gap-1">
-            <MapPin className="w-3 h-3" />Actual End
-          </p>
-          <p className="text-sm text-cargo-text font-semibold mt-1.5">{actualEndLocation || (isOngoing ? 'In progress' : 'N/A')}</p>
-        </div>
-      </div>
-
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-        <div className="rounded-lg border border-cargo-border bg-cargo-dark/20 p-3">
-          <p className="text-[11px] text-cargo-muted uppercase tracking-wider font-medium">Load Details</p>
-          <p className="text-sm text-cargo-text font-semibold mt-1.5">{loadSummary || 'N/A'}</p>
-        </div>
-        <div className="rounded-lg border border-cargo-border bg-cargo-dark/20 p-3">
-          <p className="text-[11px] text-cargo-muted uppercase tracking-wider font-medium">Load Photo</p>
-          <div className="mt-2">
-            <ClickableImage src={trip.load_photo} alt="Load photo" className="h-28" />
-          </div>
-        </div>
-        <div className="rounded-lg border border-cargo-border bg-cargo-dark/20 p-3">
-          <p className="text-[11px] text-cargo-muted uppercase tracking-wider font-medium">Expected Freight</p>
-          <p className="text-sm text-cargo-text font-semibold mt-1.5">{trip.expected_freight_charge ? formatCurrency(trip.expected_freight_charge) : 'N/A'}</p>
-        </div>
-        <div className="rounded-lg border border-cargo-border bg-cargo-dark/20 p-3">
-          <p className="text-[11px] text-cargo-muted uppercase tracking-wider font-medium">Variance Amount</p>
-          <p className={`text-sm font-semibold mt-1.5 ${varianceTone}`}>{trip.freight_variance_amount !== null && trip.freight_variance_amount !== undefined ? formatCurrency(trip.freight_variance_amount) : 'N/A'}</p>
-        </div>
-      </div>
-
-      {/* Images */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        <MeterImageCard label="Start Meter Photo" src={trip.start_meter_image} alt="Start meter" />
-        <MeterImageCard label="End Meter Photo" src={trip.end_meter_image} alt="End meter" />
-        <MeterImageCard label="Bilty Slip" src={trip.bilty_slip_image} alt="Bilty slip" />
-        <MeterImageCard label="Load Photo" src={trip.load_photo} alt="Load photo" />
-      </div>
-
-      {/* Cost Breakdown */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-        {[
-          { label: 'Bilty Commission', value: formatCurrency(trip.bilty_commission_amount) },
-          { label: 'Trip Avg', value: formatAverage(trip.trip_average_km_per_liter) },
-          { label: 'Police Cost', value: formatCurrency((trip.expenses || []).filter((item) => item.category === 'police').reduce((sum, item) => sum + Number(item.amount || 0), 0)) },
-          { label: 'Chalaan Cost', value: formatCurrency((trip.expenses || []).filter((item) => item.category === 'chalaan').reduce((sum, item) => sum + Number(item.amount || 0), 0)) },
-          { label: 'Mandi Kaat', value: formatCurrency((trip.expenses || []).filter((item) => item.category === 'mandi_kaat').reduce((sum, item) => sum + Number(item.amount || 0), 0)) },
-          { label: 'Reward Cost', value: formatCurrency((trip.expenses || []).filter((item) => item.category === 'reward').reduce((sum, item) => sum + Number(item.amount || 0), 0)) },
-        ].map((item) => (
-          <div key={item.label} className="rounded-lg border border-cargo-border bg-cargo-dark/20 p-3">
-            <p className="text-[11px] text-cargo-muted uppercase tracking-wider font-medium">{item.label}</p>
-            <p className="text-sm text-cargo-text font-semibold mt-1.5">{item.value}</p>
-          </div>
-        ))}
-      </div>
-
-      <ExpenseBreakdown trip={trip} onEditExpense={onEditExpense} onAddExpense={onAddExpense} />
-      {!isOngoing ? (
-        <BetweenTripExpenseBreakdown trip={trip} onEditDailyExpense={onEditDailyExpense} onAddDailyExpense={onAddDailyExpense} />
-      ) : null}
-
-      {trip.notes ? (
-        <div className="rounded-lg border border-cargo-border bg-cargo-dark/20 p-4">
-          <p className="text-[11px] text-cargo-muted uppercase tracking-wider font-medium flex items-center gap-1 mb-2">
-            <FileText className="w-3 h-3" />
-            Notes
-          </p>
-          <p className="text-sm text-cargo-text whitespace-pre-wrap leading-relaxed">{trip.notes}</p>
-        </div>
-      ) : null}
-    </article>
-  );
-};
 
 const SummaryCard = ({ title, value, icon, highlight = false }) => {
   const IconComponent = icon;
@@ -493,10 +50,10 @@ const SummaryCard = ({ title, value, icon, highlight = false }) => {
       <div className="flex items-start justify-between">
         <div>
           <p className="text-sm text-cargo-muted font-medium">{title}</p>
-          <p className={`text-2xl font-bold mt-2 ${highlight ? 'text-cargo-success' : 'text-cargo-text'}`}>{value}</p>
+          <p className={`text-xl font-bold mt-1 ${highlight ? 'text-cargo-success' : 'text-cargo-text'}`}>{value}</p>
         </div>
-        <div className={`p-2.5 rounded-lg ${highlight ? 'bg-cargo-success/10' : 'bg-cargo-dark/30'}`}>
-          <IconComponent className={`w-5 h-5 ${highlight ? 'text-cargo-success' : 'text-cargo-muted'}`} />
+          <div className={`p-2 rounded-lg ${highlight ? 'bg-cargo-success/10' : 'bg-cargo-dark/30'}`}>
+          <IconComponent className={`w-5 h-5 ${highlight ? 'text-cargo-success' : title === 'Total Taken' ? 'text-cargo-danger' : 'text-cargo-muted'}`} />
         </div>
       </div>
     </div>
@@ -513,27 +70,8 @@ const DriverReportPage = () => {
     from_date: '',
     to_date: '',
   });
-  const [editingTrip, setEditingTrip] = useState(null);
-  const [tripForm, setTripForm] = useState({
-    start_meter_reading: '',
-    end_meter_reading: '',
-    freight_charge: '',
-    from_location: '',
-    to_location: '',
-    notes: '',
-  });
-  const [expenseModal, setExpenseModal] = useState({ isOpen: false, tripId: null, expenseId: null, type: 'trip', driverId: null });
-  const [expenseForm, setExpenseForm] = useState({
-    category: 'diesel',
-    amount: '',
-    liters: '',
-    location: '',
-    notes: '',
-    expense_date: '',
-    meter_reading: '',
-  });
-  const [savingTrip, setSavingTrip] = useState(false);
-  const [savingExpense, setSavingExpense] = useState(false);
+
+
 
   const fetchReport = useCallback(async (activeFilters = filters) => {
     const params = { period: activeFilters.period };
@@ -574,128 +112,10 @@ const DriverReportPage = () => {
   const fallbackCurrentTrip = reportData?.currentTrip ? [reportData.currentTrip] : [];
   const ongoingToRender = ongoingTrips.length ? ongoingTrips : fallbackCurrentTrip;
 
-  const openTripModal = (trip) => {
-    setEditingTrip(trip);
-    setTripForm({
-      start_meter_reading: trip.start_meter_reading ?? '',
-      end_meter_reading: trip.end_meter_reading ?? '',
-      freight_charge: trip.freight_charge ?? '',
-      from_location: trip.from_location || '',
-      to_location: trip.to_location || '',
-      notes: trip.notes || '',
-    });
-  };
+  
 
-  const closeTripModal = () => {
-    setEditingTrip(null);
-  };
+  
 
-  const handleTripSave = async (e) => {
-    e.preventDefault();
-    if (!editingTrip) return;
-    setSavingTrip(true);
-    const result = await put(`/admin/trips/${editingTrip.id}`, tripForm);
-    setSavingTrip(false);
-
-    if (!result.success) {
-      alert(result.error);
-      return;
-    }
-
-    closeTripModal();
-    fetchReport(filters);
-  };
-
-  const openExpenseAddModal = (trip) => {
-    setExpenseModal({ isOpen: true, tripId: trip.id, expenseId: null, type: 'trip', driverId: trip.driver_id ?? reportData?.driver?.id ?? null });
-    setExpenseForm({
-      category: 'diesel',
-      amount: '',
-      liters: '',
-      location: '',
-      notes: '',
-      expense_date: '',
-      meter_reading: '',
-    });
-  };
-
-  const openExpenseEditModal = (trip, expense) => {
-    setExpenseModal({ isOpen: true, tripId: trip.id, expenseId: expense.id, type: 'trip', driverId: trip.driver_id ?? reportData?.driver?.id ?? null });
-    setExpenseForm({
-      category: expense.category || 'diesel',
-      amount: expense.amount ?? '',
-      liters: expense.liters ?? '',
-      location: expense.location || '',
-      notes: expense.notes || '',
-      expense_date: '',
-      meter_reading: '',
-    });
-  };
-
-  const openDailyExpenseAddModal = (trip) => {
-    setExpenseModal({ isOpen: true, tripId: trip.id, expenseId: null, type: 'daily', driverId: trip.driver_id ?? reportData?.driver?.id ?? null });
-    setExpenseForm({
-      category: 'food',
-      amount: '',
-      liters: '',
-      location: '',
-      notes: '',
-      expense_date: '',
-      meter_reading: '',
-    });
-  };
-
-  const openDailyExpenseEditModal = (trip, expense) => {
-    setExpenseModal({ isOpen: true, tripId: trip.id, expenseId: expense.id, type: 'daily', driverId: trip.driver_id ?? reportData?.driver?.id ?? null });
-    setExpenseForm({
-      category: expense.category || 'food',
-      amount: expense.amount ?? '',
-      liters: '',
-      location: '',
-      notes: expense.note || '',
-      expense_date: expense.expense_date ? String(expense.expense_date).slice(0, 10) : '',
-      meter_reading: expense.meter_reading ?? '',
-    });
-  };
-
-  const closeExpenseModal = () => {
-    setExpenseModal({ isOpen: false, tripId: null, expenseId: null, type: 'trip', driverId: null });
-  };
-
-  const handleExpenseSave = async (e) => {
-    e.preventDefault();
-    setSavingExpense(true);
-    const payload = expenseModal.type === 'daily'
-      ? {
-        driver_id: expenseModal.driverId,
-        category: expenseForm.category,
-        amount: expenseForm.amount,
-        note: expenseForm.notes,
-        expense_date: expenseForm.expense_date,
-        meter_reading: expenseForm.meter_reading,
-      }
-      : expenseForm;
-    const result = expenseModal.type === 'daily'
-      ? (
-        expenseModal.expenseId
-          ? await put(`/admin/drivers-expenses/${expenseModal.expenseId}`, payload)
-          : await post('/admin/drivers-expenses', payload)
-      )
-      : (
-        expenseModal.expenseId
-          ? await put(`/admin/trip-expenses/${expenseModal.expenseId}`, payload)
-          : await post(`/admin/trips/${expenseModal.tripId}/expenses`, payload)
-      );
-    setSavingExpense(false);
-
-    if (!result.success) {
-      alert(result.error);
-      return;
-    }
-
-    closeExpenseModal();
-    fetchReport(filters);
-  };
 
   return (
     <div className="space-y-6 pb-10 max-w-7xl">
@@ -717,7 +137,6 @@ const DriverReportPage = () => {
               </div>
               Driver Report {reportData?.driver?.username ? `- ${reportData.driver.username}` : ''}
             </h1>
-            <p className="text-cargo-muted mt-1.5 text-sm">Detailed route, expense, and meter audit per trip</p>
           </div>
         </div>
       </div>
@@ -762,10 +181,20 @@ const DriverReportPage = () => {
       ) : (
         <>
           {/* Summary Cards */}
-          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
-            <SummaryCard title="Total Freight" value={formatCurrency(reportData?.stats?.total_revenue)} icon={TrendingUp} />
-            <SummaryCard title="Total Expenses" value={formatCurrency(reportData?.stats?.total_expenses)} icon={TrendingDown} />
-            <SummaryCard title="Net Income" value={formatCurrency(reportData?.stats?.net_profit)} icon={Wallet} highlight />
+          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-5 gap-3">
+            <SummaryCard
+              title="Challan Amount "
+              value={`${formatCurrency(reportData?.stats?.total_challan_amount)} / ${reportData?.stats?.challan_count || 0}`}
+              icon={Receipt}
+            />
+            <SummaryCard title="Food Expenses" value={formatCurrency(reportData?.stats?.total_food_expenses)} icon={TrendingDown} />
+            <SummaryCard title="Average" value={formatAverage(reportData?.stats?.overall_average_km_per_liter)} icon={Activity} />
+            <SummaryCard title="Karay Liye" value={formatCurrency(reportData?.stats?.total_freight_taken)} icon={TrendingUp} />
+            <SummaryCard title="Available Salary" value={formatCurrency(reportData?.driver?.available_balance)} icon={Wallet} />
+            <SummaryCard title="Commission Taken" value={formatCurrency(reportData?.stats?.total_taken)} icon={ArrowUpRight} />
+            <SummaryCard title="Bilty Commission" value={formatCurrency(reportData?.stats?.total_bilty_commission)} icon={Wallet} />
+            <SummaryCard title="Income Given" value={formatCurrency(reportData?.stats?.net_profit)} icon={Wallet} highlight />
+            <SummaryCard title="Commission Balance" value={formatCurrency(reportData?.driver?.commission_balance)} icon={Wallet} />
             <SummaryCard
               title="Trips / Distance"
               value={`${reportData?.stats?.total_trips || 0} / ${(reportData?.stats?.total_distance || 0).toLocaleString()} km`}
@@ -784,7 +213,7 @@ const DriverReportPage = () => {
                 {[
                   { label: 'Phone', value: reportData?.driver?.phone || 'N/A', icon: Phone },
                   { label: 'License', value: reportData?.driver?.license_number || 'License N/A', icon: IdCard },
-                  { label: 'Car', value: reportData?.driver?.car_number || 'No cargo assigned', icon: Car },
+                  { label: 'Driver Cargo Number', value: reportData?.driver?.car_number || 'No cargo assigned', icon: Car },
                   { label: 'Overall Avg', value: formatAverage(reportData?.driver?.overall_average_km_per_liter || reportData?.stats?.overall_average_km_per_liter), icon: Activity },
                   { label: 'Status', value: reportData?.driver?.status ? reportData.driver.status.charAt(0).toUpperCase() + reportData.driver.status.slice(1) : 'N/A', icon: User },
                 ].map((item) => (
@@ -825,190 +254,11 @@ const DriverReportPage = () => {
             </div>
           </div>
 
-          {/* Ongoing Trips */}
-          <div className="card space-y-5">
-            <h2 className="text-lg font-semibold text-cargo-text flex items-center gap-2">
-              <Clock3 className="w-5 h-5 text-cargo-accent" />
-              Ongoing Trips
-            </h2>
-            {ongoingToRender.length ? (
-              ongoingToRender.map((trip) => (
-                <TripCard
-                  key={trip.id}
-                  trip={trip}
-                  status="ongoing"
-                  onEditTrip={openTripModal}
-                  onEditExpense={openExpenseEditModal}
-                  onAddExpense={openExpenseAddModal}
-                  onEditDailyExpense={openDailyExpenseEditModal}
-                  onAddDailyExpense={openDailyExpenseAddModal}
-                />
-              ))
-            ) : (
-              <p className="text-cargo-muted">No ongoing trips in this period.</p>
-            )}
-          </div>
-
-          {/* Completed Trips */}
-          <div className="card space-y-5">
-            <h2 className="text-lg font-semibold text-cargo-text flex items-center gap-2">
-              <CheckCircle2 className="w-5 h-5 text-cargo-success" />
-              Completed Trip Records
-            </h2>
-            {completedTrips.length ? (
-              completedTrips.map((trip) => (
-                <TripCard
-                  key={trip.id}
-                  trip={trip}
-                  status="completed"
-                  onEditTrip={openTripModal}
-                  onEditExpense={openExpenseEditModal}
-                  onAddExpense={openExpenseAddModal}
-                  onEditDailyExpense={openDailyExpenseEditModal}
-                  onAddDailyExpense={openDailyExpenseAddModal}
-                />
-              ))
-            ) : (
-              <p className="text-cargo-muted">No completed trips in this period.</p>
-            )}
-          </div>
+        
+     
         </>
       )}
 
-      <Modal isOpen={Boolean(editingTrip)} onClose={closeTripModal} title="Edit Trip">
-        <form onSubmit={handleTripSave} className="space-y-4">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-            <input
-              type="number"
-              min="0"
-              step="0.01"
-              value={tripForm.start_meter_reading}
-              onChange={(e) => setTripForm((prev) => ({ ...prev, start_meter_reading: e.target.value }))}
-              className="input-field w-full"
-              placeholder="Start Meter Reading"
-            />
-            <input
-              type="number"
-              min="0"
-              step="0.01"
-              value={tripForm.end_meter_reading}
-              onChange={(e) => setTripForm((prev) => ({ ...prev, end_meter_reading: e.target.value }))}
-              className="input-field w-full"
-              placeholder="End Meter Reading"
-            />
-            <input
-              type="text"
-              value={tripForm.from_location}
-              onChange={(e) => setTripForm((prev) => ({ ...prev, from_location: e.target.value }))}
-              className="input-field w-full"
-              placeholder="From Location"
-            />
-            <input
-              type="text"
-              value={tripForm.to_location}
-              onChange={(e) => setTripForm((prev) => ({ ...prev, to_location: e.target.value }))}
-              className="input-field w-full"
-              placeholder="To Location"
-            />
-            <input
-              type="number"
-              min="0"
-              step="0.01"
-              value={tripForm.freight_charge}
-              onChange={(e) => setTripForm((prev) => ({ ...prev, freight_charge: e.target.value }))}
-              className="input-field w-full md:col-span-2"
-              placeholder="Freight Charge"
-            />
-          </div>
-          <textarea
-            value={tripForm.notes}
-            onChange={(e) => setTripForm((prev) => ({ ...prev, notes: e.target.value }))}
-            className="input-field w-full min-h-24"
-            placeholder="Notes"
-          />
-          <div className="flex gap-3">
-            <button type="button" onClick={closeTripModal} className="flex-1 btn-secondary">Cancel</button>
-            <button type="submit" disabled={savingTrip} className="flex-1 btn-primary">
-              {savingTrip ? 'Saving...' : 'Save Trip'}
-            </button>
-          </div>
-        </form>
-      </Modal>
-
-      <Modal isOpen={expenseModal.isOpen} onClose={closeExpenseModal} title={expenseModal.type === 'daily' ? (expenseModal.expenseId ? 'Edit While Looking For Next Trip Expense' : 'Add While Looking For Next Trip Expense') : (expenseModal.expenseId ? 'Edit Trip Expense' : 'Add Trip Expense')}>
-        <form onSubmit={handleExpenseSave} className="space-y-4">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-            <select
-              value={expenseForm.category}
-              onChange={(e) => setExpenseForm((prev) => ({ ...prev, category: e.target.value }))}
-              className="input-field w-full"
-            >
-              {(expenseModal.type === 'daily' ? dailyExpenseCategories : tripExpenseCategories).map((category) => (
-                <option key={category} value={category}>{formatCategoryLabel(category)}</option>
-              ))}
-            </select>
-            <input
-              type="number"
-              min="0"
-              step="0.01"
-              value={expenseForm.amount}
-              onChange={(e) => setExpenseForm((prev) => ({ ...prev, amount: e.target.value }))}
-              className="input-field w-full"
-              placeholder="Amount"
-            />
-            {expenseModal.type === 'daily' ? (
-              <>
-                <input
-                  type="date"
-                  value={expenseForm.expense_date}
-                  onChange={(e) => setExpenseForm((prev) => ({ ...prev, expense_date: e.target.value }))}
-                  className="input-field w-full"
-                />
-                <input
-                  type="number"
-                  min="0"
-                  step="0.01"
-                  value={expenseForm.meter_reading}
-                  onChange={(e) => setExpenseForm((prev) => ({ ...prev, meter_reading: e.target.value }))}
-                  className="input-field w-full"
-                  placeholder="Meter Reading"
-                />
-              </>
-            ) : (
-              <>
-                <input
-                  type="number"
-                  min="0"
-                  step="0.01"
-                  value={expenseForm.liters}
-                  onChange={(e) => setExpenseForm((prev) => ({ ...prev, liters: e.target.value }))}
-                  className="input-field w-full"
-                  placeholder="Liters"
-                />
-                <input
-                  type="text"
-                  value={expenseForm.location}
-                  onChange={(e) => setExpenseForm((prev) => ({ ...prev, location: e.target.value }))}
-                  className="input-field w-full"
-                  placeholder="Location"
-                />
-              </>
-            )}
-          </div>
-          <textarea
-            value={expenseForm.notes}
-            onChange={(e) => setExpenseForm((prev) => ({ ...prev, notes: e.target.value }))}
-            className="input-field w-full min-h-24"
-            placeholder={expenseModal.type === 'daily' ? 'Name / Notes' : 'Notes'}
-          />
-          <div className="flex gap-3">
-            <button type="button" onClick={closeExpenseModal} className="flex-1 btn-secondary">Cancel</button>
-            <button type="submit" disabled={savingExpense} className="flex-1 btn-primary">
-              {savingExpense ? 'Saving...' : expenseModal.expenseId ? 'Save Expense' : 'Add Expense'}
-            </button>
-          </div>
-        </form>
-      </Modal>
     </div>
   );
 };

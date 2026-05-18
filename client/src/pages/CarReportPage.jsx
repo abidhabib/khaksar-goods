@@ -65,6 +65,21 @@ const formatCategoryLabel = (value) =>
     .replace(/_/g, ' ')
     .replace(/\b\w/g, (char) => char.toUpperCase());
 
+const sortExpensesByCategory = (expenses = [], orderedCategories = []) => [...expenses].sort((left, right) => {
+  const leftIndex = orderedCategories.indexOf(left.category);
+  const rightIndex = orderedCategories.indexOf(right.category);
+
+  if (leftIndex === -1 && rightIndex === -1) {
+    return String(left.category || '').localeCompare(String(right.category || ''));
+  }
+
+  if (leftIndex === -1) return 1;
+  if (rightIndex === -1) return -1;
+  if (leftIndex !== rightIndex) return leftIndex - rightIndex;
+
+  return (new Date(left.created_at).getTime() || 0) - (new Date(right.created_at).getTime() || 0);
+});
+
 const tripExpenseCategories = [
   'diesel',
   'toll',
@@ -177,7 +192,19 @@ const MeterImageCard = ({ label, src, alt }) => (
 );
 
 const ExpenseBreakdown = ({ trip, onEditExpense, onAddExpense }) => {
-  const expenses = trip.expenses || [];
+  const biltyCommissionAmount = Number(trip.bilty_commission_amount) || 0;
+  const expenses = sortExpensesByCategory([
+    ...(trip.expenses || []),
+    ...(biltyCommissionAmount > 0 ? [{
+      id: `bilty-${trip.id}`,
+      category: 'bilty_commission',
+      amount: biltyCommissionAmount,
+      created_at: trip.ended_at || trip.started_at,
+      location: null,
+      liters: null,
+      receipt_image: null,
+    }] : []),
+  ], tripExpenseCategories);
   const totalExpenses = Number(trip.trip_expenses_total ?? trip.total_expenses ?? 0);
 
   return (
@@ -241,7 +268,7 @@ const ExpenseBreakdown = ({ trip, onEditExpense, onAddExpense }) => {
 };
 
 const BetweenTripExpenseBreakdown = ({ trip, onEditDailyExpense, onAddDailyExpense }) => {
-  const expenses = trip.daily_expenses || [];
+  const expenses = sortExpensesByCategory(trip.daily_expenses || [], dailyExpenseCategories);
   const totalExpenses = Number(trip.between_trip_expenses_total ?? 0);
 
   return (
@@ -327,30 +354,38 @@ const StatBadge = ({ children, variant = 'default' }) => {
 
 const TripCard = ({ trip, status = 'completed', onEditTrip, onEditExpense, onAddExpense, onEditDailyExpense, onAddDailyExpense }) => {
   const isOngoing = status === 'ongoing';
+  const totalExpenses = Number(trip.total_expenses ?? 0);
+  const net = Number(trip.net_income ?? (Number(trip.freight_charge || 0) - totalExpenses));
   const actualEndLocation = trip.end_location || trip.end_live_location;
   const loadSummary = [trip.load_name, trip.load_weight].filter(Boolean).join(' • ');
+  const statusVariant = trip.status === 'completed' ? 'completed' : trip.status === 'cancelled' ? 'cancelled' : 'ongoing';
   const varianceTone = getVarianceTone(trip.freight_variance_direction);
 
   return (
     <article className="rounded-xl border border-cargo-border bg-cargo-card/50 p-5 space-y-5 hover:border-cargo-border/80 transition-all duration-200 shadow-sm">
-      {/* Header */}
       <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
         <div className="flex items-start gap-3">
-          <div className={`mt-1 p-2 rounded-lg ${isOngoing ? 'bg-cargo-accent/10' : 'bg-cargo-success/10'}`}>
-            <Route className={`w-4 h-4 ${isOngoing ? 'text-cargo-accent' : 'text-cargo-success'}`} />
+          <div className={`mt-1 p-2 rounded-lg ${isOngoing ? 'bg-cargo-accent/10' : trip.status === 'cancelled' ? 'bg-cargo-danger/10' : 'bg-cargo-success/10'}`}>
+            <Route className={`w-4 h-4 ${isOngoing ? 'text-cargo-accent' : trip.status === 'cancelled' ? 'text-cargo-danger' : 'text-cargo-success'}`} />
           </div>
           <div>
             <p className="text-cargo-text font-bold text-base">
               {trip.from_location} <span className="text-cargo-muted font-normal mx-1">→</span> {trip.to_location}
             </p>
-            <p className="text-xs text-cargo-muted mt-1 flex items-center gap-1">
-              <User className="w-3 h-3" />
-              Driver: {trip.driver_name || 'N/A'}
-            </p>
+            <div className="mt-1 flex flex-wrap items-center gap-3 text-xs text-cargo-muted">
+              <span className="flex items-center gap-1">
+                <User className="w-3 h-3" />
+                {trip.driver_name || 'N/A'}
+              </span>
+              <span className="flex items-center gap-1">
+                <Car className="w-3 h-3" />
+                Car: {trip.car_number || 'N/A'}
+              </span>
+            </div>
           </div>
         </div>
-        <StatBadge variant={isOngoing ? 'ongoing' : 'completed'}>
-          {isOngoing ? 'Ongoing' : 'Completed'}
+        <StatBadge variant={statusVariant}>
+          {String(trip.status || 'unknown').charAt(0).toUpperCase() + String(trip.status || 'unknown').slice(1)}
         </StatBadge>
       </div>
 
@@ -361,33 +396,46 @@ const TripCard = ({ trip, status = 'completed', onEditTrip, onEditExpense, onAdd
         </button>
       </div>
 
-      {/* Primary Stats */}
       <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
         {[
           { label: 'Started', value: formatDate(trip.started_at), icon: Calendar },
           { label: 'Ended', value: isOngoing ? 'In progress' : formatDate(trip.ended_at), icon: Clock3 },
-          { label: 'Freight', value: formatCurrency(trip.freight_charge), icon: Wallet },
-          { label: 'Rent Up/Down', value: formatVariancePercent(trip.freight_variance_percentage), icon: trip.freight_variance_direction === 'down' ? TrendingDown : TrendingUp, tone: varianceTone },
-          { label: 'Expenses', value: formatCurrency(trip.total_expenses), icon: TrendingDown },
-          { label: 'Net', value: formatCurrency(trip.net_income), icon: TrendingUp, highlight: true },
-          { label: 'Distance', value: `${Math.max((trip.end_meter_reading || 0) - (trip.start_meter_reading || 0), 0).toLocaleString()} km`, icon: Activity },
+          {
+            label: 'Freight',
+            value: formatCurrency(trip.freight_charge),
+            subvalue: `↕ ${formatVariancePercent(trip.freight_variance_percentage)}`,
+            icon: Wallet,
+            tone: varianceTone
+          },
+          { label: 'Expenses', value: formatCurrency(totalExpenses), icon: TrendingDown },
+          { label: 'Net income', value: formatCurrency(net), icon: TrendingUp, highlight: true },
+          {
+            label: 'Distance',
+            value: `${Math.max((Number(trip.end_meter_reading) || 0) - (Number(trip.start_meter_reading) || 0), 0).toLocaleString()} km`,
+            subvalue: `Avg: ${formatAverage(trip.trip_average_km_per_liter)}`,
+            icon: Activity
+          },
         ].map((item) => (
           <div
             key={item.label}
             className={`rounded-lg border p-3 ${item.highlight ? 'border-cargo-success/30 bg-cargo-success/5' : 'border-cargo-border bg-cargo-dark/20'}`}
           >
-            <p className="text-[11px] text-cargo-muted uppercase tracking-wider font-medium flex items-center gap-1">
+            <p className="text-xs text-cargo-muted font-medium flex items-center gap-1">
               <item.icon className="w-3 h-3" />
               {item.label}
             </p>
             <p className={`text-sm font-semibold mt-1.5 ${item.highlight ? 'text-cargo-success' : item.tone || 'text-cargo-text'}`}>
               {item.value}
             </p>
+            {item.subvalue ? (
+              <p className={`text-xs mt-1 ${item.tone || 'text-cargo-muted'}`}>
+                {item.subvalue}
+              </p>
+            ) : null}
           </div>
         ))}
       </div>
 
-      {/* Secondary Stats */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
         <div className="rounded-lg border border-cargo-border bg-cargo-dark/20 p-3">
           <p className="text-[11px] text-cargo-muted uppercase tracking-wider font-medium flex items-center gap-1">
@@ -423,12 +471,6 @@ const TripCard = ({ trip, status = 'completed', onEditTrip, onEditExpense, onAdd
           <p className="text-sm text-cargo-text font-semibold mt-1.5">{loadSummary || 'N/A'}</p>
         </div>
         <div className="rounded-lg border border-cargo-border bg-cargo-dark/20 p-3">
-          <p className="text-[11px] text-cargo-muted uppercase tracking-wider font-medium">Load Photo</p>
-          <div className="mt-2">
-            <ClickableImage src={trip.load_photo} alt="Load photo" className="h-28" />
-          </div>
-        </div>
-        <div className="rounded-lg border border-cargo-border bg-cargo-dark/20 p-3">
           <p className="text-[11px] text-cargo-muted uppercase tracking-wider font-medium">Expected Freight</p>
           <p className="text-sm text-cargo-text font-semibold mt-1.5">{trip.expected_freight_charge ? formatCurrency(trip.expected_freight_charge) : 'N/A'}</p>
         </div>
@@ -446,15 +488,11 @@ const TripCard = ({ trip, status = 'completed', onEditTrip, onEditExpense, onAdd
         <MeterImageCard label="Load Photo" src={trip.load_photo} alt="Load photo" />
       </div>
 
-      {/* Cost Breakdown */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
         {[
-          { label: 'Bilty Commission', value: formatCurrency(trip.bilty_commission_amount) },
-          { label: 'Trip Avg', value: formatAverage(trip.trip_average_km_per_liter) },
-          { label: 'Police Cost', value: formatCurrency((trip.expenses || []).filter((item) => item.category === 'police').reduce((sum, item) => sum + Number(item.amount || 0), 0)) },
-          { label: 'Chalaan Cost', value: formatCurrency((trip.expenses || []).filter((item) => item.category === 'chalaan').reduce((sum, item) => sum + Number(item.amount || 0), 0)) },
-          { label: 'Mandi Kaat', value: formatCurrency((trip.expenses || []).filter((item) => item.category === 'mandi_kaat').reduce((sum, item) => sum + Number(item.amount || 0), 0)) },
-          { label: 'Reward Cost', value: formatCurrency((trip.expenses || []).filter((item) => item.category === 'reward').reduce((sum, item) => sum + Number(item.amount || 0), 0)) },
+          { label: 'Diesel Liters', value: `${Number(trip.total_diesel_liters || 0).toLocaleString()} L` },
+          { label: 'Phone', value: trip.driver_phone || 'N/A' },
+          { label: 'License', value: trip.license_number || 'N/A' },
         ].map((item) => (
           <div key={item.label} className="rounded-lg border border-cargo-border bg-cargo-dark/20 p-3">
             <p className="text-[11px] text-cargo-muted uppercase tracking-wider font-medium">{item.label}</p>
@@ -710,7 +748,6 @@ const CarReportPage = () => {
               </div>
               Cargo Report {reportData?.car?.car_number ? `- ${reportData.car.car_number}` : ''}
             </h1>
-            <p className="text-cargo-muted mt-1.5 text-sm">Detailed route, expense, and meter audit per trip</p>
           </div>
         </div>
       </div>

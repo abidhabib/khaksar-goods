@@ -282,6 +282,49 @@ const computeAverageKmPerLiter = (distance, liters) => {
     return +(d / l).toFixed(2);
 };
 
+const buildMoboilStatus = ({
+    currentMeterReading,
+    lastMoboilChangeMeterReading,
+    baselineMeterReading
+}) => {
+    const currentMeter = Number(currentMeterReading) || 0;
+    const lastMeter = lastMoboilChangeMeterReading === null || lastMoboilChangeMeterReading === undefined
+        ? null
+        : Number(lastMoboilChangeMeterReading) || 0;
+    const baselineMeter = Number.isFinite(Number(baselineMeterReading))
+        ? Number(baselineMeterReading) || 0
+        : 0;
+
+    const referenceMeter = lastMeter !== null ? lastMeter : baselineMeter;
+    const kmSinceChange = currentMeter >= referenceMeter
+        ? Number((currentMeter - referenceMeter).toFixed(2))
+        : 0;
+    const remainingKm = Math.max(0, MOBOIL_CHANGE_INTERVAL - kmSinceChange);
+    const progressPercent = Math.min(100, (kmSinceChange / MOBOIL_CHANGE_INTERVAL) * 100);
+
+    return {
+        last_change_meter: lastMeter,
+        baseline_meter: baselineMeter,
+        km_since_change: Number(kmSinceChange.toFixed(2)),
+        remaining_km: Number(remainingKm.toFixed(2)),
+        progress_percent: Number(progressPercent.toFixed(1)),
+        needs_change: remainingKm <= 0
+    };
+};
+
+const getDriverCarContext = async (driverId) => {
+    const [rows] = await pool.execute(
+        `SELECT d.assigned_car_id, c.car_number, c.current_meter_reading
+         FROM drivers d
+         LEFT JOIN cars c ON d.assigned_car_id = c.id
+         WHERE d.id = ?
+         LIMIT 1`,
+        [driverId]
+    );
+
+    return rows[0] || null;
+};
+
 const attachDriverTimelineExpensesToTrips = async (trips) => {
     if (!Array.isArray(trips) || !trips.length) {
         return Array.isArray(trips) ? trips : [];
@@ -479,42 +522,17 @@ const [lastMoboilRows] = await pool.execute(`
         lifetimeStats.net_earnings = lifetimeStats.total_revenue - lifetimeStats.total_expenses;
 
         const profilePayload = profile[0];
-const lastMoboilChange = lastMoboilRows[0] || null;
-const currentMeter = Number(profilePayload.current_meter_reading) || 0;
-      // In backend controller
-profilePayload.overall_average_km_per_liter = computeAverageKmPerLiter(
-    profilePayload.car_total_distance,
-    profilePayload.car_total_diesel_liters
-) ?? 0;  // Return 0 if null
-      if (lastMoboilChange) {
-    const lastMoboilMeter = Number(lastMoboilChange.meter_reading) || 0;
-    const kmSinceChange = lastMoboilMeter > 0 && currentMeter >= lastMoboilMeter
-        ? Number((currentMeter - lastMoboilMeter).toFixed(2))
-        : 0;
-    
-    const remainingKm = Math.max(0, MOBOIL_CHANGE_INTERVAL - kmSinceChange);
-    const progressPercent = Math.min(100, (kmSinceChange / MOBOIL_CHANGE_INTERVAL) * 100);
-    
-    profilePayload.moboil_status = {
-        last_change_meter: lastMoboilMeter,
-        km_since_change: kmSinceChange,
-        remaining_km: Number(remainingKm.toFixed(2)),
-        progress_percent: Number(progressPercent.toFixed(1)),
-        needs_change: remainingKm <= 0
-    };
-} else {
-    // No moboil change recorded yet - assume full interval remaining from current meter
-    const kmSinceChange = currentMeter % MOBOIL_CHANGE_INTERVAL;
-    const remainingKm = MOBOIL_CHANGE_INTERVAL - kmSinceChange;
-    
-    profilePayload.moboil_status = {
-        last_change_meter: null,
-        km_since_change: Number(kmSinceChange.toFixed(2)),
-        remaining_km: Number(remainingKm.toFixed(2)),
-        progress_percent: Number(((kmSinceChange / MOBOIL_CHANGE_INTERVAL) * 100).toFixed(1)),
-        needs_change: false
-    };
-}
+        const lastMoboilChange = lastMoboilRows[0] || null;
+        const currentMeter = Number(profilePayload.current_meter_reading) || 0;
+        profilePayload.overall_average_km_per_liter = computeAverageKmPerLiter(
+            profilePayload.car_total_distance,
+            profilePayload.car_total_diesel_liters
+        ) ?? 0;
+        profilePayload.moboil_status = buildMoboilStatus({
+            currentMeterReading: currentMeter,
+            lastMoboilChangeMeterReading: lastMoboilChange ? lastMoboilChange.meter_reading : null,
+            baselineMeterReading: 0
+        });
 
         lifetimeStats.overall_average_km_per_liter = computeAverageKmPerLiter(
             lifetimeStats.total_distance,
@@ -1296,6 +1314,19 @@ const saveDailyExpense = async (req, res) => {
                 return res.status(400).json({ message: 'Meter reading is required for moboil change' });
             }
 
+            let carContext = null;
+            if (normalizedCategory === 'moboil_change') {
+                carContext = await getDriverCarContext(driver_id);
+                if (!carContext?.assigned_car_id) {
+                    return res.status(400).json({ message: 'Driver has no assigned cargo' });
+                }
+
+                const currentCarMeter = Number(carContext.current_meter_reading) || 0;
+                if (meterReadingValue < currentCarMeter) {
+                    return res.status(400).json({ message: 'Meter reading must be greater than or equal to current car meter reading' });
+                }
+            }
+
             const expenseDate = toNullableString(req.body.expense_date);
             const [result] = await pool.execute(
                 `INSERT INTO driver_daily_expense_entries
@@ -1303,6 +1334,13 @@ const saveDailyExpense = async (req, res) => {
                  VALUES (?, ?, ?, ?, ?, ?, COALESCE(?, CURDATE()))`,
                 [driver_id, normalizedCategory, amountValue, meterReadingValue, noteValue, expense_image, expenseDate]
             );
+
+            if (normalizedCategory === 'moboil_change' && carContext?.assigned_car_id) {
+                await pool.execute(
+                    'UPDATE cars SET current_meter_reading = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?',
+                    [meterReadingValue, carContext.assigned_car_id]
+                );
+            }
 
             const [[entry]] = await pool.execute(
                 `SELECT id, driver_id, category, amount, meter_reading, note, expense_image, expense_date, created_at
@@ -1356,6 +1394,54 @@ const saveDailyExpense = async (req, res) => {
         });
     } catch (error) {
         console.error('Save daily expense error:', error);
+        res.status(500).json({ message: 'Server error' });
+    }
+};
+
+const saveMoboilChangeReading = async (req, res) => {
+    try {
+        const driver_id = await resolveDriverId(req);
+        if (!driver_id) {
+            return res.status(403).json({ message: 'Driver account required' });
+        }
+
+        const meterReadingValue = toOptionalDecimal(req.body?.meter_reading);
+
+        if (meterReadingValue === null) {
+            return res.status(400).json({ message: 'Meter reading is required for moboil change' });
+        }
+
+        const carContext = await getDriverCarContext(driver_id);
+        if (!carContext?.assigned_car_id) {
+            return res.status(400).json({ message: 'Driver has no assigned cargo' });
+        }
+
+        const currentCarMeter = Number(carContext.current_meter_reading) || 0;
+        if (meterReadingValue < currentCarMeter) {
+            return res.status(400).json({ message: 'Meter reading must be greater than or equal to current car meter reading' });
+        }
+
+        await pool.execute(
+            'UPDATE cars SET current_meter_reading = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?',
+            [meterReadingValue, carContext.assigned_car_id]
+        );
+
+        res.json({
+            success: true,
+            message: 'Moboil change saved successfully',
+            car: {
+                id: carContext.assigned_car_id,
+                car_number: carContext.car_number,
+                current_meter_reading: meterReadingValue
+            },
+            moboil_status: buildMoboilStatus({
+                currentMeterReading: meterReadingValue,
+                lastMoboilChangeMeterReading: meterReadingValue,
+                baselineMeterReading: currentCarMeter
+            })
+        });
+    } catch (error) {
+        console.error('Save moboil change error:', error);
         res.status(500).json({ message: 'Server error' });
     }
 };
@@ -1965,7 +2051,7 @@ const requestJoinAfterLeave = async (req, res) => {
             await connection.beginTransaction();
             await connection.execute(
                 `UPDATE driver_leave_requests
-                 SET status = 'pending_join',
+                 SET status = 'completed',
                      join_meter_reading = ?,
                      join_meter_image = ?,
                      join_location = ?,
@@ -2115,6 +2201,7 @@ module.exports = {
     getTripDetails,
     getDailyExpenses,
     saveDailyExpense,
+    saveMoboilChangeReading,
     submitCompanyPayment,
     getCompanyPayments,
     getDriverAccount,

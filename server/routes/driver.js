@@ -13,6 +13,7 @@ const {
     getTripDetails,
     getDailyExpenses,
     saveDailyExpense,
+    saveMoboilChangeReading,
     submitCompanyPayment,
     getCompanyPayments,
     getDriverAccount,
@@ -74,6 +75,7 @@ router.post(
     upload.fields([{ name: 'expense_image', maxCount: 1 }]),
     saveDailyExpense
 );
+router.post('/moboil-change', authMiddleware, driverOnly, saveMoboilChangeReading);
 router.post(
     '/company-payments',
     authMiddleware,

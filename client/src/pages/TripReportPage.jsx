@@ -61,6 +61,33 @@ const formatCategoryLabel = (value) =>
     .replace(/_/g, ' ')
     .replace(/\b\w/g, (char) => char.toUpperCase());
 
+const tripExpenseCategoryOrder = [
+  'diesel',
+  'food',
+  'toll',
+  'police',
+  'chalaan',
+  'mandi_kaat',
+  'reward',
+  'tyre_puncture',
+  'bilty_commission',
+];
+
+const sortExpensesByCategory = (expenses = []) => [...expenses].sort((left, right) => {
+  const leftIndex = tripExpenseCategoryOrder.indexOf(left.category);
+  const rightIndex = tripExpenseCategoryOrder.indexOf(right.category);
+
+  if (leftIndex === -1 && rightIndex === -1) {
+    return String(left.category || '').localeCompare(String(right.category || ''));
+  }
+
+  if (leftIndex === -1) return 1;
+  if (rightIndex === -1) return -1;
+  if (leftIndex !== rightIndex) return leftIndex - rightIndex;
+
+  return (new Date(left.created_at).getTime() || 0) - (new Date(right.created_at).getTime() || 0);
+});
+
 const ImageModal = ({ src, alt, isOpen, onClose }) => {
   useEffect(() => {
     const handleEsc = (e) => {
@@ -149,7 +176,19 @@ const MeterImageCard = ({ label, src, alt }) => (
 );
 
 const ExpenseBreakdown = ({ trip }) => {
-  const expenses = trip.expenses || [];
+  const biltyCommissionAmount = Number(trip.bilty_commission_amount) || 0;
+  const expenses = sortExpensesByCategory([
+    ...(trip.expenses || []),
+    ...(biltyCommissionAmount > 0 ? [{
+      id: `bilty-${trip.id}`,
+      category: 'bilty_commission',
+      amount: biltyCommissionAmount,
+      created_at: trip.ended_at || trip.started_at,
+      location: null,
+      liters: null,
+      receipt_image: null,
+    }] : []),
+  ]);
   const totalExpenses = Number(trip.total_expenses ?? 0);
 
   return (
@@ -256,13 +295,19 @@ const TripCard = ({ trip }) => {
         {[
           { label: 'Started', value: formatDate(trip.started_at), icon: Calendar },
           { label: 'Ended', value: isOngoing ? 'In progress' : formatDate(trip.ended_at), icon: Clock3 },
-          { label: 'Freight', value: formatCurrency(trip.freight_charge), icon: Wallet },
-          { label: 'Rent Up/Down', value: formatVariancePercent(trip.freight_variance_percentage), icon: trip.freight_variance_direction === 'down' ? TrendingDown : TrendingUp, tone: varianceTone },
+          {
+            label: 'Freight',
+            value: formatCurrency(trip.freight_charge),
+            subvalue: `↕ ${formatVariancePercent(trip.freight_variance_percentage)}`,
+            icon: Wallet,
+            tone: varianceTone
+          },
           { label: 'Expenses', value: formatCurrency(totalExpenses), icon: TrendingDown },
-          { label: 'Net', value: formatCurrency(net), icon: TrendingUp, highlight: true },
+          { label: 'Net income', value: formatCurrency(net), icon: TrendingUp, highlight: true },
           {
             label: 'Distance',
             value: `${Math.max((Number(trip.end_meter_reading) || 0) - (Number(trip.start_meter_reading) || 0), 0).toLocaleString()} km`,
+            subvalue: `Avg: ${formatAverage(trip.trip_average_km_per_liter)}`,
             icon: Activity
           },
         ].map((item) => (
@@ -270,13 +315,18 @@ const TripCard = ({ trip }) => {
             key={item.label}
             className={`rounded-lg border p-3 ${item.highlight ? 'border-cargo-success/30 bg-cargo-success/5' : 'border-cargo-border bg-cargo-dark/20'}`}
           >
-            <p className="text-[11px] text-cargo-muted uppercase tracking-wider font-medium flex items-center gap-1">
+            <p className="text-xs text-cargo-muted font-medium flex items-center gap-1">
               <item.icon className="w-3 h-3" />
               {item.label}
             </p>
             <p className={`text-sm font-semibold mt-1.5 ${item.highlight ? 'text-cargo-success' : item.tone || 'text-cargo-text'}`}>
               {item.value}
             </p>
+            {item.subvalue ? (
+              <p className={`text-xs mt-1 ${item.tone || 'text-cargo-muted'}`}>
+                {item.subvalue}
+              </p>
+            ) : null}
           </div>
         ))}
       </div>
@@ -316,10 +366,6 @@ const TripCard = ({ trip }) => {
           <p className="text-sm text-cargo-text font-semibold mt-1.5">{loadSummary || 'N/A'}</p>
         </div>
         <div className="rounded-lg border border-cargo-border bg-cargo-dark/20 p-3">
-          <p className="text-[11px] text-cargo-muted uppercase tracking-wider font-medium">Trip Average</p>
-          <p className="text-sm text-cargo-text font-semibold mt-1.5">{formatAverage(trip.trip_average_km_per_liter)}</p>
-        </div>
-        <div className="rounded-lg border border-cargo-border bg-cargo-dark/20 p-3">
           <p className="text-[11px] text-cargo-muted uppercase tracking-wider font-medium">Expected Freight</p>
           <p className="text-sm text-cargo-text font-semibold mt-1.5">{trip.expected_freight_charge ? formatCurrency(trip.expected_freight_charge) : 'N/A'}</p>
         </div>
@@ -338,7 +384,6 @@ const TripCard = ({ trip }) => {
 
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
         {[
-          { label: 'Bilty Commission', value: formatCurrency(trip.bilty_commission_amount) },
           { label: 'Diesel Liters', value: `${Number(trip.total_diesel_liters || 0).toLocaleString()} L` },
           { label: 'Phone', value: trip.driver_phone || 'N/A' },
           { label: 'License', value: trip.license_number || 'N/A' },

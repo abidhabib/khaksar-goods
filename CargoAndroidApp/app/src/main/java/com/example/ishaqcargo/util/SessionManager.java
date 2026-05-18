@@ -8,6 +8,7 @@ public class SessionManager {
     private static final String KEY_TOKEN = "token";
     private static final String KEY_USERNAME = "username";
     private static final String KEY_BASE_URL = "base_url";
+    private static final String KEY_MOBOIL_BASELINE_PREFIX = "moboil_baseline_";
 //    private static final String DEFAULT_BASE_URL = "https://api.khaksargoods.com/api";
   private static final String DEFAULT_BASE_URL = "http://192.168.0.120:5000/api";
 
@@ -52,6 +53,29 @@ public class SessionManager {
         String baseUrl = getBaseUrl();
         preferences.edit().clear().apply();
         saveBaseUrl(baseUrl);
+    }
+
+    public void saveMoboilBaseline(String carNumber, double meterReading) {
+        if (carNumber == null || carNumber.trim().isEmpty()) {
+            return;
+        }
+
+        preferences.edit()
+                .putLong(KEY_MOBOIL_BASELINE_PREFIX + carNumber.trim(), Double.doubleToRawLongBits(meterReading))
+                .apply();
+    }
+
+    public Double getMoboilBaseline(String carNumber) {
+        if (carNumber == null || carNumber.trim().isEmpty()) {
+            return null;
+        }
+
+        String key = KEY_MOBOIL_BASELINE_PREFIX + carNumber.trim();
+        if (!preferences.contains(key)) {
+            return null;
+        }
+
+        return Double.longBitsToDouble(preferences.getLong(key, Double.doubleToRawLongBits(0)));
     }
 
     private String normalizeBaseUrl(String value) {

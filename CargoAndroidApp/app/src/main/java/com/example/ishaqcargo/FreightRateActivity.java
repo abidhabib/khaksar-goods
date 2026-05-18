@@ -152,7 +152,6 @@ public class FreightRateActivity extends AppCompatActivity {
         ));
         binding.resultRate.setText(getString(R.string.freight_result_rate, formatNumber(appliedRatePerKm)));
         binding.resultTotal.setText(getString(R.string.freight_result_total, formatNumber(totalFreight)));
-        binding.resultMode.setText(getString(R.string.freight_result_mode, mode));
         binding.resultCard.setVisibility(View.VISIBLE);
     }
 

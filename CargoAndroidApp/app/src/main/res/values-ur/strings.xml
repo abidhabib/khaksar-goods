@@ -265,6 +265,11 @@
     <string name="moboil_alert_title"> موبل آئل چینج</string>
     <string name="moboil_alert_empty">  آئل چینج محفوظ نہیں </string>
     <string name="moboil_alert_value"> %2$s کلومیٹر </string>
+    <string name="moboil_change_screen_title">موبل آئل چینج</string>
+    <string name="moboil_current_meter_value">موجودہ میٹر: %1$s کلومیٹر</string>
+    <string name="moboil_remaining_label">اگلے موبل آئل چینج کے لیے باقی کلومیٹر</string>
+    <string name="moboil_meter_too_low">میٹر ریڈنگ موجودہ گاڑی کے میٹر سے کم نہیں ہو سکتی</string>
+    <string name="moboil_invalid_meter">غلط میٹر</string>
     <string name="start_trip_subtitle">ٹرپ  شروع کریں </string>
     <string name="add_photo">Add Photo</string>
     <string name="add_expense_photo_optional">Add an expense photo? (optional)</string>

@@ -355,6 +355,28 @@ const computeAverageKmPerLiter = (distance, liters) => {
     return Number((distanceValue / litersValue).toFixed(2));
 };
 
+const applyTripNetIncomeFormula = (trip) => {
+    const freightCharge = Number(trip?.freight_charge) || 0;
+    const tripExpensesTotal = Number(
+        trip?.trip_expenses_total ?? trip?.current_expenses ?? trip?.total_expenses
+    ) || 0;
+    const betweenTripExpensesTotal = Number(trip?.between_trip_expenses_total) || 0;
+    const biltyCommissionAmount = Number(trip?.bilty_commission_amount) || 0;
+    const totalExpenses = tripExpensesTotal + betweenTripExpensesTotal + biltyCommissionAmount;
+    const netIncome = freightCharge - totalExpenses;
+
+    return {
+        ...trip,
+        freight_charge: freightCharge,
+        trip_expenses_total: tripExpensesTotal,
+        between_trip_expenses_total: betweenTripExpensesTotal,
+        bilty_commission_amount: biltyCommissionAmount,
+        total_expenses: totalExpenses,
+        net_profit: netIncome,
+        net_income: netIncome
+    };
+};
+
 const hasOngoingTrip = async (connection, driverId) => {
     const [ongoing] = await connection.execute(
         'SELECT id FROM trips WHERE driver_id = ? AND status = "ongoing" LIMIT 1',
@@ -713,7 +735,9 @@ const getCarHistory = async (req, res) => {
         `, [id, ...tripDateFilter.params]);
         const tripsWithExpenses = await attachExpensesToTrips(trips);
         const freightRates = await getFreightRates().catch(() => []);
-        const tripsWithVariance = tripsWithExpenses.map((trip) => withFreightVariance(trip, freightRates));
+        const tripsWithVariance = tripsWithExpenses
+            .map((trip) => withFreightVariance(trip, freightRates))
+            .map(applyTripNetIncomeFormula);
 
         const completedTrips = tripsWithVariance.filter((trip) => trip.status === 'completed');
         const driverStatsMap = new Map();
@@ -811,7 +835,7 @@ const getTripReport = async (req, res) => {
 
         const [tripWithExpenses] = await attachExpensesToTrips(tripRows);
         const freightRates = await getFreightRates().catch(() => []);
-        const tripWithVariance = withFreightVariance(tripWithExpenses, freightRates);
+        const tripWithVariance = applyTripNetIncomeFormula(withFreightVariance(tripWithExpenses, freightRates));
 
         res.json({
             success: true,
@@ -843,6 +867,19 @@ const getAllDrivers = async (req, res) => {
                    u.username, u.phone, u.status, u.created_at,
                    c.id as car_id, c.car_number, c.current_meter_reading as car_current_meter,
                    h.helper_name, h.phone_number as helper_phone_number, h.salary_amount as helper_salary_amount,
+                   (
+                       COALESCE((
+                           SELECT SUM(CASE WHEN t3.status = 'completed' THEN t3.freight_charge ELSE 0 END)
+                           FROM trips t3
+                           WHERE t3.driver_id = d.id
+                       ), 0)
+                       -
+                       COALESCE((
+                           SELECT SUM(CASE WHEN r.status = 'approved' THEN r.amount ELSE 0 END)
+                           FROM driver_cashout_requests r
+                           WHERE r.driver_id = d.id
+                       ), 0)
+                   ) AS company_amount,
                    dll.area as last_location_area,
                    dll.city as last_location_city,
                    dll.province as last_location_province,
@@ -1234,16 +1271,27 @@ const getDriverCommissionRequests = async (req, res) => {
 
         const whereClause = filters.length ? `WHERE ${filters.join(' AND ')}` : '';
         const [requests] = await pool.execute(
-            `SELECT cr.*,
+            `SELECT
+                    cr.id AS request_id,
+                    cr.driver_id AS request_driver_id,
+                    cr.trip_id AS request_trip_id,
+                    cr.commission_percentage,
+                    cr.net_profit AS request_net_profit,
+                    cr.commission_amount,
+                    cr.status AS request_status,
+                    cr.reviewed_by,
+                    cr.reviewed_at,
+                    cr.remarks,
+                    cr.created_at AS request_created_at,
+                    cr.updated_at AS request_updated_at,
+                    t.*,
                     d.full_name AS driver_full_name,
                     u.username AS driver_username,
+                    u.phone AS driver_phone,
+                    d.license_number,
                     c.car_number,
-                    t.from_location,
-                    t.to_location,
-                    t.freight_charge,
-                    t.load_weight,
-                    (COALESCE(t.end_meter_reading, 0) - COALESCE(t.start_meter_reading, 0)) AS distance_km,
-                    reviewer.username AS reviewed_by_username
+                    reviewer.username AS reviewed_by_username,
+                    (COALESCE(t.end_meter_reading, 0) - COALESCE(t.start_meter_reading, 0)) AS distance_km
              FROM driver_commission_requests cr
              JOIN drivers d ON cr.driver_id = d.id
              JOIN users u ON d.user_id = u.id
@@ -1255,16 +1303,21 @@ const getDriverCommissionRequests = async (req, res) => {
             params
         );
 
+        const requestsWithExpenses = await attachExpensesToTrips(requests);
         const freightRates = await getFreightRates().catch(() => []);
-        const requestsWithVariance = requests.map((request) => {
-            const enrichedTrip = withFreightVariance(request, freightRates);
+        const requestsWithVariance = requestsWithExpenses.map((request) => {
+            const enrichedTrip = applyTripNetIncomeFormula(withFreightVariance(request, freightRates));
             return {
-                ...request,
-                expected_freight_charge: enrichedTrip.expected_freight_charge,
-                expected_rate_per_km: enrichedTrip.expected_rate_per_km,
-                freight_variance_amount: enrichedTrip.freight_variance_amount,
-                freight_variance_percentage: enrichedTrip.freight_variance_percentage,
-                freight_variance_direction: enrichedTrip.freight_variance_direction
+                ...enrichedTrip,
+                request_id: request.request_id,
+                driver_id: request.request_driver_id,
+                trip_id: request.request_trip_id,
+                commission_percentage: Number(request.commission_percentage) || 0,
+                commission_amount: Number(request.commission_amount) || 0,
+                net_profit: Number(request.request_net_profit) || Number(enrichedTrip.net_income) || 0,
+                status: request.request_status,
+                created_at: request.request_created_at,
+                updated_at: request.request_updated_at
             };
         });
 
@@ -1762,6 +1815,30 @@ const getDriverReport = async (req, res) => {
         const { id } = req.params;
         const { period = 'all', from_date, to_date } = req.query;
         const dateFilter = getDateFilter(period, from_date, to_date, 't');
+        const cashoutConditions = ['status = \'approved\''];
+        const cashoutParams = [id];
+
+        if (from_date) {
+            cashoutConditions.push('reviewed_at >= ?');
+            cashoutParams.push(`${from_date} 00:00:00`);
+        }
+
+        if (to_date) {
+            cashoutConditions.push('reviewed_at <= ?');
+            cashoutParams.push(`${to_date} 23:59:59`);
+        }
+
+        if (!from_date && !to_date) {
+            if (period === 'today') {
+                cashoutConditions.push('DATE(reviewed_at) = CURDATE()');
+            } else if (period === 'week') {
+                cashoutConditions.push('reviewed_at >= DATE_SUB(NOW(), INTERVAL 7 DAY)');
+            } else if (period === 'month') {
+                cashoutConditions.push('reviewed_at >= DATE_SUB(NOW(), INTERVAL 30 DAY)');
+            } else if (period === 'year') {
+                cashoutConditions.push('reviewed_at >= DATE_SUB(NOW(), INTERVAL 1 YEAR)');
+            }
+        }
 
         const [driver] = await pool.execute(`
             SELECT d.*, u.username, u.phone, u.status, u.created_at,
@@ -1811,7 +1888,9 @@ const getDriverReport = async (req, res) => {
         `, [id, ...dateFilter.params]);
         const tripsWithExpenses = await attachExpensesToTrips(trips);
         const freightRates = await getFreightRates().catch(() => []);
-        const tripsWithVariance = tripsWithExpenses.map((trip) => withFreightVariance(trip, freightRates));
+        const tripsWithVariance = tripsWithExpenses
+            .map((trip) => withFreightVariance(trip, freightRates))
+            .map(applyTripNetIncomeFormula);
         const currentTripWithExpenses = currentTrip[0]
             ? (await attachExpensesToTrips([{
                 ...currentTrip[0],
@@ -1819,7 +1898,7 @@ const getDriverReport = async (req, res) => {
             }]))[0]
             : null;
         const currentTripWithVariance = currentTripWithExpenses
-            ? withFreightVariance(currentTripWithExpenses, freightRates)
+            ? applyTripNetIncomeFormula(withFreightVariance(currentTripWithExpenses, freightRates))
             : null;
 
         const stats = [tripsWithVariance.reduce((acc, trip) => {
@@ -1843,6 +1922,35 @@ const getDriverReport = async (req, res) => {
             net_profit: 0
         })];
         stats[0].net_profit = stats[0].total_revenue - stats[0].total_expenses;
+        stats[0].total_food_expenses = tripsWithVariance.reduce((sum, trip) => (
+            sum + (trip.expenses || [])
+                .filter((expense) => expense.category === 'food')
+                .reduce((expenseSum, expense) => expenseSum + (Number(expense.amount) || 0), 0)
+        ), 0) + tripsWithVariance.reduce((sum, trip) => (
+            sum + (trip.daily_expenses || [])
+                .filter((expense) => expense.category === 'food')
+                .reduce((expenseSum, expense) => expenseSum + (Number(expense.amount) || 0), 0)
+        ), 0);
+        stats[0].total_freight_taken = stats[0].total_revenue;
+        stats[0].total_bilty_commission = tripsWithVariance.reduce(
+            (sum, trip) => sum + (Number(trip.bilty_commission_amount) || 0),
+            0
+        );
+        const [[cashoutSummary]] = await pool.execute(
+            `SELECT COALESCE(SUM(amount), 0) AS total_taken
+             FROM driver_cashout_requests
+             WHERE driver_id = ? AND ${cashoutConditions.join(' AND ')}`,
+            cashoutParams
+        );
+        stats[0].total_challan_amount = tripsWithVariance.reduce((sum, trip) => (
+            sum + (trip.expenses || [])
+                .filter((expense) => expense.category === 'chalaan')
+                .reduce((expenseSum, expense) => expenseSum + (Number(expense.amount) || 0), 0)
+        ), 0);
+        stats[0].challan_count = tripsWithVariance.reduce((sum, trip) => (
+            sum + (trip.expenses || []).filter((expense) => expense.category === 'chalaan').length
+        ), 0);
+        stats[0].total_taken = Number(cashoutSummary?.total_taken) || 0;
 
         const driverPayload = driver[0];
         driverPayload.overall_average_km_per_liter = computeAverageKmPerLiter(
@@ -2526,176 +2634,7 @@ const updateDriverDailyExpenseByAdmin = async (req, res) => {
     }
 };
 
-const getDriverLeaveRequests = async (req, res) => {
-    try {
-        const schemaConnection = await pool.getConnection();
-        try {
-            await ensureDriverLeaveRequestsTable(schemaConnection);
-        } finally {
-            schemaConnection.release();
-        }
 
-        const { status = 'pending_join', driver_id } = req.query;
-        const filters = [];
-        const params = [];
-
-        if (status) {
-            filters.push('lr.status = ?');
-            params.push(status);
-        }
-
-        if (driver_id) {
-            filters.push('lr.driver_id = ?');
-            params.push(driver_id);
-        }
-
-        const whereClause = filters.length ? `WHERE ${filters.join(' AND ')}` : '';
-
-        const [requests] = await pool.execute(
-            `SELECT
-                lr.*,
-                u.username AS driver_name,
-                u.phone AS driver_phone,
-                d.license_number,
-                c.car_number
-             FROM driver_leave_requests lr
-             JOIN drivers d ON lr.driver_id = d.id
-             JOIN users u ON d.user_id = u.id
-             LEFT JOIN cars c ON lr.car_id = c.id
-             ${whereClause}
-             ORDER BY lr.leave_requested_at DESC, lr.id DESC`,
-            params
-        );
-
-        const [[summary]] = await pool.execute(
-            `SELECT
-                COUNT(*) AS total_requests,
-                COUNT(DISTINCT driver_id) AS total_drivers
-             FROM driver_leave_requests lr
-             ${whereClause}`,
-            params
-        );
-
-        res.json({
-            success: true,
-            requests,
-            summary
-        });
-    } catch (error) {
-        res.status(500).json({ message: 'Server error', error: error.message });
-    }
-};
-
-const updateDriverLeaveRequestStatus = async (req, res) => {
-    const connection = await pool.getConnection();
-    try {
-        const schemaConnection = await pool.getConnection();
-        try {
-            await ensureDriverLeaveRequestsTable(schemaConnection);
-        } finally {
-            schemaConnection.release();
-        }
-
-        const { id } = req.params;
-        const action = String(req.body?.action || '').trim().toLowerCase();
-
-        if (!LEAVE_REQUEST_ACTIONS.has(action)) {
-            return res.status(400).json({ message: 'Action must be approve or reject' });
-        }
-
-        const [rows] = await connection.execute(
-            'SELECT * FROM driver_leave_requests WHERE id = ? LIMIT 1',
-            [id]
-        );
-
-        if (!rows.length) {
-            return res.status(404).json({ message: 'Leave request not found' });
-        }
-
-        const request = rows[0];
-
-        await connection.beginTransaction();
-
-        if (action === 'approve') {
-            if (request.status !== 'pending_join') {
-                return res.status(400).json({ message: 'Only pending join requests can be approved' });
-            }
-
-            if (request.car_id && request.join_meter_reading !== null) {
-                await connection.execute(
-                    'UPDATE cars SET current_meter_reading = ? WHERE id = ?',
-                    [request.join_meter_reading, request.car_id]
-                );
-            }
-
-            await connection.execute(
-                `UPDATE driver_leave_requests
-                 SET status = 'completed',
-                     join_approved_at = CURRENT_TIMESTAMP,
-                     status_updated_at = CURRENT_TIMESTAMP
-                 WHERE id = ?`,
-                [id]
-            );
-            await connection.execute(
-                `UPDATE users u
-                 JOIN drivers d ON d.user_id = u.id
-                 SET u.status = 'active'
-                 WHERE d.id = ?`,
-                [request.driver_id]
-            );
-        } else {
-            if (request.status !== 'pending_join') {
-                return res.status(400).json({ message: 'Only pending join requests can be rejected' });
-            }
-
-            await connection.execute(
-                `UPDATE driver_leave_requests
-                 SET status = 'on_leave',
-                     join_meter_reading = NULL,
-                     join_location = NULL,
-                     join_coordinates = NULL,
-                     join_requested_at = NULL,
-                     status_updated_at = CURRENT_TIMESTAMP
-                 WHERE id = ?`,
-                [id]
-            );
-            await connection.execute(
-                `UPDATE users u
-                 JOIN drivers d ON d.user_id = u.id
-                 SET u.status = 'on_leave'
-                 WHERE d.id = ?`,
-                [request.driver_id]
-            );
-        }
-
-        await connection.commit();
-
-        const [[updated]] = await pool.execute(
-            `SELECT
-                lr.*,
-                u.username AS driver_name,
-                c.car_number
-             FROM driver_leave_requests lr
-             JOIN drivers d ON lr.driver_id = d.id
-             JOIN users u ON d.user_id = u.id
-             LEFT JOIN cars c ON lr.car_id = c.id
-             WHERE lr.id = ?
-             LIMIT 1`,
-            [id]
-        );
-
-        res.json({
-            success: true,
-            message: action === 'approve' ? 'Join request approved successfully' : 'Join request rejected successfully',
-            request: updated
-        });
-    } catch (error) {
-        await connection.rollback();
-        res.status(500).json({ message: 'Server error', error: error.message });
-    } finally {
-        connection.release();
-    }
-};
 
 // ========== DASHBOARD & REPORTS ==========
 
@@ -2875,35 +2814,73 @@ const attachExpensesToTrips = async (trips) => {
 
 const getDashboardStats = async (req, res) => {
     try {
-        const dashboardTripSummaryQuery = `
-            SELECT
-                t.id,
-                t.car_id,
-                t.started_at,
-                t.freight_charge,
-                COALESCE(SUM(e.amount), 0) as total_expenses
-            FROM trips t
-            LEFT JOIN expenses e ON t.id = e.trip_id
-            WHERE t.status = 'completed'
-            GROUP BY t.id, t.car_id, t.started_at, t.freight_charge
-        `;
-
-        // Overall statistics
         const [[overall]] = await pool.execute(`
-            SELECT 
+            SELECT
                 (SELECT COUNT(*) FROM cars WHERE status = 'active') as active_cars,
                 (SELECT COUNT(*) FROM drivers d JOIN users u ON d.user_id = u.id WHERE u.status = 'active') as active_drivers,
+                (SELECT COUNT(*) FROM helpers WHERE status = 'active') as active_helpers,
                 (SELECT COUNT(*) FROM trips WHERE status = 'ongoing') as ongoing_trips,
                 (SELECT COUNT(*) FROM trips WHERE DATE(started_at) = CURDATE()) as today_trips
         `);
 
-        // Today's financials
+        const monthlyCompletedTripsQuery = `
+            SELECT
+                t.id,
+                t.car_id,
+                t.driver_id,
+                t.started_at,
+                t.freight_charge,
+                t.bilty_commission_amount,
+                COALESCE(SUM(e.amount), 0) AS total_expenses
+            FROM trips t
+            LEFT JOIN expenses e ON t.id = e.trip_id
+            WHERE t.status = 'completed'
+              AND DATE_FORMAT(t.started_at, '%Y-%m') = DATE_FORMAT(CURDATE(), '%Y-%m')
+            GROUP BY t.id, t.car_id, t.driver_id, t.started_at, t.freight_charge, t.bilty_commission_amount
+        `;
+
         const [[today]] = await pool.execute(`
-            SELECT 
+            SELECT
                 COALESCE(SUM(trip_summary.freight_charge), 0) as today_revenue,
-                COALESCE(SUM(trip_summary.total_expenses), 0) as today_expenses
-            FROM (${dashboardTripSummaryQuery}) trip_summary
+                COALESCE(SUM(trip_summary.total_expenses + COALESCE(trip_summary.bilty_commission_amount, 0)), 0) as today_expenses
+            FROM (
+                SELECT
+                    t.id,
+                    t.started_at,
+                    t.freight_charge,
+                    t.bilty_commission_amount,
+                    COALESCE(SUM(e.amount), 0) AS total_expenses
+                FROM trips t
+                LEFT JOIN expenses e ON t.id = e.trip_id
+                WHERE t.status = 'completed'
+                GROUP BY t.id, t.started_at, t.freight_charge, t.bilty_commission_amount
+            ) trip_summary
             WHERE DATE(trip_summary.started_at) = CURDATE()
+        `);
+
+        const [monthlyTripsRaw] = await pool.execute(monthlyCompletedTripsQuery);
+        const monthlyTrips = applyTripNetIncomeFormula ? monthlyTripsRaw.map(applyTripNetIncomeFormula) : monthlyTripsRaw;
+
+        const [[monthlyDailyExpenseRow]] = await pool.execute(`
+            SELECT COALESCE(SUM(amount), 0) AS total_daily_expenses
+            FROM driver_daily_expense_entries
+            WHERE DATE_FORMAT(expense_date, '%Y-%m') = DATE_FORMAT(CURDATE(), '%Y-%m')
+        `);
+
+        const [[monthlyApprovedCashoutRow]] = await pool.execute(`
+            SELECT COALESCE(SUM(amount), 0) AS total_approved_cashouts
+            FROM driver_cashout_requests
+            WHERE status = 'approved'
+              AND reviewed_at IS NOT NULL
+              AND DATE_FORMAT(reviewed_at, '%Y-%m') = DATE_FORMAT(CURDATE(), '%Y-%m')
+        `);
+
+        const [monthlyExpenseBreakdownRows] = await pool.execute(`
+            SELECT category, COALESCE(SUM(amount), 0) AS total_amount
+            FROM expenses
+            WHERE DATE_FORMAT(created_at, '%Y-%m') = DATE_FORMAT(CURDATE(), '%Y-%m')
+            GROUP BY category
+            ORDER BY FIELD(category, 'diesel', 'toll', 'food', 'police', 'chalaan', 'mandi_kaat', 'reward', 'tyre_puncture', 'bilty_commission'), category
         `);
 
         // Recent trips
@@ -2917,16 +2894,14 @@ const getDashboardStats = async (req, res) => {
             LIMIT 10
         `);
 
-        // Car performance (top 5 by revenue this month)
         const [carPerformance] = await pool.execute(`
             SELECT 
                 c.car_number,
                 COUNT(trip_summary.id) as trip_count,
                 COALESCE(SUM(trip_summary.freight_charge), 0) as revenue,
-                COALESCE(SUM(trip_summary.total_expenses), 0) as expenses
+                COALESCE(SUM(trip_summary.total_expenses + COALESCE(trip_summary.bilty_commission_amount, 0)), 0) as expenses
             FROM cars c
-            LEFT JOIN (${dashboardTripSummaryQuery}) trip_summary ON c.id = trip_summary.car_id
-                AND trip_summary.started_at >= DATE_SUB(NOW(), INTERVAL 30 DAY)
+            LEFT JOIN (${monthlyCompletedTripsQuery}) trip_summary ON c.id = trip_summary.car_id
             WHERE c.status = 'active'
             GROUP BY c.id
             ORDER BY revenue DESC
@@ -2938,8 +2913,19 @@ const getDashboardStats = async (req, res) => {
                 DATE(trip_summary.started_at) as date,
                 DATE_FORMAT(DATE(trip_summary.started_at), '%a') as name,
                 COALESCE(SUM(trip_summary.freight_charge), 0) as revenue,
-                COALESCE(SUM(trip_summary.total_expenses), 0) as expenses
-            FROM (${dashboardTripSummaryQuery}) trip_summary
+                COALESCE(SUM(trip_summary.total_expenses + COALESCE(trip_summary.bilty_commission_amount, 0)), 0) as expenses
+            FROM (
+                SELECT
+                    t.id,
+                    t.started_at,
+                    t.freight_charge,
+                    t.bilty_commission_amount,
+                    COALESCE(SUM(e.amount), 0) AS total_expenses
+                FROM trips t
+                LEFT JOIN expenses e ON t.id = e.trip_id
+                WHERE t.status = 'completed'
+                GROUP BY t.id, t.started_at, t.freight_charge, t.bilty_commission_amount
+            ) trip_summary
             WHERE trip_summary.started_at >= DATE_SUB(CURDATE(), INTERVAL 6 DAY)
             GROUP BY DATE(trip_summary.started_at), DATE_FORMAT(DATE(trip_summary.started_at), '%a')
             ORDER BY DATE(trip_summary.started_at) ASC
@@ -2969,16 +2955,33 @@ const getDashboardStats = async (req, res) => {
             };
         });
 
+        const monthlyFreight = monthlyTrips.reduce((sum, trip) => sum + (Number(trip.freight_charge) || 0), 0);
+        const monthlyTripExpenses = monthlyTrips.reduce((sum, trip) => sum + (Number(trip.trip_expenses_total) || 0), 0);
+        const monthlyBiltyCommission = monthlyTrips.reduce((sum, trip) => sum + (Number(trip.bilty_commission_amount) || 0), 0);
+        const monthlyDailyExpenses = Number(monthlyDailyExpenseRow?.total_daily_expenses) || 0;
+        const monthlyApprovedCashouts = Number(monthlyApprovedCashoutRow?.total_approved_cashouts) || 0;
+        const monthlyExpenses = monthlyTripExpenses + monthlyDailyExpenses + monthlyBiltyCommission;
+        const monthlyNetIncome = monthlyFreight - monthlyExpenses - monthlyApprovedCashouts;
+
         res.json({
             success: true,
             stats: {
                 ...overall,
                 ...today,
+                monthly_freight: monthlyFreight,
+                monthly_expenses: monthlyExpenses,
+                monthly_net_income: monthlyNetIncome,
                 net_today: today.today_revenue - today.today_expenses
             },
             recentTrips,
             carPerformance,
-            revenueChart
+            revenueChart,
+            expenseBreakdown: monthlyExpenseBreakdownRows.map((row) => ({
+                name: String(row.category || '')
+                    .replace(/_/g, ' ')
+                    .replace(/\b\w/g, (char) => char.toUpperCase()),
+                value: Number(row.total_amount) || 0
+            }))
         });
     } catch (error) {
         res.status(500).json({ message: 'Server error' });
@@ -3343,8 +3346,6 @@ module.exports = {
     updateTripExpenseByAdmin,
     addDriverDailyExpenseByAdmin,
     updateDriverDailyExpenseByAdmin,
-    getDriverLeaveRequests,
-    updateDriverLeaveRequestStatus,
     
     // Dashboard
     getDashboardStats,

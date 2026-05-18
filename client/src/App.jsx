@@ -10,7 +10,6 @@ import CarReportPage from './pages/CarReportPage'
 import DriverReportPage from './pages/DriverReportPage'
 import DriverExpensesReportPage from './pages/DriverExpensesReportPage'
 import PaymentSubmissionsPage from './pages/PaymentSubmissionsPage'
-import LeaveRequestsPage from './pages/LeaveRequestsPage'
 import TripMonitor from './pages/TripMonitor'
 import TripReportPage from './pages/TripReportPage'
 import Reports from './pages/Reports'
@@ -36,7 +35,6 @@ function App() {
           <Route path="/drivers/:id/report" element={<DriverReportPage />} />
           <Route path="/drivers-expenses" element={<DriverExpensesReportPage />} />
           <Route path="/payment-submissions" element={<PaymentSubmissionsPage />} />
-          <Route path="/leave-requests" element={<LeaveRequestsPage />} />
           <Route path="/trips" element={<TripMonitor />} />
           <Route path="/trips/:id/report" element={<TripReportPage />} />
           <Route path="/reports" element={<Reports />} />
