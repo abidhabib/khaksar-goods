@@ -1020,34 +1020,155 @@ const addDriver = async (req, res) => {
     }
 };
 
-// Assign/Reassign car to driver
 const assignCarToDriver = async (req, res) => {
     const connection = await pool.getConnection();
-    
+
+    console.log('==============================');
+    console.log('ASSIGN CAR PROCESS STARTED');
+    console.log('Request Body:', req.body);
+
     try {
         await connection.beginTransaction();
-        
+
+        console.log('Transaction started');
+
         const { driver_id, car_id } = req.body;
-        await assignCarWithIntegrity(connection, Number(driver_id), car_id);
+
+        const driverId = Number(driver_id);
+        const carId = Number(car_id);
+
+        console.log('Parsed Driver ID:', driverId);
+        console.log('Parsed Car ID:', carId);
+
+        // Assign car with integrity checks
+        console.log('Calling assignCarWithIntegrity...');
+
+        await assignCarWithIntegrity(connection, driverId, carId);
+
+        console.log('assignCarWithIntegrity completed successfully');
+
+        // Fetch car meter reading
+        console.log('Fetching current meter reading from cars table...');
+
+        const [carRows] = await connection.execute(
+            `SELECT current_meter_reading 
+             FROM cars 
+             WHERE id = ?`,
+            [carId]
+        );
+
+        console.log('Car Query Result:', carRows);
+
+        if (carRows.length === 0) {
+            console.error('Car not found after assignment check');
+            throw new Error('Car not found');
+        }
+
+        const currentMeterReading = carRows[0].current_meter_reading || 0;
+
+        console.log('Current Meter Reading:', currentMeterReading);
+
+        // Check existing moboil entry
+        console.log('Checking existing moboil entry...');
+
+        const [existingMoboil] = await connection.execute(
+            `SELECT id 
+             FROM driver_daily_expense_entries
+             WHERE driver_id = ?
+               AND category = 'moboil_change'
+               AND meter_reading = ?
+             LIMIT 1`,
+            [driverId, currentMeterReading]
+        );
+
+        console.log('Existing Moboil Result:', existingMoboil);
+
+        // Insert initial moboil entry
+        if (existingMoboil.length === 0) {
+
+            console.log('No existing moboil entry found');
+            console.log('Creating initial moboil entry...');
+
+            const [moboilInsert] = await connection.execute(
+                `INSERT INTO driver_daily_expense_entries
+                (
+                    driver_id,
+                    category,
+                    amount,
+                    meter_reading,
+                    note,
+                    expense_date
+                )
+                VALUES (?, 'moboil_change', 0, ?, ?, CURDATE())`,
+                [
+                    driverId,
+                    currentMeterReading,
+                    'Initial moboil entry on car assignment'
+                ]
+            );
+
+            console.log('Moboil Entry Created Successfully');
+            console.log('Inserted ID:', moboilInsert.insertId);
+
+        } else {
+
+            console.log('Moboil entry already exists');
+            console.log('Skipping insert');
+
+        }
+
+        console.log('Committing transaction...');
 
         await connection.commit();
 
-        res.json({ success: true, message: 'Car assigned successfully' });
+        console.log('Transaction committed successfully');
+        console.log('ASSIGN CAR PROCESS COMPLETED');
+        console.log('==============================');
+
+        res.json({
+            success: true,
+            message: 'Car assigned successfully'
+        });
+
     } catch (error) {
+
+        console.error('==============================');
+        console.error('ASSIGN CAR PROCESS FAILED');
+        console.error('Error Message:', error.message);
+        console.error('Error Stack:', error.stack);
+
+        console.log('Rolling back transaction...');
+
         await connection.rollback();
-        if (error.message === 'Driver not found' ||
+
+        console.log('Transaction rolled back');
+        console.error('==============================');
+
+        if (
+            error.message === 'Driver not found' ||
             error.message === 'Car not found' ||
             error.message === 'Only active cars can be assigned' ||
             error.message === 'Driver has ongoing trip. Complete it first.' ||
-            error.message === 'Selected cargo is assigned to a driver with an ongoing trip') {
-            return res.status(400).json({ message: error.message });
+            error.message === 'Selected cargo is assigned to a driver with an ongoing trip'
+        ) {
+            return res.status(400).json({
+                message: error.message
+            });
         }
-        res.status(500).json({ message: 'Server error', error: error.message });
+
+        res.status(500).json({
+            message: 'Server error',
+            error: error.message
+        });
+
     } finally {
+
+        console.log('Releasing database connection...');
         connection.release();
+        console.log('Database connection released');
+
     }
 };
-
 // Update driver
 const updateDriver = async (req, res) => {
     const connection = await pool.getConnection();
