@@ -305,6 +305,7 @@ const buildMoboilStatus = ({
     return {
         last_change_meter: lastMeter,
         baseline_meter: baselineMeter,
+        reference_meter: Number(referenceMeter.toFixed(2)),
         km_since_change: Number(kmSinceChange.toFixed(2)),
         remaining_km: Number(remainingKm.toFixed(2)),
         progress_percent: Number(progressPercent.toFixed(1)),
@@ -314,7 +315,27 @@ const buildMoboilStatus = ({
 
 const getDriverCarContext = async (driverId) => {
     const [rows] = await pool.execute(
-        `SELECT d.assigned_car_id, c.car_number, c.current_meter_reading
+        `SELECT d.assigned_car_id,
+                c.car_number,
+                c.current_meter_reading,
+                (
+                    SELECT ca.start_meter_reading
+                    FROM car_assignments ca
+                    WHERE ca.driver_id = d.id
+                      AND ca.car_id = d.assigned_car_id
+                      AND ca.unassigned_at IS NULL
+                    ORDER BY ca.assigned_at DESC, ca.id DESC
+                    LIMIT 1
+                ) AS assignment_start_meter,
+                (
+                    SELECT ca.assigned_at
+                    FROM car_assignments ca
+                    WHERE ca.driver_id = d.id
+                      AND ca.car_id = d.assigned_car_id
+                      AND ca.unassigned_at IS NULL
+                    ORDER BY ca.assigned_at DESC, ca.id DESC
+                    LIMIT 1
+                ) AS assignment_assigned_at
          FROM drivers d
          LEFT JOIN cars c ON d.assigned_car_id = c.id
          WHERE d.id = ?
@@ -392,6 +413,24 @@ const getDashboard = async (req, res) => {
                    COALESCE(d.full_name, u.username) AS full_name,
                    u.username, u.phone,
                    c.id as car_id, c.car_number, c.current_meter_reading,
+                   (
+                       SELECT ca.start_meter_reading
+                       FROM car_assignments ca
+                       WHERE ca.driver_id = d.id
+                         AND ca.car_id = d.assigned_car_id
+                         AND ca.unassigned_at IS NULL
+                       ORDER BY ca.assigned_at DESC, ca.id DESC
+                       LIMIT 1
+                   ) as assignment_start_meter,
+                   (
+                       SELECT ca.assigned_at
+                       FROM car_assignments ca
+                       WHERE ca.driver_id = d.id
+                         AND ca.car_id = d.assigned_car_id
+                         AND ca.unassigned_at IS NULL
+                       ORDER BY ca.assigned_at DESC, ca.id DESC
+                       LIMIT 1
+                   ) as assignment_assigned_at,
                    h.id as helper_id, h.helper_name, h.phone_number as helper_phone_number, h.salary_amount as helper_salary_amount, h.available_balance as helper_available_balance,
                    (
                        SELECT COALESCE(SUM(t2.end_meter_reading - t2.start_meter_reading), 0)
@@ -457,13 +496,26 @@ const getDashboard = async (req, res) => {
                 AND DATE(t.started_at) = CURDATE()
                 AND t.status = 'completed'
         `, [driver_id]);
-const [lastMoboilRows] = await pool.execute(`
-    SELECT id, amount, meter_reading, expense_date, created_at
-    FROM driver_daily_expense_entries
-    WHERE driver_id = ? AND category = 'moboil_change'
-    ORDER BY expense_date DESC, created_at DESC, id DESC
-    LIMIT 1
-`, [driver_id]);
+        const assignmentAssignedAt = profile[0].assignment_assigned_at || null;
+        const lastMoboilQuery = assignmentAssignedAt
+            ? `SELECT id, amount, meter_reading, expense_date, created_at
+               FROM driver_daily_expense_entries
+               WHERE driver_id = ? AND category = 'moboil_change'
+                 AND (
+                     expense_date > DATE(?)
+                     OR (expense_date = DATE(?) AND created_at >= ?)
+                 )
+               ORDER BY expense_date DESC, created_at DESC, id DESC
+               LIMIT 1`
+            : `SELECT id, amount, meter_reading, expense_date, created_at
+               FROM driver_daily_expense_entries
+               WHERE driver_id = ? AND category = 'moboil_change'
+               ORDER BY expense_date DESC, created_at DESC, id DESC
+               LIMIT 1`;
+        const lastMoboilParams = assignmentAssignedAt
+            ? [driver_id, assignmentAssignedAt, assignmentAssignedAt, assignmentAssignedAt]
+            : [driver_id];
+        const [lastMoboilRows] = await pool.execute(lastMoboilQuery, lastMoboilParams);
 
         // Recent completed trips (last 5)
         const [recentTrips] = await pool.execute(`
@@ -531,7 +583,7 @@ const [lastMoboilRows] = await pool.execute(`
         profilePayload.moboil_status = buildMoboilStatus({
             currentMeterReading: currentMeter,
             lastMoboilChangeMeterReading: lastMoboilChange ? lastMoboilChange.meter_reading : null,
-            baselineMeterReading: 0
+            baselineMeterReading: profilePayload.assignment_start_meter
         });
 
         lifetimeStats.overall_average_km_per_liter = computeAverageKmPerLiter(
@@ -1421,6 +1473,28 @@ const saveMoboilChangeReading = async (req, res) => {
             return res.status(400).json({ message: 'Meter reading must be greater than or equal to current car meter reading' });
         }
 
+        const assignmentAssignedAt = carContext.assignment_assigned_at || null;
+        const lastMoboilQuery = assignmentAssignedAt
+            ? `SELECT meter_reading
+               FROM driver_daily_expense_entries
+               WHERE driver_id = ? AND category = 'moboil_change'
+                 AND (
+                     expense_date > DATE(?)
+                     OR (expense_date = DATE(?) AND created_at >= ?)
+                 )
+               ORDER BY expense_date DESC, created_at DESC, id DESC
+               LIMIT 1`
+            : `SELECT meter_reading
+               FROM driver_daily_expense_entries
+               WHERE driver_id = ? AND category = 'moboil_change'
+               ORDER BY expense_date DESC, created_at DESC, id DESC
+               LIMIT 1`;
+        const lastMoboilParams = assignmentAssignedAt
+            ? [driver_id, assignmentAssignedAt, assignmentAssignedAt, assignmentAssignedAt]
+            : [driver_id];
+        const [lastMoboilRows] = await pool.execute(lastMoboilQuery, lastMoboilParams);
+        const lastMoboilChange = lastMoboilRows[0] || null;
+
         await pool.execute(
             'UPDATE cars SET current_meter_reading = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?',
             [meterReadingValue, carContext.assigned_car_id]
@@ -1436,8 +1510,8 @@ const saveMoboilChangeReading = async (req, res) => {
             },
             moboil_status: buildMoboilStatus({
                 currentMeterReading: meterReadingValue,
-                lastMoboilChangeMeterReading: meterReadingValue,
-                baselineMeterReading: currentCarMeter
+                lastMoboilChangeMeterReading: lastMoboilChange ? lastMoboilChange.meter_reading : null,
+                baselineMeterReading: carContext.assignment_start_meter
             })
         });
     } catch (error) {

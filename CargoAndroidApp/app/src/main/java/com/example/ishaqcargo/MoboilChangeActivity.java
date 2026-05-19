@@ -27,12 +27,14 @@ public class MoboilChangeActivity extends AppCompatActivity {
 
     public static final String EXTRA_CAR_NUMBER = "extra_car_number";
     public static final String EXTRA_CURRENT_METER = "extra_current_meter";
-    private static final double MOBOIL_CHANGE_INTERVAL = 5000;
+    public static final String EXTRA_REFERENCE_METER = "extra_reference_meter";
+    private static final double MOBOIL_CHANGE_INTERVAL = 5000d;
 
     private ActivityMoboilChangeBinding binding;
     private SessionManager sessionManager;
     private String baseUrl;
     private double currentMeterReading;
+    private double baselineMeterReading;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -44,10 +46,11 @@ public class MoboilChangeActivity extends AppCompatActivity {
         baseUrl = sessionManager.getBaseUrl();
         currentMeterReading = getIntent().getDoubleExtra(EXTRA_CURRENT_METER, 0);
         String carNumber = getIntent().getStringExtra(EXTRA_CAR_NUMBER);
+        baselineMeterReading = getIntent().getDoubleExtra(EXTRA_REFERENCE_METER, 0);
 
         binding.carNumberValue.setText(getString(R.string.car_number_value, TextUtils.isEmpty(carNumber) ? "-" : carNumber));
         binding.currentMeterValue.setText(getString(R.string.moboil_current_meter_value, formatPlainNumber(currentMeterReading)));
-        binding.remainingValue.setText(formatPlainNumber(Math.max(0, MOBOIL_CHANGE_INTERVAL - currentMeterReading)) + " km");
+        binding.remainingValue.setText(formatPlainNumber(calculateRemainingKm(currentMeterReading)) + " km");
 
         binding.backButton.setOnClickListener(v -> finish());
         binding.saveButton.setOnClickListener(v -> saveMoboilChange());
@@ -79,7 +82,7 @@ public class MoboilChangeActivity extends AppCompatActivity {
                 return;
             }
 
-            binding.remainingValue.setText(formatPlainNumber(MOBOIL_CHANGE_INTERVAL) + " km");
+            binding.remainingValue.setText(formatPlainNumber(calculateRemainingKm(enteredMeter)) + " km");
         } catch (NumberFormatException ignored) {
             binding.remainingValue.setText(getString(R.string.moboil_alert_empty));
         }
@@ -143,8 +146,6 @@ public class MoboilChangeActivity extends AppCompatActivity {
                     double remainingKm = moboilStatus != null ? moboilStatus.optDouble("remaining_km", MOBOIL_CHANGE_INTERVAL) : MOBOIL_CHANGE_INTERVAL;
                     runOnUiThread(() -> {
                         setSaving(false);
-                        String carNumber = getIntent().getStringExtra(EXTRA_CAR_NUMBER);
-                        sessionManager.saveMoboilBaseline(carNumber, enteredMeter);
                         currentMeterReading = enteredMeter;
                         binding.currentMeterValue.setText(getString(R.string.moboil_current_meter_value, formatPlainNumber(currentMeterReading)));
                         binding.remainingValue.setText(formatPlainNumber(remainingKm) + " km");
@@ -165,6 +166,11 @@ public class MoboilChangeActivity extends AppCompatActivity {
     private void setSaving(boolean saving) {
         binding.saveButton.setEnabled(!saving);
         binding.meterInput.setEnabled(!saving);
+    }
+
+    private double calculateRemainingKm(double meterReading) {
+        double kmSinceChange = Math.max(0, meterReading - baselineMeterReading);
+        return Math.max(0, MOBOIL_CHANGE_INTERVAL - kmSinceChange);
     }
 
     private String formatPlainNumber(double value) {
