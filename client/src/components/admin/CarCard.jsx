@@ -3,7 +3,7 @@ import { formatLocationAgo, formatLocationSummary } from '../../utils/location';
 
 const formatAverage = (value) => {
   const numericValue = Number(value || 0);
-  return numericValue > 0 ? `${numericValue.toFixed(2)} km/L` : 'N/A';
+  return numericValue > 0 ? `${numericValue} km/L` : 'N/A';
 };
 
 const CarCard = ({ car, onEdit, onDelete, onAssign, onViewHistory }) => {

@@ -17,7 +17,7 @@ const Sidebar = ({ collapsed = false, mobileOpen = false, onClose }) => {
     { path: '/cars', icon: Car, label: 'Cars' },
     { path: '/drivers', icon: Users, label: 'Drivers' },
     { path: '/helpers', icon: HandHelping, label: 'Helpers' },
-    { path: '/account-requests', icon: Wallet, label: 'Comission/Cashout' },
+    { path: '/account-requests', icon: Wallet, label: 'Trip Review' },
     { path: '/trips', icon: Route, label: 'Trips' },
     { path: '/drivers-expenses', icon: FileText, label: 'Drivers Expenses' },
     { path: '/payment-submissions', icon: Wallet, label: 'Payment' },
