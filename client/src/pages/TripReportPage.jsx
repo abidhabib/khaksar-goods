@@ -491,7 +491,7 @@ const TripReportPage = () => {
   }
 
   return (
-    <div className="space-y-6 pb-10">
+    <div className="space-y-6 pb-10 max-w-7xl">
       <div className="flex items-center gap-3">
         <button onClick={() => navigate(-1)} className="btn-secondary p-2">
           <ArrowLeft className="w-4 h-4" />
