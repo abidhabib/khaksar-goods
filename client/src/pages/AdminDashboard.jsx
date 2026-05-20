@@ -9,7 +9,8 @@ import {
   Users, 
   HandHelping,
   DollarSign,
-  Activity
+  Activity,
+  CarIcon
 } from 'lucide-react';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 
@@ -34,6 +35,7 @@ const AdminDashboard = () => {
 
     fetchDashboardData();
   }, [get]);
+console.log(stats);
 
   if (loading || !stats) {
     return (
@@ -79,22 +81,31 @@ const AdminDashboard = () => {
         <StatCard
           title="Monthly Freight"
           value={stats.monthly_freight?.toLocaleString() || 0}
-          subtitle="Current month"
           icon={DollarSign}
           color="blue"
         />
         <StatCard
-          title="Monthly Expenses"
+          title="Expenses"
           value={stats.monthly_expenses?.toLocaleString() || 0}
-          subtitle="Trip + daily + bilty"
           icon={DollarSign}
           color="red"
         />
         <StatCard
-          title="Monthly Net Income"
+          title="Net Income"
           value={stats.monthly_net_income?.toLocaleString() || 0}
-          subtitle="After approved cashout"
           icon={DollarSign}
+          color="green"
+        />
+           <StatCard
+          title="Going Trip"
+          value={stats.ongoing_trips?.toLocaleString() || 0}
+          icon={CarIcon}
+          color="amber"
+        />
+           <StatCard
+          title="Completed Trips"
+          value={stats.completed_trips_this_month?.toLocaleString() || 0}
+          icon={CarIcon}
           color="green"
         />
       </div>

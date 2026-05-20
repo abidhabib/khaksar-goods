@@ -14,7 +14,7 @@ const StatCard = ({ title, value,  trend, trendUp, icon: Icon, color = 'blue' })
       <div className="flex items-start justify-between">
         <div className="flex-1">
           <p className="text-xs text-cargo-muted mb-1">{title}</p>
-          <h3 className="text-xl font-bold text-cargo-text">{value}</h3>
+          <h3 className="text-x font-bold text-cargo-text">{value}</h3>
           
           {trend && (
             <div className={`flex items-center gap-1 mt-2 text-xs ${trendUp ? 'text-cargo-success' : 'text-cargo-danger'}`}>
@@ -25,7 +25,7 @@ const StatCard = ({ title, value,  trend, trendUp, icon: Icon, color = 'blue' })
         </div>
         
         {Icon && (
-          <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${colorClasses[color]}`}>
+          <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${colorClasses[color]}`}>
             <Icon className="w-5 h-5" />
           </div>
         )}

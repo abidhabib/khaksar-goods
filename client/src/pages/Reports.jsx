@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { format } from 'date-fns';
-import jsPDF from 'jspdf';
-import autoTable from 'jspdf-autotable';
+import { jsPDF } from 'jspdf';
+import { autoTable } from 'jspdf-autotable';
 import {
   BarChart,
   Bar,
@@ -52,7 +52,7 @@ const reportTypeConfig = {
   trips: {
     title: 'Trip Volume',
     dataKey: 'trips',
-    color: '#f59e0b',
+    color: '#6366f1',
     formatter: (value) => `${value} trips`,
   },
 };
@@ -142,6 +142,9 @@ const Reports = () => {
       });
 
       doc.save(`cargo-report-${period}-${format(new Date(), 'yyyy-MM-dd-HH-mm')}.pdf`);
+    } catch (error) {
+      console.error('PDF export error:', error);
+      alert('Failed to generate PDF. Please try again.');
     } finally {
       setExporting(false);
     }
@@ -329,7 +332,7 @@ const Reports = () => {
                     {trip.source} to {trip.destination}
                   </p>
                   <p className="text-xs text-cargo-muted mt-1">
-                    {trip.driver_name} • {trip.car_number} • {format(new Date(trip.started_at), 'PPP')}
+                    {trip.driver_name} &bull; {trip.car_number} &bull; {format(new Date(trip.started_at), 'PPP')}
                   </p>
                 </div>
                 <div className="flex flex-wrap items-center gap-4 text-sm">

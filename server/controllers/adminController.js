@@ -53,6 +53,7 @@ const DAILY_EXPENSE_CATEGORIES = new Set([
     'cargo_security_guard',
     'other'
 ]);
+const MOBOIL_CHANGE_INTERVAL = 5000;
 
 const toNullableString = (value) => {
     if (value === undefined || value === null) {
@@ -355,6 +356,37 @@ const computeAverageKmPerLiter = (distance, liters) => {
     return Number((distanceValue / litersValue).toFixed(2));
 };
 
+const buildMoboilStatus = ({
+    currentMeterReading,
+    lastMoboilChangeMeterReading,
+    baselineMeterReading
+}) => {
+    const currentMeter = Number(currentMeterReading) || 0;
+    const lastMeter = lastMoboilChangeMeterReading === null || lastMoboilChangeMeterReading === undefined
+        ? null
+        : Number(lastMoboilChangeMeterReading) || 0;
+    const baselineMeter = Number.isFinite(Number(baselineMeterReading))
+        ? Number(baselineMeterReading) || 0
+        : 0;
+
+    const referenceMeter = lastMeter !== null ? lastMeter : baselineMeter;
+    const kmSinceChange = currentMeter >= referenceMeter
+        ? Number((currentMeter - referenceMeter).toFixed(2))
+        : 0;
+    const remainingKm = Math.max(0, MOBOIL_CHANGE_INTERVAL - kmSinceChange);
+    const progressPercent = Math.min(100, (kmSinceChange / MOBOIL_CHANGE_INTERVAL) * 100);
+
+    return {
+        last_change_meter: lastMeter,
+        baseline_meter: baselineMeter,
+        reference_meter: Number(referenceMeter.toFixed(2)),
+        km_since_change: Number(kmSinceChange.toFixed(2)),
+        remaining_km: Number(remainingKm.toFixed(2)),
+        progress_percent: Number(progressPercent.toFixed(1)),
+        needs_change: remainingKm <= 0
+    };
+};
+
 const applyTripNetIncomeFormula = (trip) => {
     const freightCharge = Number(trip?.freight_charge) || 0;
     const tripExpensesTotal = Number(
@@ -512,6 +544,20 @@ const getAllCars = async (req, res) => {
                        WHERE t5.car_id = c.id AND t5.status = 'completed'
                    ) as total_diesel_liters,
                    ca.start_meter_reading as assigned_at_meter,
+                   ca.assigned_at as assignment_assigned_at,
+                   (
+                       SELECT de.meter_reading
+                       FROM driver_daily_expense_entries de
+                       WHERE de.driver_id = d.id
+                         AND de.category = 'moboil_change'
+                         AND (
+                             ca.assigned_at IS NULL
+                             OR de.expense_date > DATE(ca.assigned_at)
+                             OR (de.expense_date = DATE(ca.assigned_at) AND de.created_at >= ca.assigned_at)
+                         )
+                       ORDER BY de.expense_date DESC, de.created_at DESC, de.id DESC
+                       LIMIT 1
+                   ) as last_moboil_change_meter,
                    ot.from_location as ongoing_from_location,
                    ot.to_location as ongoing_to_location,
                    lt.from_location as last_from_location,
@@ -557,7 +603,17 @@ const getAllCars = async (req, res) => {
                 overall_average_km_per_liter: computeAverageKmPerLiter(
                     car.total_distance_for_average,
                     car.total_diesel_liters
+                ),
+                moboil_status: (
+                    (car.last_moboil_change_meter !== null && car.last_moboil_change_meter !== undefined)
+                    || (car.assigned_at_meter !== null && car.assigned_at_meter !== undefined)
                 )
+                    ? buildMoboilStatus({
+                        currentMeterReading: car.current_meter_reading,
+                        lastMoboilChangeMeterReading: car.last_moboil_change_meter,
+                        baselineMeterReading: car.assigned_at_meter
+                    })
+                    : null
             }))
         });
     } catch (error) {
@@ -2941,8 +2997,7 @@ const getDashboardStats = async (req, res) => {
                 (SELECT COUNT(*) FROM drivers d JOIN users u ON d.user_id = u.id WHERE u.status = 'active') as active_drivers,
                 (SELECT COUNT(*) FROM helpers WHERE status = 'active') as active_helpers,
                 (SELECT COUNT(*) FROM trips WHERE status = 'ongoing') as ongoing_trips,
-                (SELECT COUNT(*) FROM trips WHERE DATE(started_at) = CURDATE()) as today_trips
-        `);
+                (SELECT COUNT(*) FROM trips WHERE status = 'completed' AND DATE_FORMAT(started_at, '%Y-%m') = DATE_FORMAT(CURDATE(), '%Y-%m')) as completed_trips_this_month    `);
 
         const monthlyCompletedTripsQuery = `
             SELECT

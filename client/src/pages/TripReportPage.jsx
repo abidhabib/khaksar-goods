@@ -88,6 +88,35 @@ const sortExpensesByCategory = (expenses = []) => [...expenses].sort((left, righ
   return (new Date(left.created_at).getTime() || 0) - (new Date(right.created_at).getTime() || 0);
 });
 
+const sortExpenseEntriesForDisplay = (expenses = []) => [...expenses].sort((left, right) => {
+  const leftHasImage = Boolean(left.receipt_image);
+  const rightHasImage = Boolean(right.receipt_image);
+
+  if (leftHasImage !== rightHasImage) {
+    return leftHasImage ? -1 : 1;
+  }
+
+  return (new Date(left.created_at).getTime() || 0) - (new Date(right.created_at).getTime() || 0);
+});
+
+const groupExpensesByCategory = (expenses = []) => {
+  const grouped = new Map();
+
+  sortExpensesByCategory(expenses).forEach((expense) => {
+    const key = expense.category || 'other';
+    if (!grouped.has(key)) {
+      grouped.set(key, []);
+    }
+    grouped.get(key).push(expense);
+  });
+
+  return Array.from(grouped.entries()).map(([category, items]) => ({
+    category,
+    items: sortExpenseEntriesForDisplay(items),
+    total: items.reduce((sum, item) => sum + (Number(item.amount) || 0), 0),
+  }));
+};
+
 const ImageModal = ({ src, alt, isOpen, onClose }) => {
   useEffect(() => {
     const handleEsc = (e) => {
@@ -190,6 +219,7 @@ const ExpenseBreakdown = ({ trip }) => {
     }] : []),
   ]);
   const totalExpenses = Number(trip.total_expenses ?? 0);
+  const groupedExpenses = groupExpensesByCategory(expenses);
 
   return (
     <div className="rounded-xl border border-cargo-border bg-cargo-dark/30 p-4 space-y-4">
@@ -201,34 +231,44 @@ const ExpenseBreakdown = ({ trip }) => {
         <p className="text-sm text-cargo-muted font-medium">Total: {formatCurrency(totalExpenses)}</p>
       </div>
 
-      {expenses.length ? (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-          {expenses.map((expense) => (
-            <div
-              key={expense.id}
-              className="rounded-lg border border-cargo-border/60 bg-cargo-card/40 p-3 hover:border-cargo-border transition-colors"
-            >
+      {groupedExpenses.length ? (
+        <div className="space-y-4">
+          {groupedExpenses.map((group) => (
+            <div key={group.category} className="rounded-lg border border-cargo-border/60 bg-cargo-card/30 p-4 space-y-3">
               <div className="flex items-center justify-between gap-3">
                 <div className="flex items-center gap-2">
                   <div className="w-2 h-2 rounded-full bg-cargo-accent/60" />
-                  <p className="text-sm text-cargo-text font-medium">{formatCategoryLabel(expense.category)}</p>
+                  <p className="text-sm text-cargo-text font-semibold">{formatCategoryLabel(group.category)}</p>
                 </div>
-                <p className="text-sm text-cargo-text font-semibold">{formatCurrency(expense.amount)}</p>
+                <p className="text-sm text-cargo-muted">Total: {formatCurrency(group.total)}</p>
               </div>
-              <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs text-cargo-muted">
-                <span>{formatDate(expense.created_at)}</span>
-                {expense.liters ? <span>Liters: {Number(expense.liters).toLocaleString()}</span> : null}
-                {expense.location ? <span>Location: {expense.location}</span> : null}
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                {group.items.map((expense) => (
+                  <div
+                    key={expense.id}
+                    className="rounded-lg  bg-cargo-card/40  hover:border-cargo-border transition-colors"
+                  >
+                    {expense.receipt_image ? (
+                      <div className="mb-3">
+                        <ClickableImage
+                          src={expense.receipt_image}
+                          alt={`${expense.category} receipt`}
+                          className="h-28"
+                        />
+                      </div>
+                    ) : null}
+                    <div className="flex items-center justify-between gap-3">
+                      <p className="text-sm text-cargo-text font-medium">{formatCurrency(expense.amount)}</p>
+                      <p className="text-xs text-cargo-muted">{formatDate(expense.created_at)}</p>
+                    </div>
+                    <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs text-cargo-muted">
+                      {expense.liters ? <span>Liters: {Number(expense.liters).toLocaleString()}</span> : null}
+                      {expense.location ? <span>Location: {expense.location}</span> : null}
+                    </div>
+                  </div>
+                ))}
               </div>
-              {expense.receipt_image ? (
-                <div className="mt-3">
-                  <ClickableImage
-                    src={expense.receipt_image}
-                    alt={`${expense.category} receipt`}
-                    className="h-28"
-                  />
-                </div>
-              ) : null}
             </div>
           ))}
         </div>
@@ -264,7 +304,7 @@ const TripCard = ({ trip }) => {
   const varianceTone = getVarianceTone(trip.freight_variance_direction);
 
   return (
-    <article className="rounded-xl border border-cargo-border bg-cargo-card/50 p-5 space-y-5 hover:border-cargo-border/80 transition-all duration-200 shadow-sm">
+    <article className="rounded-xl   bg-cargo-card/50 p-3 space-y-5 hover:border-cargo-border/80 transition-all duration-200 shadow-sm">
       <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
         <div className="flex items-start gap-3">
           <div className={`mt-1 p-2 rounded-lg ${isOngoing ? 'bg-cargo-accent/10' : trip.status === 'cancelled' ? 'bg-cargo-danger/10' : 'bg-cargo-success/10'}`}>

@@ -18,7 +18,7 @@ const ExpenseBreakdown = ({ data }) => {
   const chartData = Array.isArray(data) ? data.filter((item) => Number(item?.value) > 0) : [];
 
   return (
-    <div className="card p-4 max-w-5xl">
+    <div className="card p-4 max-w-3xl">
       <h3 className="text-base font-semibold text-cargo-text mb-4">Expense Breakdown</h3>
       
       {chartData.length ? (
@@ -40,12 +40,7 @@ const ExpenseBreakdown = ({ data }) => {
                   ))}
                 </Pie>
                 <Tooltip content={<CustomTooltip />} />
-                <Legend 
-                  verticalAlign="bottom" 
-                  height={32}
-                  iconType="circle"
-                  wrapperStyle={{ color: '#94a3b8' }}
-                />
+              
               </PieChart>
             </ResponsiveContainer>
           </div>

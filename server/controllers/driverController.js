@@ -715,7 +715,10 @@ const startTrip = async (req, res) => {
                 null
             ]
         );
-
+ await connection.execute(
+            'UPDATE cars SET current_meter_reading = ? WHERE id = ?',
+            [meterReadingValue, car_id]
+        );
         if (biltyCommissionValue > 0) {
             await connection.execute(
                 'INSERT INTO expenses (trip_id, category, amount) VALUES (?, ?, ?)',

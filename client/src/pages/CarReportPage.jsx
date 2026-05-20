@@ -80,6 +80,35 @@ const sortExpensesByCategory = (expenses = [], orderedCategories = []) => [...ex
   return (new Date(left.created_at).getTime() || 0) - (new Date(right.created_at).getTime() || 0);
 });
 
+const sortExpenseEntriesForDisplay = (expenses = [], imageKey) => [...expenses].sort((left, right) => {
+  const leftHasImage = Boolean(left[imageKey]);
+  const rightHasImage = Boolean(right[imageKey]);
+
+  if (leftHasImage !== rightHasImage) {
+    return leftHasImage ? -1 : 1;
+  }
+
+  return (new Date(left.created_at).getTime() || 0) - (new Date(right.created_at).getTime() || 0);
+});
+
+const groupExpensesByCategory = (expenses = [], orderedCategories = [], imageKey) => {
+  const grouped = new Map();
+
+  sortExpensesByCategory(expenses, orderedCategories).forEach((expense) => {
+    const key = expense.category || 'other';
+    if (!grouped.has(key)) {
+      grouped.set(key, []);
+    }
+    grouped.get(key).push(expense);
+  });
+
+  return Array.from(grouped.entries()).map(([category, items]) => ({
+    category,
+    items: sortExpenseEntriesForDisplay(items, imageKey),
+    total: items.reduce((sum, item) => sum + (Number(item.amount) || 0), 0),
+  }));
+};
+
 const tripExpenseCategories = [
   'diesel',
   'toll',
@@ -206,6 +235,7 @@ const ExpenseBreakdown = ({ trip, onEditExpense, onAddExpense }) => {
     }] : []),
   ], tripExpenseCategories);
   const totalExpenses = Number(trip.trip_expenses_total ?? trip.total_expenses ?? 0);
+  const groupedExpenses = groupExpensesByCategory(expenses, tripExpenseCategories, 'receipt_image');
 
   return (
     <div className="rounded-xl border border-cargo-border bg-cargo-dark/30 p-4 space-y-4">
@@ -223,40 +253,48 @@ const ExpenseBreakdown = ({ trip, onEditExpense, onAddExpense }) => {
         </div>
       </div>
 
-      {expenses.length ? (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-          {expenses.map((expense) => (
-            <div
-              key={expense.id}
-              className="rounded-lg border border-cargo-border/60 bg-cargo-card/40 p-3 hover:border-cargo-border transition-colors"
-            >
+      {groupedExpenses.length ? (
+        <div className="space-y-4">
+          {groupedExpenses.map((group) => (
+            <div key={group.category} className="rounded-lg border border-cargo-border/60 bg-cargo-card/30 p-4 space-y-3">
               <div className="flex items-center justify-between gap-3">
                 <div className="flex items-center gap-2">
                   <div className="w-2 h-2 rounded-full bg-cargo-accent/60" />
-                  <p className="text-sm text-cargo-text font-medium">{formatCategoryLabel(expense.category)}</p>
+                  <p className="text-sm text-cargo-text font-semibold">{formatCategoryLabel(group.category)}</p>
                 </div>
-                <div className="flex items-center gap-2">
-                  <p className="text-sm text-cargo-text font-semibold">{formatCurrency(expense.amount)}</p>
-                  <button type="button" onClick={() => onEditExpense(trip, expense)} className="inline-flex items-center gap-1 rounded-lg bg-primary-500/15 px-2.5 py-1.5 text-xs text-primary-300">
-                    <Pencil className="w-3.5 h-3.5" />
-                    Edit
-                  </button>
-                </div>
+                <p className="text-sm text-cargo-muted">Total: {formatCurrency(group.total)}</p>
               </div>
-              <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs text-cargo-muted">
-                <span>{formatDate(expense.created_at)}</span>
-                {expense.liters ? <span>Liters: {Number(expense.liters).toLocaleString()}</span> : null}
-                {expense.location ? <span>Location: {expense.location}</span> : null}
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                {group.items.map((expense) => (
+                  <div
+                    key={expense.id}
+                    className="rounded-lg bg-cargo-card/40 p-3 hover:border-cargo-border transition-colors"
+                  >
+                    {expense.receipt_image ? (
+                      <div className="mb-3">
+                        <ClickableImage
+                          src={expense.receipt_image}
+                          alt={`${expense.category} receipt`}
+                          className="h-28"
+                        />
+                      </div>
+                    ) : null}
+                    <div className="flex items-center justify-between gap-3">
+                      <p className="text-sm text-cargo-text font-semibold">{formatCurrency(expense.amount)}</p>
+                      <button type="button" onClick={() => onEditExpense(trip, expense)} className="inline-flex items-center gap-1 rounded-lg bg-primary-500/15 px-2.5 py-1.5 text-xs text-primary-300">
+                        <Pencil className="w-3.5 h-3.5" />
+                        Edit
+                      </button>
+                    </div>
+                    <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs text-cargo-muted">
+                      <span>{formatDate(expense.created_at)}</span>
+                      {expense.liters ? <span>Liters: {Number(expense.liters).toLocaleString()}</span> : null}
+                      {expense.location ? <span>Location: {expense.location}</span> : null}
+                    </div>
+                  </div>
+                ))}
               </div>
-              {expense.receipt_image ? (
-                <div className="mt-3">
-                  <ClickableImage
-                    src={expense.receipt_image}
-                    alt={`${expense.category} receipt`}
-                    className="h-28"
-                  />
-                </div>
-              ) : null}
             </div>
           ))}
         </div>
@@ -270,6 +308,7 @@ const ExpenseBreakdown = ({ trip, onEditExpense, onAddExpense }) => {
 const BetweenTripExpenseBreakdown = ({ trip, onEditDailyExpense, onAddDailyExpense }) => {
   const expenses = sortExpensesByCategory(trip.daily_expenses || [], dailyExpenseCategories);
   const totalExpenses = Number(trip.between_trip_expenses_total ?? 0);
+  const groupedExpenses = groupExpensesByCategory(expenses, dailyExpenseCategories, 'expense_image');
 
   return (
     <div className="rounded-xl border border-cargo-border bg-cargo-dark/30 p-4 space-y-4">
@@ -291,43 +330,51 @@ const BetweenTripExpenseBreakdown = ({ trip, onEditDailyExpense, onAddDailyExpen
         Expenses added after this trip ended and before the next trip started.
       </p>
 
-      {expenses.length ? (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-          {expenses.map((expense) => (
-            <div
-              key={`daily-${expense.id}`}
-              className="rounded-lg border border-cargo-border/60 bg-cargo-card/40 p-3 hover:border-cargo-border transition-colors"
-            >
+      {groupedExpenses.length ? (
+        <div className="space-y-4">
+          {groupedExpenses.map((group) => (
+            <div key={group.category} className="rounded-lg border border-cargo-border/60 bg-cargo-card/30 p-4 space-y-3">
               <div className="flex items-center justify-between gap-3">
                 <div className="flex items-center gap-2">
                   <div className="w-2 h-2 rounded-full bg-cargo-success/60" />
-                  <p className="text-sm text-cargo-text font-medium">{formatCategoryLabel(expense.category)}</p>
+                  <p className="text-sm text-cargo-text font-semibold">{formatCategoryLabel(group.category)}</p>
                 </div>
-                <div className="flex items-center gap-2">
-                  <p className="text-sm text-cargo-text font-semibold">{formatCurrency(expense.amount)}</p>
-                  <button type="button" onClick={() => onEditDailyExpense(trip, expense)} className="inline-flex items-center gap-1 rounded-lg bg-primary-500/15 px-2.5 py-1.5 text-xs text-primary-300">
-                    <Pencil className="w-3.5 h-3.5" />
-                    Edit
-                  </button>
-                </div>
+                <p className="text-sm text-cargo-muted">Total: {formatCurrency(group.total)}</p>
               </div>
-              <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs text-cargo-muted">
-                <span>{formatDate(expense.created_at)}</span>
-                {expense.expense_date ? <span>Expense Date: {formatDate(expense.expense_date, 'PPP')}</span> : null}
-                {expense.meter_reading ? <span>Meter: {Number(expense.meter_reading).toLocaleString()}</span> : null}
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                {group.items.map((expense) => (
+                  <div
+                    key={`daily-${expense.id}`}
+                    className="rounded-lg  bg-cargo-card/40  hover:border-cargo-border transition-colors"
+                  >
+                    {expense.expense_image ? (
+                      <div className="mb-3">
+                        <ClickableImage
+                          src={expense.expense_image}
+                          alt={`${expense.category} expense`}
+                          className="h-28"
+                        />
+                      </div>
+                    ) : null}
+                    <div className="flex items-center justify-between gap-3">
+                      <p className="text-sm text-cargo-text font-semibold">{formatCurrency(expense.amount)}</p>
+                      <button type="button" onClick={() => onEditDailyExpense(trip, expense)} className="inline-flex items-center gap-1 rounded-lg bg-primary-500/15 px-2.5 py-1.5 text-xs text-primary-300">
+                        <Pencil className="w-3.5 h-3.5" />
+                        Edit
+                      </button>
+                    </div>
+                    <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs text-cargo-muted">
+                      <span>{formatDate(expense.created_at)}</span>
+                      {expense.expense_date ? <span>Expense Date: {formatDate(expense.expense_date, 'PPP')}</span> : null}
+                      {expense.meter_reading ? <span>Meter: {Number(expense.meter_reading).toLocaleString()}</span> : null}
+                    </div>
+                    {expense.note ? (
+                      <p className="mt-2 text-xs text-cargo-muted">{expense.note}</p>
+                    ) : null}
+                  </div>
+                ))}
               </div>
-              {expense.note ? (
-                <p className="mt-2 text-xs text-cargo-muted">{expense.note}</p>
-              ) : null}
-              {expense.expense_image ? (
-                <div className="mt-3">
-                  <ClickableImage
-                    src={expense.expense_image}
-                    alt={`${expense.category} expense`}
-                    className="h-28"
-                  />
-                </div>
-              ) : null}
             </div>
           ))}
         </div>
@@ -362,7 +409,7 @@ const TripCard = ({ trip, status = 'completed', onEditTrip, onEditExpense, onAdd
   const varianceTone = getVarianceTone(trip.freight_variance_direction);
 
   return (
-    <article className="rounded-xl border border-cargo-border bg-cargo-card/50 p-5 space-y-5 hover:border-cargo-border/80 transition-all duration-200 shadow-sm">
+    <article className="rounded-xl   bg-cargo-card/50 p-3 space-y-5 hover:border-cargo-border/80 transition-all duration-200 shadow-sm">
       <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
         <div className="flex items-start gap-3">
           <div className={`mt-1 p-2 rounded-lg ${isOngoing ? 'bg-cargo-accent/10' : trip.status === 'cancelled' ? 'bg-cargo-danger/10' : 'bg-cargo-success/10'}`}>

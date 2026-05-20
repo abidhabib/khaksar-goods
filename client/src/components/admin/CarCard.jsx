@@ -6,12 +6,19 @@ const formatAverage = (value) => {
   return numericValue > 0 ? `${numericValue} km/L` : 'N/A';
 };
 
+const formatRemainingKm = (value) => {
+  const numericValue = Number(value);
+  return Number.isFinite(numericValue) ? `${numericValue.toLocaleString()} km` : '-- km';
+};
+
 const CarCard = ({ car, onEdit, onDelete, onAssign, onViewHistory }) => {
   const statusColors = {
     active: 'bg-cargo-success/20 text-cargo-success',
     maintenance: 'bg-cargo-accent/20 text-cargo-accent',
     retired: 'bg-cargo-danger/20 text-cargo-danger'
   };
+  const moboilRemainingKm = car.moboil_status?.remaining_km;
+  const moboilNeedsChange = Boolean(car.moboil_status?.needs_change);
 
   const tripStatusLabel = car.trip_status === 'ongoing'
     ? `Ongoing: ${car.ongoing_from_location} -> ${car.ongoing_to_location}`
@@ -70,6 +77,12 @@ const CarCard = ({ car, onEdit, onDelete, onAssign, onViewHistory }) => {
         <div className="flex items-center gap-2 text-sm col-span-2">
           <Gauge className="w-4 h-4 text-cargo-muted" />
           <span className="text-cargo-text">Average: {formatAverage(car.overall_average_km_per_liter)}</span>
+        </div>
+        <div className="flex items-center gap-2 text-sm col-span-2">
+          <AlertCircle className={`w-4 h-4 ${moboilNeedsChange ? 'text-cargo-danger' : 'text-cargo-muted'}`} />
+          <span className={moboilNeedsChange ? 'text-cargo-danger font-medium' : 'text-emerald-400'}>
+            Oil Change Remaining: {formatRemainingKm(moboilRemainingKm)}
+          </span>
         </div>
       </div>
 
