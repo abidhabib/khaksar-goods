@@ -10,6 +10,8 @@ import {
   FileText,
   Gauge,
   MapPin,
+  Pencil,
+  Plus,
   Receipt,
   Route,
   TrendingDown,
@@ -19,20 +21,15 @@ import {
   X,
   ZoomIn,
 } from 'lucide-react';
+import Modal from '../components/common/Modal';
 import { useApi } from '../hooks/useApi';
 
 const formatCurrency = (value) => `Rs ${Number(value || 0).toLocaleString()}`;
 
 const formatDate = (value, pattern = 'PPP p') => {
-  if (!value) {
-    return 'N/A';
-  }
-
+  if (!value) return 'N/A';
   const date = new Date(value);
-  if (Number.isNaN(date.getTime())) {
-    return 'N/A';
-  }
-
+  if (Number.isNaN(date.getTime())) return 'N/A';
   return format(date, pattern);
 };
 
@@ -43,10 +40,7 @@ const formatAverage = (value) => {
 
 const formatVariancePercent = (value) => {
   const numericValue = Number(value);
-  if (!Number.isFinite(numericValue)) {
-    return 'N/A';
-  }
-
+  if (!Number.isFinite(numericValue)) return 'N/A';
   return `${numericValue > 0 ? '+' : ''}${numericValue.toFixed(2)}%`;
 };
 
@@ -61,7 +55,7 @@ const formatCategoryLabel = (value) =>
     .replace(/_/g, ' ')
     .replace(/\b\w/g, (char) => char.toUpperCase());
 
-const tripExpenseCategoryOrder = [
+const tripExpenseCategories = [
   'diesel',
   'food',
   'toll',
@@ -85,7 +79,7 @@ const dailyExpenseCategories = [
   'other',
 ];
 
-const sortExpensesByCategory = (expenses = [], orderedCategories = tripExpenseCategoryOrder) => [...expenses].sort((left, right) => {
+const sortExpensesByCategory = (expenses = [], orderedCategories = tripExpenseCategories) => [...expenses].sort((left, right) => {
   const leftIndex = orderedCategories.indexOf(left.category);
   const rightIndex = orderedCategories.indexOf(right.category);
 
@@ -100,9 +94,9 @@ const sortExpensesByCategory = (expenses = [], orderedCategories = tripExpenseCa
   return (new Date(left.created_at).getTime() || 0) - (new Date(right.created_at).getTime() || 0);
 });
 
-const sortExpenseEntriesForDisplay = (expenses = []) => [...expenses].sort((left, right) => {
-  const leftHasImage = Boolean(left.receipt_image || left.expense_image);
-  const rightHasImage = Boolean(right.receipt_image || right.expense_image);
+const sortExpenseEntriesForDisplay = (expenses = [], imageKey) => [...expenses].sort((left, right) => {
+  const leftHasImage = Boolean(left[imageKey]);
+  const rightHasImage = Boolean(right[imageKey]);
 
   if (leftHasImage !== rightHasImage) {
     return leftHasImage ? -1 : 1;
@@ -111,7 +105,7 @@ const sortExpenseEntriesForDisplay = (expenses = []) => [...expenses].sort((left
   return (new Date(left.created_at).getTime() || 0) - (new Date(right.created_at).getTime() || 0);
 });
 
-const groupExpensesByCategory = (expenses = [], orderedCategories = tripExpenseCategoryOrder) => {
+const groupExpensesByCategory = (expenses = [], orderedCategories = tripExpenseCategories, imageKey = 'receipt_image') => {
   const grouped = new Map();
 
   sortExpensesByCategory(expenses, orderedCategories).forEach((expense) => {
@@ -124,7 +118,7 @@ const groupExpensesByCategory = (expenses = [], orderedCategories = tripExpenseC
 
   return Array.from(grouped.entries()).map(([category, items]) => ({
     category,
-    items: sortExpenseEntriesForDisplay(items),
+    items: sortExpenseEntriesForDisplay(items, imageKey),
     total: items.reduce((sum, item) => sum + (Number(item.amount) || 0), 0),
   }));
 };
@@ -158,6 +152,7 @@ const ImageModal = ({ src, alt, isOpen, onClose }) => {
         onClick={(e) => e.stopPropagation()}
       >
         <button
+          type="button"
           onClick={onClose}
           className="absolute -top-12 right-0 p-2 rounded-full bg-white/10 hover:bg-white/20 text-white transition-colors"
         >
@@ -216,7 +211,7 @@ const MeterImageCard = ({ label, src, alt }) => (
   </div>
 );
 
-const ExpenseBreakdown = ({ trip }) => {
+const ExpenseBreakdown = ({ trip, onEditExpense, onAddExpense }) => {
   const biltyCommissionAmount = Number(trip.bilty_commission_amount) || 0;
   const expenses = sortExpensesByCategory([
     ...(trip.expenses || []),
@@ -228,10 +223,11 @@ const ExpenseBreakdown = ({ trip }) => {
       location: null,
       liters: null,
       receipt_image: null,
+      notes: null,
     }] : []),
-  ]);
+  ], tripExpenseCategories);
   const totalExpenses = Number(trip.total_expenses ?? 0);
-  const groupedExpenses = groupExpensesByCategory(expenses);
+  const groupedExpenses = groupExpensesByCategory(expenses, tripExpenseCategories, 'receipt_image');
 
   return (
     <div className="rounded-xl border border-cargo-border bg-cargo-dark/30 p-4 space-y-4">
@@ -240,7 +236,13 @@ const ExpenseBreakdown = ({ trip }) => {
           <Receipt className="w-4 h-4 text-cargo-muted" />
           Expense Breakdown
         </p>
-        <p className="text-sm text-cargo-muted font-medium">Total: {formatCurrency(totalExpenses)}</p>
+        <div className="flex items-center gap-3">
+          <p className="text-sm text-cargo-muted font-medium">Total: {formatCurrency(totalExpenses)}</p>
+          <button type="button" onClick={() => onAddExpense(trip)} className="inline-flex items-center gap-1 rounded-lg bg-primary-500/15 px-3 py-2 text-primary-300">
+            <Plus className="w-4 h-4" />
+            Add Expense
+          </button>
+        </div>
       </div>
 
       {groupedExpenses.length ? (
@@ -257,27 +259,27 @@ const ExpenseBreakdown = ({ trip }) => {
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                 {group.items.map((expense) => (
-                  <div
-                    key={expense.id}
-                    className="rounded-lg  bg-cargo-card/40  hover:border-cargo-border transition-colors"
-                  >
+                  <div key={expense.id} className="rounded-lg bg-cargo-card/40 hover:border-cargo-border transition-colors p-3">
                     {expense.receipt_image ? (
                       <div className="mb-3">
-                        <ClickableImage
-                          src={expense.receipt_image}
-                          alt={`${expense.category} receipt`}
-                          className="h-28"
-                        />
+                        <ClickableImage src={expense.receipt_image} alt={`${expense.category} receipt`} className="h-28" />
                       </div>
                     ) : null}
                     <div className="flex items-center justify-between gap-3">
                       <p className="text-sm text-cargo-text font-medium">{formatCurrency(expense.amount)}</p>
-                      <p className="text-xs text-cargo-muted">{formatDate(expense.created_at)}</p>
+                      <button type="button" onClick={() => onEditExpense(trip, expense)} className="inline-flex items-center gap-1 rounded-lg bg-primary-500/15 px-2.5 py-1.5 text-xs text-primary-300">
+                        <Pencil className="w-3.5 h-3.5" />
+                        Edit
+                      </button>
                     </div>
                     <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs text-cargo-muted">
+                      <span>{formatDate(expense.created_at)}</span>
                       {expense.liters ? <span>Liters: {Number(expense.liters).toLocaleString()}</span> : null}
                       {expense.location ? <span>Location: {expense.location}</span> : null}
                     </div>
+                    {expense.notes ? (
+                      <p className="mt-2 text-xs text-cargo-muted">{expense.notes}</p>
+                    ) : null}
                   </div>
                 ))}
               </div>
@@ -291,10 +293,19 @@ const ExpenseBreakdown = ({ trip }) => {
   );
 };
 
-const FindingTripExpenseBreakdown = ({ expenses = [], totalExpenses = 0, title = 'Finding This Trip Expenses', description = 'These expenses were spent while finding and preparing this trip, and they are cut from this trip.' }) => {
-  const groupedExpenses = groupExpensesByCategory(expenses, dailyExpenseCategories);
+const FindingTripExpenseBreakdown = ({
+  trip,
+  expenses = [],
+  totalExpenses = 0,
+  onEditDailyExpense,
+  onAddDailyExpense,
+  title = 'Finding This Trip Expenses',
+  description = 'These expenses were spent while finding and preparing this trip, and they are cut from this trip.',
+  allowAdd = false,
+}) => {
+  const groupedExpenses = groupExpensesByCategory(expenses, dailyExpenseCategories, 'expense_image');
 
-  if (!groupedExpenses.length) {
+  if (!groupedExpenses.length && !allowAdd) {
     return null;
   }
 
@@ -306,51 +317,62 @@ const FindingTripExpenseBreakdown = ({ expenses = [], totalExpenses = 0, title =
             <Receipt className="w-4 h-4 text-cargo-success" />
             {title}
           </p>
-          <p className="text-xs text-cargo-muted mt-1">{description}</p>
         </div>
-        <p className="text-sm text-cargo-muted font-medium">Total: {formatCurrency(totalExpenses)}</p>
+        <div className="flex items-center gap-3">
+          <p className="text-sm text-cargo-muted font-medium">Total: {formatCurrency(totalExpenses)}</p>
+          {allowAdd ? (
+            <button type="button" onClick={() => onAddDailyExpense(trip)} className="inline-flex items-center gap-1 rounded-lg bg-primary-500/15 px-3 py-2 text-primary-300">
+              <Plus className="w-4 h-4" />
+              Add Expense
+            </button>
+          ) : null}
+        </div>
       </div>
 
-      <div className="space-y-4">
-        {groupedExpenses.map((group) => (
-          <div key={group.category} className="rounded-lg border border-cargo-border/60 bg-cargo-card/30 p-4 space-y-3">
-            <div className="flex items-center justify-between gap-3">
-              <div className="flex items-center gap-2">
-                <div className="w-2 h-2 rounded-full bg-cargo-success/60" />
-                <p className="text-sm text-cargo-text font-semibold">{formatCategoryLabel(group.category)}</p>
-              </div>
-              <p className="text-sm text-cargo-muted">Total: {formatCurrency(group.total)}</p>
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-              {group.items.map((expense) => (
-                <div key={expense.id} className="rounded-lg border border-cargo-border/60 bg-cargo-card/40 p-3 hover:border-cargo-border transition-colors">
-                  {expense.expense_image ? (
-                    <div className="mb-3">
-                      <ClickableImage
-                        src={expense.expense_image}
-                        alt={`${expense.category} expense`}
-                        className="h-28"
-                      />
-                    </div>
-                  ) : null}
-                  <div className="flex items-center justify-between gap-3">
-                    <p className="text-sm text-cargo-text font-semibold">{formatCurrency(expense.amount)}</p>
-                    <p className="text-xs text-cargo-muted">{formatDate(expense.created_at)}</p>
-                  </div>
-                  <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs text-cargo-muted">
-                    {expense.expense_date ? <span>Expense Date: {formatDate(expense.expense_date, 'PPP')}</span> : null}
-                    {expense.meter_reading ? <span>Meter: {Number(expense.meter_reading).toLocaleString()}</span> : null}
-                  </div>
-                  {expense.note ? (
-                    <p className="mt-2 text-xs text-cargo-muted">{expense.note}</p>
-                  ) : null}
+      {groupedExpenses.length ? (
+        <div className="space-y-4">
+          {groupedExpenses.map((group) => (
+            <div key={group.category} className="rounded-lg border border-cargo-border/60 bg-cargo-card/30 p-4 space-y-3">
+              <div className="flex items-center justify-between gap-3">
+                <div className="flex items-center gap-2">
+                  <div className="w-2 h-2 rounded-full bg-cargo-success/60" />
+                  <p className="text-sm text-cargo-text font-semibold">{formatCategoryLabel(group.category)}</p>
                 </div>
-              ))}
+                <p className="text-sm text-cargo-muted">Total: {formatCurrency(group.total)}</p>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                {group.items.map((expense) => (
+                  <div key={expense.id} className="rounded-lg border border-cargo-border/60 bg-cargo-card/40 p-3 hover:border-cargo-border transition-colors">
+                    {expense.expense_image ? (
+                      <div className="mb-3">
+                        <ClickableImage src={expense.expense_image} alt={`${expense.category} expense`} className="h-28" />
+                      </div>
+                    ) : null}
+                    <div className="flex items-center justify-between gap-3">
+                      <p className="text-sm text-cargo-text font-semibold">{formatCurrency(expense.amount)}</p>
+                      <button type="button" onClick={() => onEditDailyExpense(trip, expense)} className="inline-flex items-center gap-1 rounded-lg bg-primary-500/15 px-2.5 py-1.5 text-xs text-primary-300">
+                        <Pencil className="w-3.5 h-3.5" />
+                        Edit
+                      </button>
+                    </div>
+                    <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs text-cargo-muted">
+                      <span>{formatDate(expense.created_at)}</span>
+                      {expense.expense_date ? <span>Expense Date: {formatDate(expense.expense_date, 'PPP')}</span> : null}
+                      {expense.meter_reading ? <span>Meter: {Number(expense.meter_reading).toLocaleString()}</span> : null}
+                    </div>
+                    {expense.note ? (
+                      <p className="mt-2 text-xs text-cargo-muted">{expense.note}</p>
+                    ) : null}
+                  </div>
+                ))}
+              </div>
             </div>
-          </div>
-        ))}
-      </div>
+          ))}
+        </div>
+      ) : (
+        <p className="text-sm text-cargo-muted">No entries yet.</p>
+      )}
     </div>
   );
 };
@@ -370,7 +392,7 @@ const StatBadge = ({ children, variant = 'default' }) => {
   );
 };
 
-const TripCard = ({ trip }) => {
+const TripCard = ({ trip, onEditTrip, onEditExpense, onAddExpense, onEditDailyExpense, onAddDailyExpense }) => {
   const isOngoing = trip.status === 'ongoing';
   const totalExpenses = Number(trip.total_expenses ?? 0);
   const net = Number(trip.net_profit ?? (Number(trip.freight_charge || 0) - totalExpenses));
@@ -380,7 +402,7 @@ const TripCard = ({ trip }) => {
   const varianceTone = getVarianceTone(trip.freight_variance_direction);
 
   return (
-    <article className="rounded-xl   bg-cargo-card/50 p-3 space-y-5 hover:border-cargo-border/80 transition-all duration-200 shadow-sm">
+    <article className="rounded-xl bg-cargo-card/50 p-3 space-y-5 hover:border-cargo-border/80 transition-all duration-200 shadow-sm">
       <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
         <div className="flex items-start gap-3">
           <div className={`mt-1 p-2 rounded-lg ${isOngoing ? 'bg-cargo-accent/10' : trip.status === 'cancelled' ? 'bg-cargo-danger/10' : 'bg-cargo-success/10'}`}>
@@ -407,30 +429,23 @@ const TripCard = ({ trip }) => {
         </StatBadge>
       </div>
 
+      <div className="flex justify-end">
+        <button type="button" onClick={() => onEditTrip(trip)} className="inline-flex items-center gap-2 rounded-lg bg-primary-500/15 px-3 py-2 text-sm text-primary-300">
+          <Pencil className="w-4 h-4" />
+          Edit Trip
+        </button>
+      </div>
+
       <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
         {[
           { label: 'Started', value: formatDate(trip.started_at), icon: Calendar },
           { label: 'Ended', value: isOngoing ? 'In progress' : formatDate(trip.ended_at), icon: Clock3 },
-          {
-            label: 'Freight',
-            value: formatCurrency(trip.freight_charge),
-            subvalue: `↕ ${formatVariancePercent(trip.freight_variance_percentage)}`,
-            icon: Wallet,
-            tone: varianceTone
-          },
+          { label: 'Freight', value: formatCurrency(trip.freight_charge), subvalue: `↕ ${formatVariancePercent(trip.freight_variance_percentage)}`, icon: Wallet, tone: varianceTone },
           { label: 'Expenses', value: formatCurrency(totalExpenses), icon: TrendingDown },
           { label: 'Net income', value: formatCurrency(net), icon: TrendingUp, highlight: true },
-          {
-            label: 'Distance',
-            value: `${Math.max((Number(trip.end_meter_reading) || 0) - (Number(trip.start_meter_reading) || 0), 0).toLocaleString()} km`,
-            subvalue: `Avg: ${formatAverage(trip.trip_average_km_per_liter)}`,
-            icon: Activity
-          },
+          { label: 'Distance', value: `${Math.max((Number(trip.end_meter_reading) || 0) - (Number(trip.start_meter_reading) || 0), 0).toLocaleString()} km`, subvalue: `Avg: ${formatAverage(trip.trip_average_km_per_liter)}`, icon: Activity },
         ].map((item) => (
-          <div
-            key={item.label}
-            className={`rounded-lg border p-3 ${item.highlight ? 'border-cargo-success/30 bg-cargo-success/5' : 'border-cargo-border bg-cargo-dark/20'}`}
-          >
+          <div key={item.label} className={`rounded-lg border p-3 ${item.highlight ? 'border-cargo-success/30 bg-cargo-success/5' : 'border-cargo-border bg-cargo-dark/20'}`}>
             <p className="text-xs text-cargo-muted font-medium flex items-center gap-1">
               <item.icon className="w-3 h-3" />
               {item.label}
@@ -438,40 +453,26 @@ const TripCard = ({ trip }) => {
             <p className={`text-sm font-semibold mt-1.5 ${item.highlight ? 'text-cargo-success' : item.tone || 'text-cargo-text'}`}>
               {item.value}
             </p>
-            {item.subvalue ? (
-              <p className={`text-xs mt-1 ${item.tone || 'text-cargo-muted'}`}>
-                {item.subvalue}
-              </p>
-            ) : null}
+            {item.subvalue ? <p className={`text-xs mt-1 ${item.tone || 'text-cargo-muted'}`}>{item.subvalue}</p> : null}
           </div>
         ))}
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
         <div className="rounded-lg border border-cargo-border bg-cargo-dark/20 p-3">
-          <p className="text-[11px] text-cargo-muted uppercase tracking-wider font-medium flex items-center gap-1">
-            <Gauge className="w-3 h-3" />Start Meter
-          </p>
+          <p className="text-[11px] text-cargo-muted uppercase tracking-wider font-medium flex items-center gap-1"><Gauge className="w-3 h-3" />Start Meter</p>
           <p className="text-sm text-cargo-text font-semibold mt-1.5">{(Number(trip.start_meter_reading) || 0).toLocaleString()}</p>
         </div>
         <div className="rounded-lg border border-cargo-border bg-cargo-dark/20 p-3">
-          <p className="text-[11px] text-cargo-muted uppercase tracking-wider font-medium flex items-center gap-1">
-            <Gauge className="w-3 h-3" />End Meter
-          </p>
-          <p className="text-sm text-cargo-text font-semibold mt-1.5">
-            {trip.end_meter_reading ? Number(trip.end_meter_reading).toLocaleString() : isOngoing ? 'Pending' : 'N/A'}
-          </p>
+          <p className="text-[11px] text-cargo-muted uppercase tracking-wider font-medium flex items-center gap-1"><Gauge className="w-3 h-3" />End Meter</p>
+          <p className="text-sm text-cargo-text font-semibold mt-1.5">{trip.end_meter_reading ? Number(trip.end_meter_reading).toLocaleString() : isOngoing ? 'Pending' : 'N/A'}</p>
         </div>
         <div className="rounded-lg border border-cargo-border bg-cargo-dark/20 p-3">
-          <p className="text-[11px] text-cargo-muted uppercase tracking-wider font-medium flex items-center gap-1">
-            <MapPin className="w-3 h-3" />Live Start
-          </p>
+          <p className="text-[11px] text-cargo-muted uppercase tracking-wider font-medium flex items-center gap-1"><MapPin className="w-3 h-3" />Live Start</p>
           <p className="text-sm text-cargo-text font-semibold mt-1.5">{trip.start_live_location || trip.from_location || 'N/A'}</p>
         </div>
         <div className="rounded-lg border border-cargo-border bg-cargo-dark/20 p-3">
-          <p className="text-[11px] text-cargo-muted uppercase tracking-wider font-medium flex items-center gap-1">
-            <MapPin className="w-3 h-3" />Actual End
-          </p>
+          <p className="text-[11px] text-cargo-muted uppercase tracking-wider font-medium flex items-center gap-1"><MapPin className="w-3 h-3" />Actual End</p>
           <p className="text-sm text-cargo-text font-semibold mt-1.5">{actualEndLocation || (isOngoing ? 'In progress' : 'N/A')}</p>
         </div>
       </div>
@@ -491,12 +492,16 @@ const TripCard = ({ trip }) => {
         </div>
       </div>
 
-
+  
       <FindingTripExpenseBreakdown
+        trip={trip}
         expenses={trip.pending_next_trip_daily_expenses || []}
         totalExpenses={Number(trip.pending_next_trip_expenses_total || 0)}
+        onEditDailyExpense={onEditDailyExpense}
+        onAddDailyExpense={onAddDailyExpense}
         title="Waiting For Next Trip Expenses"
         description="These expenses are still independent because the next trip has not started yet, so they are not cut from this trip."
+        allowAdd
       />
 
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
@@ -519,7 +524,7 @@ const TripCard = ({ trip }) => {
         ))}
       </div>
 
-      <ExpenseBreakdown trip={trip} />
+      <ExpenseBreakdown trip={trip} onEditExpense={onEditExpense} onAddExpense={onAddExpense} />
 
       {trip.notes ? (
         <div className="rounded-lg border border-cargo-border bg-cargo-dark/20 p-4">
@@ -537,22 +542,146 @@ const TripCard = ({ trip }) => {
 const TripReportPage = () => {
   const navigate = useNavigate();
   const { id } = useParams();
-  const { get, loading } = useApi();
+  const { get, post, put, loading } = useApi();
   const [trip, setTrip] = useState(null);
+  const [editingTrip, setEditingTrip] = useState(null);
+  const [savingTrip, setSavingTrip] = useState(false);
+  const [tripForm, setTripForm] = useState({
+    start_meter_reading: '',
+    end_meter_reading: '',
+    freight_charge: '',
+    from_location: '',
+    to_location: '',
+    notes: '',
+  });
+  const [expenseModal, setExpenseModal] = useState({ isOpen: false, tripId: null, expenseId: null, type: 'trip', driverId: null });
+  const [expenseForm, setExpenseForm] = useState({
+    category: 'diesel',
+    amount: '',
+    liters: '',
+    location: '',
+    notes: '',
+    expense_date: '',
+    meter_reading: '',
+  });
+  const [savingExpense, setSavingExpense] = useState(false);
+
+  const fetchTripReport = async () => {
+    const result = await get(`/admin/trips/${id}/report`);
+    if (result.success) {
+      setTrip({
+        ...result.data.trip,
+        expenses: result.data.expenses || [],
+      });
+    }
+  };
 
   useEffect(() => {
-    const fetchTripReport = async () => {
-      const result = await get(`/admin/trips/${id}/report`);
-      if (result.success) {
-        setTrip({
-          ...result.data.trip,
-          expenses: result.data.expenses || [],
-        });
-      }
-    };
-
     fetchTripReport();
   }, [get, id]);
+
+  const openTripModal = (tripRow) => {
+    setEditingTrip(tripRow);
+    setTripForm({
+      start_meter_reading: tripRow.start_meter_reading ?? '',
+      end_meter_reading: tripRow.end_meter_reading ?? '',
+      freight_charge: tripRow.freight_charge ?? '',
+      from_location: tripRow.from_location || '',
+      to_location: tripRow.to_location || '',
+      notes: tripRow.notes || '',
+    });
+  };
+
+  const closeTripModal = () => setEditingTrip(null);
+
+  const handleTripSave = async (e) => {
+    e.preventDefault();
+    if (!editingTrip) return;
+    setSavingTrip(true);
+    const result = await put(`/admin/trips/${editingTrip.id}`, tripForm);
+    setSavingTrip(false);
+    if (!result.success) {
+      alert(result.error);
+      return;
+    }
+    closeTripModal();
+    fetchTripReport();
+  };
+
+  const openExpenseAddModal = (tripRow) => {
+    setExpenseModal({ isOpen: true, tripId: tripRow.id, expenseId: null, type: 'trip', driverId: tripRow.driver_id ?? null });
+    setExpenseForm({ category: 'diesel', amount: '', liters: '', location: '', notes: '', expense_date: '', meter_reading: '' });
+  };
+
+  const openExpenseEditModal = (tripRow, expense) => {
+    setExpenseModal({ isOpen: true, tripId: tripRow.id, expenseId: expense.id, type: 'trip', driverId: tripRow.driver_id ?? null });
+    setExpenseForm({
+      category: expense.category || 'diesel',
+      amount: expense.amount ?? '',
+      liters: expense.liters ?? '',
+      location: expense.location || '',
+      notes: expense.notes || '',
+      expense_date: '',
+      meter_reading: '',
+    });
+  };
+
+  const openDailyExpenseAddModal = (tripRow) => {
+    setExpenseModal({ isOpen: true, tripId: tripRow.id, expenseId: null, type: 'daily', driverId: tripRow.driver_id ?? null });
+    setExpenseForm({ category: 'food', amount: '', liters: '', location: '', notes: '', expense_date: '', meter_reading: '' });
+  };
+
+  const openDailyExpenseEditModal = (tripRow, expense) => {
+    setExpenseModal({ isOpen: true, tripId: tripRow.id, expenseId: expense.id, type: 'daily', driverId: tripRow.driver_id ?? null });
+    setExpenseForm({
+      category: expense.category || 'food',
+      amount: expense.amount ?? '',
+      liters: '',
+      location: '',
+      notes: expense.note || '',
+      expense_date: expense.expense_date ? String(expense.expense_date).slice(0, 10) : '',
+      meter_reading: expense.meter_reading ?? '',
+    });
+  };
+
+  const closeExpenseModal = () => {
+    setExpenseModal({ isOpen: false, tripId: null, expenseId: null, type: 'trip', driverId: null });
+  };
+
+  const handleExpenseSave = async (e) => {
+    e.preventDefault();
+    setSavingExpense(true);
+    const payload = expenseModal.type === 'daily'
+      ? {
+        driver_id: expenseModal.driverId,
+        category: expenseForm.category,
+        amount: expenseForm.amount,
+        note: expenseForm.notes,
+        expense_date: expenseForm.expense_date,
+        meter_reading: expenseForm.meter_reading,
+      }
+      : expenseForm;
+    const result = expenseModal.type === 'daily'
+      ? (
+        expenseModal.expenseId
+          ? await put(`/admin/drivers-expenses/${expenseModal.expenseId}`, payload)
+          : await post('/admin/drivers-expenses', payload)
+      )
+      : (
+        expenseModal.expenseId
+          ? await put(`/admin/trip-expenses/${expenseModal.expenseId}`, payload)
+          : await post(`/admin/trips/${expenseModal.tripId}/expenses`, payload)
+      );
+    setSavingExpense(false);
+
+    if (!result.success) {
+      alert(result.error);
+      return;
+    }
+
+    closeExpenseModal();
+    fetchTripReport();
+  };
 
   if (loading && !trip) {
     return (
@@ -575,18 +704,73 @@ const TripReportPage = () => {
   }
 
   return (
-    <div className="space-y-6 pb-10 max-w-7xl">
-      <div className="flex items-center gap-3">
-        <button onClick={() => navigate(-1)} className="btn-secondary p-2">
-          <ArrowLeft className="w-4 h-4" />
-        </button>
-        <div>
-          <h1 className="text-2xl font-bold text-cargo-text">Trip Report</h1>
+    <>
+      <div className="space-y-6 pb-10">
+        <div className="flex items-center gap-3">
+          <button onClick={() => navigate(-1)} className="btn-secondary p-2">
+            <ArrowLeft className="w-4 h-4" />
+          </button>
+          <div>
+            <h1 className="text-2xl font-bold text-cargo-text">Trip Report</h1>
+          </div>
         </div>
+
+        <TripCard
+          trip={trip}
+          onEditTrip={openTripModal}
+          onEditExpense={openExpenseEditModal}
+          onAddExpense={openExpenseAddModal}
+          onEditDailyExpense={openDailyExpenseEditModal}
+          onAddDailyExpense={openDailyExpenseAddModal}
+        />
       </div>
 
-      <TripCard trip={trip} />
-    </div>
+      <Modal isOpen={Boolean(editingTrip)} onClose={closeTripModal} title="Edit Trip">
+        <form onSubmit={handleTripSave} className="space-y-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+            <input type="number" min="0" step="0.01" value={tripForm.start_meter_reading} onChange={(e) => setTripForm((prev) => ({ ...prev, start_meter_reading: e.target.value }))} className="input-field w-full" placeholder="Start Meter Reading" />
+            <input type="number" min="0" step="0.01" value={tripForm.end_meter_reading} onChange={(e) => setTripForm((prev) => ({ ...prev, end_meter_reading: e.target.value }))} className="input-field w-full" placeholder="End Meter Reading" />
+            <input type="text" value={tripForm.from_location} onChange={(e) => setTripForm((prev) => ({ ...prev, from_location: e.target.value }))} className="input-field w-full" placeholder="From Location" />
+            <input type="text" value={tripForm.to_location} onChange={(e) => setTripForm((prev) => ({ ...prev, to_location: e.target.value }))} className="input-field w-full" placeholder="To Location" />
+            <input type="number" min="0" step="0.01" value={tripForm.freight_charge} onChange={(e) => setTripForm((prev) => ({ ...prev, freight_charge: e.target.value }))} className="input-field w-full md:col-span-2" placeholder="Freight Charge" />
+          </div>
+          <textarea value={tripForm.notes} onChange={(e) => setTripForm((prev) => ({ ...prev, notes: e.target.value }))} className="input-field w-full min-h-24" placeholder="Notes" />
+          <div className="flex gap-3">
+            <button type="button" onClick={closeTripModal} className="flex-1 btn-secondary">Cancel</button>
+            <button type="submit" disabled={savingTrip} className="flex-1 btn-primary">{savingTrip ? 'Saving...' : 'Save Trip'}</button>
+          </div>
+        </form>
+      </Modal>
+
+      <Modal isOpen={expenseModal.isOpen} onClose={closeExpenseModal} title={expenseModal.type === 'daily' ? (expenseModal.expenseId ? 'Edit While Looking For Next Trip Expense' : 'Add While Looking For Next Trip Expense') : (expenseModal.expenseId ? 'Edit Trip Expense' : 'Add Trip Expense')}>
+        <form onSubmit={handleExpenseSave} className="space-y-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+            <select value={expenseForm.category} onChange={(e) => setExpenseForm((prev) => ({ ...prev, category: e.target.value }))} className="input-field w-full">
+              {(expenseModal.type === 'daily' ? dailyExpenseCategories : tripExpenseCategories).map((category) => (
+                <option key={category} value={category}>{formatCategoryLabel(category)}</option>
+              ))}
+            </select>
+            <input type="number" min="0" step="0.01" value={expenseForm.amount} onChange={(e) => setExpenseForm((prev) => ({ ...prev, amount: e.target.value }))} className="input-field w-full" placeholder="Amount" />
+            {expenseModal.type === 'daily' ? (
+              <>
+                <input type="date" value={expenseForm.expense_date} onChange={(e) => setExpenseForm((prev) => ({ ...prev, expense_date: e.target.value }))} className="input-field w-full" />
+                <input type="number" min="0" step="0.01" value={expenseForm.meter_reading} onChange={(e) => setExpenseForm((prev) => ({ ...prev, meter_reading: e.target.value }))} className="input-field w-full" placeholder="Meter Reading" />
+              </>
+            ) : (
+              <>
+                <input type="number" min="0" step="0.01" value={expenseForm.liters} onChange={(e) => setExpenseForm((prev) => ({ ...prev, liters: e.target.value }))} className="input-field w-full" placeholder="Liters" />
+                <input type="text" value={expenseForm.location} onChange={(e) => setExpenseForm((prev) => ({ ...prev, location: e.target.value }))} className="input-field w-full" placeholder="Location" />
+              </>
+            )}
+          </div>
+          <textarea value={expenseForm.notes} onChange={(e) => setExpenseForm((prev) => ({ ...prev, notes: e.target.value }))} className="input-field w-full min-h-24" placeholder={expenseModal.type === 'daily' ? 'Name / Notes' : 'Notes'} />
+          <div className="flex gap-3">
+            <button type="button" onClick={closeExpenseModal} className="flex-1 btn-secondary">Cancel</button>
+            <button type="submit" disabled={savingExpense} className="flex-1 btn-primary">{savingExpense ? 'Saving...' : expenseModal.expenseId ? 'Save Expense' : 'Add Expense'}</button>
+          </div>
+        </form>
+      </Modal>
+    </>
   );
 };
 

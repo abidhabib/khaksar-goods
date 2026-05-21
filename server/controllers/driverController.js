@@ -1608,12 +1608,39 @@ const getCompanyPayments = async (req, res) => {
         const [[income]] = await pool.execute(
             `SELECT
                 c.car_number,
-                COALESCE(SUM(CASE WHEN t.status = 'completed' THEN t.freight_charge ELSE 0 END), 0) AS total_income
+                (
+                    COALESCE((
+                        SELECT SUM(CASE WHEN t.status = 'completed' THEN t.freight_charge ELSE 0 END)
+                        FROM trips t
+                        WHERE t.driver_id = d.id
+                    ), 0)
+                    -
+                    COALESCE((
+                        SELECT SUM(e.amount)
+                        FROM expenses e
+                        JOIN trips t2 ON t2.id = e.trip_id
+                        WHERE t2.driver_id = d.id
+                          AND t2.status = 'completed'
+                    ), 0)
+                    -
+                    COALESCE((
+                        SELECT SUM(de.amount)
+                        FROM driver_daily_expense_entries de
+                        WHERE de.driver_id = d.id
+                    ), 0)
+                    -
+                    COALESCE((
+                        SELECT SUM(CASE WHEN r.status = 'approved' THEN r.amount ELSE 0 END)
+                        FROM driver_cashout_requests r
+                        WHERE r.driver_id = d.id
+                    ), 0)
+                    +
+                    15000
+                ) AS total_income
              FROM drivers d
              LEFT JOIN cars c ON d.assigned_car_id = c.id
-             LEFT JOIN trips t ON t.driver_id = d.id
              WHERE d.id = ?
-             GROUP BY c.car_number`,
+             LIMIT 1`,
             [driver_id]
         );
 
@@ -1671,17 +1698,20 @@ const submitCompanyPayment = async (req, res) => {
             return res.status(400).json({ message: 'Payment screenshot is required for account payment' });
         }
 
+        const paymentStatus = paymentMethod === 'cash' ? 'approved' : 'pending';
+
         const [result] = await pool.execute(
             `INSERT INTO driver_payment_submissions
                 (driver_id, payment_method, amount, sending_fee, handover_to, screenshot_image, status, submitted_at, status_updated_at)
-             VALUES (?, ?, ?, ?, ?, ?, 'pending', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)`,
+             VALUES (?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)`,
             [
                 driver_id,
                 paymentMethod,
                 amountValue,
                 paymentMethod === 'account' ? sendingFeeValue : 0,
                 paymentMethod === 'cash' ? handoverTo : null,
-                paymentMethod === 'account' ? screenshotImage : null
+                paymentMethod === 'account' ? screenshotImage : null,
+                paymentStatus
             ]
         );
 
@@ -1704,7 +1734,9 @@ const submitCompanyPayment = async (req, res) => {
 
         res.status(201).json({
             success: true,
-            message: 'Payment submission saved successfully',
+            message: paymentMethod === 'cash'
+                ? 'Cash payment saved and approved successfully'
+                : 'Payment submission saved successfully',
             payment
         });
     } catch (error) {

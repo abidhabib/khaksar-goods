@@ -314,9 +314,13 @@ Medical %6$s • Food %7$s • Guard %8$s</string>
     <string name="payment_remaining_amount">Remaining Amount</string>
     <string name="payment_amount_placeholder">Rs 0</string>
     <string name="payment_deposit_cash">Deposit Via Cash</string>
-    <string name="payment_deposit_cash_subtitle">Record handover amount, fee, and recipient</string>
+    <string name="payment_deposit_cash_subtitle">Cash handover is approved instantly after submission</string>
     <string name="payment_deposit_account">Deposit Via Account</string>
     <string name="payment_deposit_account_subtitle">Upload bank or app screenshot as proof</string>
+    <string name="payment_company_account_title">Show Company account bank detail</string>
+    <string name="payment_company_account_method">Method : EasyPaisa</string>
+    <string name="payment_company_account_number">Number: 03446667214</string>
+    <string name="payment_company_account_name">Name : Muhammad Arslan</string>
     <string name="payment_method_hint">Tap a deposit method card to open its form, then save the submission.</string>
     <string name="payment_sending_fee">Sending fee</string>
     <string name="payment_handover_to">Handover to</string>

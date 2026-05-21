@@ -1002,10 +1002,27 @@ const getAllDrivers = async (req, res) => {
                        ), 0)
                        -
                        COALESCE((
+                           SELECT SUM(e.amount)
+                           FROM expenses e
+                           JOIN trips t4 ON t4.id = e.trip_id
+                           WHERE t4.driver_id = d.id
+                             AND t4.status = 'completed'
+                       ), 0)
+                       -
+                       COALESCE((
+                           SELECT SUM(de.amount)
+                           FROM driver_daily_expense_entries de
+                           WHERE de.driver_id = d.id
+                       ), 0)
+                       -
+                       COALESCE((
                            SELECT SUM(CASE WHEN r.status = 'approved' THEN r.amount ELSE 0 END)
                            FROM driver_cashout_requests r
                            WHERE r.driver_id = d.id
                        ), 0)
+                       
+                        +15000
+                     
                    ) AS company_amount,
                    dll.area as last_location_area,
                    dll.city as last_location_city,

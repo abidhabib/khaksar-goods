@@ -332,9 +332,7 @@ const PendingNextTripExpenseBreakdown = ({ trip, onEditDailyExpense, onAddDailyE
         </div>
       </div>
 
-      <p className="text-xs text-cargo-muted">
-        These expenses are still independent because the next trip has not started yet, so they are not cut from this trip.
-      </p>
+
 
       <div className="space-y-4">
         {groupedExpenses.map((group) => (

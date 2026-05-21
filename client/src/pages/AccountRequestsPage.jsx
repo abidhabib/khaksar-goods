@@ -2,11 +2,14 @@ import { useCallback, useEffect, useState } from 'react';
 import {
   Activity,
   Calendar,
+  Car,
   CheckCircle2,
   Clock3,
   FileText,
   Gauge,
+  MapPin,
   Pencil,
+  Plus,
   Receipt,
   Route,
   TrendingDown,
@@ -22,11 +25,11 @@ import { useApi } from '../hooks/useApi';
 
 const formatCurrency = (value) => `Rs ${Number(value || 0).toLocaleString()}`;
 
-const formatDate = (value) => {
+const formatDate = (value, pattern = 'default') => {
   if (!value) return 'N/A';
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return 'N/A';
-  return date.toLocaleString();
+  return pattern === 'date' ? date.toLocaleDateString() : date.toLocaleString();
 };
 
 const formatAverage = (value) => {
@@ -45,7 +48,7 @@ const formatCategoryLabel = (value) =>
     .replace(/_/g, ' ')
     .replace(/\b\w/g, (char) => char.toUpperCase());
 
-const expenseCategoryOrder = [
+const tripExpenseCategories = [
   'diesel',
   'food',
   'toll',
@@ -69,7 +72,7 @@ const dailyExpenseCategories = [
   'other',
 ];
 
-const sortExpensesByCategory = (expenses = [], orderedCategories = expenseCategoryOrder) => [...expenses].sort((left, right) => {
+const sortExpensesByCategory = (expenses = [], orderedCategories = tripExpenseCategories) => [...expenses].sort((left, right) => {
   const leftIndex = orderedCategories.indexOf(left.category);
   const rightIndex = orderedCategories.indexOf(right.category);
 
@@ -84,9 +87,9 @@ const sortExpensesByCategory = (expenses = [], orderedCategories = expenseCatego
   return (new Date(left.created_at).getTime() || 0) - (new Date(right.created_at).getTime() || 0);
 });
 
-const sortExpenseEntriesForDisplay = (expenses = []) => [...expenses].sort((left, right) => {
-  const leftHasImage = Boolean(left.receipt_image || left.expense_image);
-  const rightHasImage = Boolean(right.receipt_image || right.expense_image);
+const sortExpenseEntriesForDisplay = (expenses = [], imageKey) => [...expenses].sort((left, right) => {
+  const leftHasImage = Boolean(left[imageKey]);
+  const rightHasImage = Boolean(right[imageKey]);
 
   if (leftHasImage !== rightHasImage) {
     return leftHasImage ? -1 : 1;
@@ -95,7 +98,7 @@ const sortExpenseEntriesForDisplay = (expenses = []) => [...expenses].sort((left
   return (new Date(left.created_at).getTime() || 0) - (new Date(right.created_at).getTime() || 0);
 });
 
-const groupExpensesByCategory = (expenses = [], orderedCategories = expenseCategoryOrder) => {
+const groupExpensesByCategory = (expenses = [], orderedCategories = tripExpenseCategories, imageKey = 'receipt_image') => {
   const grouped = new Map();
 
   sortExpensesByCategory(expenses, orderedCategories).forEach((expense) => {
@@ -108,7 +111,7 @@ const groupExpensesByCategory = (expenses = [], orderedCategories = expenseCateg
 
   return Array.from(grouped.entries()).map(([category, items]) => ({
     category,
-    items: sortExpenseEntriesForDisplay(items),
+    items: sortExpenseEntriesForDisplay(items, imageKey),
     total: items.reduce((sum, item) => sum + (Number(item.amount) || 0), 0),
   }));
 };
@@ -213,8 +216,23 @@ const MeterImageCard = ({ label, src, alt }) => (
   </div>
 );
 
-const ExpenseBreakdown = ({ expenses }) => {
-  const groupedExpenses = groupExpensesByCategory(expenses);
+const ExpenseBreakdown = ({ row, onEditExpense, onAddExpense }) => {
+  const biltyCommissionAmount = Number(row.bilty_commission_amount) || 0;
+  const expenses = sortExpensesByCategory([
+    ...(row.expenses || []),
+    ...(biltyCommissionAmount > 0 ? [{
+      id: `bilty-${row.trip_id}`,
+      category: 'bilty_commission',
+      amount: biltyCommissionAmount,
+      created_at: row.ended_at || row.started_at,
+      location: null,
+      liters: null,
+      receipt_image: null,
+      notes: null,
+    }] : []),
+  ], tripExpenseCategories);
+  const totalExpenses = Number(row.trip_expenses_total ?? row.total_expenses ?? 0);
+  const groupedExpenses = groupExpensesByCategory(expenses, tripExpenseCategories, 'receipt_image');
 
   return (
     <div className="rounded-xl border border-cargo-border bg-cargo-dark/30 p-4 space-y-4">
@@ -223,9 +241,13 @@ const ExpenseBreakdown = ({ expenses }) => {
           <Receipt className="w-4 h-4 text-cargo-muted" />
           Expense Breakdown
         </p>
-        <p className="text-sm text-cargo-muted font-medium">
-          Entries: {expenses.length}
-        </p>
+        <div className="flex items-center gap-3">
+          <p className="text-sm text-cargo-muted font-medium">Total: {formatCurrency(totalExpenses)}</p>
+          <button type="button" onClick={() => onAddExpense(row)} className="inline-flex items-center gap-1 rounded-lg bg-primary-500/15 px-3 py-2 text-primary-300">
+            <Plus className="w-4 h-4" />
+            Add Expense
+          </button>
+        </div>
       </div>
 
       {groupedExpenses.length ? (
@@ -242,27 +264,27 @@ const ExpenseBreakdown = ({ expenses }) => {
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                 {group.items.map((expense) => (
-                  <div
-                    key={expense.id}
-                    className="rounded-lg  bg-cargo-card/40  hover:border-cargo-border transition-colors"
-                  >
+                  <div key={expense.id} className="rounded-lg bg-cargo-card/40 p-3 hover:border-cargo-border transition-colors">
                     {expense.receipt_image ? (
                       <div className="mb-3">
-                        <ClickableImage
-                          src={expense.receipt_image}
-                          alt={`${expense.category} receipt`}
-                          className="h-28"
-                        />
+                        <ClickableImage src={expense.receipt_image} alt={`${expense.category} receipt`} className="h-28" />
                       </div>
                     ) : null}
                     <div className="flex items-center justify-between gap-3">
                       <p className="text-sm text-cargo-text font-semibold">{formatCurrency(expense.amount)}</p>
-                      <p className="text-xs text-cargo-muted">{formatDate(expense.created_at)}</p>
+                      {String(expense.id).startsWith('bilty-') ? null : (
+                        <button type="button" onClick={() => onEditExpense(row, expense)} className="inline-flex items-center gap-1 rounded-lg bg-primary-500/15 px-2.5 py-1.5 text-xs text-primary-300">
+                          <Pencil className="w-3.5 h-3.5" />
+                          Edit
+                        </button>
+                      )}
                     </div>
                     <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs text-cargo-muted">
+                      <span>{formatDate(expense.created_at)}</span>
                       {expense.liters ? <span>Liters: {Number(expense.liters).toLocaleString()}</span> : null}
                       {expense.location ? <span>Location: {expense.location}</span> : null}
                     </div>
+                    {expense.notes ? <p className="mt-2 text-xs text-cargo-muted">{expense.notes}</p> : null}
                   </div>
                 ))}
               </div>
@@ -276,10 +298,18 @@ const ExpenseBreakdown = ({ expenses }) => {
   );
 };
 
-const FindingTripExpenseBreakdown = ({ expenses = [], totalExpenses = 0, title = 'Finding This Trip Expenses', description = 'These expenses were spent while finding and preparing this trip, and they are cut from this trip.' }) => {
-  const groupedExpenses = groupExpensesByCategory(expenses, dailyExpenseCategories);
+const FindingTripExpenseBreakdown = ({
+  row,
+  expenses = [],
+  totalExpenses = 0,
+  onEditDailyExpense,
+  onAddDailyExpense,
+  title = 'Finding This Trip Expenses',
+  allowAdd = false,
+}) => {
+  const groupedExpenses = groupExpensesByCategory(expenses, dailyExpenseCategories, 'expense_image');
 
-  if (!groupedExpenses.length) {
+  if (!groupedExpenses.length && !allowAdd) {
     return null;
   }
 
@@ -291,51 +321,60 @@ const FindingTripExpenseBreakdown = ({ expenses = [], totalExpenses = 0, title =
             <Receipt className="w-4 h-4 text-cargo-success" />
             {title}
           </p>
-          <p className="text-xs text-cargo-muted mt-1">{description}</p>
         </div>
-        <p className="text-sm text-cargo-muted font-medium">Total: {formatCurrency(totalExpenses)}</p>
+        <div className="flex items-center gap-3">
+          <p className="text-sm text-cargo-muted font-medium">Total: {formatCurrency(totalExpenses)}</p>
+          {allowAdd ? (
+            <button type="button" onClick={() => onAddDailyExpense(row)} className="inline-flex items-center gap-1 rounded-lg bg-primary-500/15 px-3 py-2 text-primary-300">
+              <Plus className="w-4 h-4" />
+              Add Expense
+            </button>
+          ) : null}
+        </div>
       </div>
 
-      <div className="space-y-4">
-        {groupedExpenses.map((group) => (
-          <div key={group.category} className="rounded-lg border border-cargo-border/60 bg-cargo-card/30 p-4 space-y-3">
-            <div className="flex items-center justify-between gap-3">
-              <div className="flex items-center gap-2">
-                <div className="w-2 h-2 rounded-full bg-cargo-success/60" />
-                <p className="text-sm text-cargo-text font-semibold">{formatCategoryLabel(group.category)}</p>
-              </div>
-              <p className="text-sm text-cargo-muted">Total: {formatCurrency(group.total)}</p>
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-              {group.items.map((expense) => (
-                <div key={expense.id} className="rounded-lg border border-cargo-border/60 bg-cargo-card/40 p-3 hover:border-cargo-border transition-colors">
-                  {expense.expense_image ? (
-                    <div className="mb-3">
-                      <ClickableImage
-                        src={expense.expense_image}
-                        alt={`${expense.category} expense`}
-                        className="h-28"
-                      />
-                    </div>
-                  ) : null}
-                  <div className="flex items-center justify-between gap-3">
-                    <p className="text-sm text-cargo-text font-semibold">{formatCurrency(expense.amount)}</p>
-                    <p className="text-xs text-cargo-muted">{formatDate(expense.created_at)}</p>
-                  </div>
-                  <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs text-cargo-muted">
-                    {expense.expense_date ? <span>Expense Date: {formatDate(expense.expense_date)}</span> : null}
-                    {expense.meter_reading ? <span>Meter: {Number(expense.meter_reading).toLocaleString()}</span> : null}
-                  </div>
-                  {expense.note ? (
-                    <p className="mt-2 text-xs text-cargo-muted">{expense.note}</p>
-                  ) : null}
+      {groupedExpenses.length ? (
+        <div className="space-y-4">
+          {groupedExpenses.map((group) => (
+            <div key={group.category} className="rounded-lg border border-cargo-border/60 bg-cargo-card/30 p-4 space-y-3">
+              <div className="flex items-center justify-between gap-3">
+                <div className="flex items-center gap-2">
+                  <div className="w-2 h-2 rounded-full bg-cargo-success/60" />
+                  <p className="text-sm text-cargo-text font-semibold">{formatCategoryLabel(group.category)}</p>
                 </div>
-              ))}
+                <p className="text-sm text-cargo-muted">Total: {formatCurrency(group.total)}</p>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                {group.items.map((expense) => (
+                  <div key={expense.id} className="rounded-lg border border-cargo-border/60 bg-cargo-card/40 p-3 hover:border-cargo-border transition-colors">
+                    {expense.expense_image ? (
+                      <div className="mb-3">
+                        <ClickableImage src={expense.expense_image} alt={`${expense.category} expense`} className="h-28" />
+                      </div>
+                    ) : null}
+                    <div className="flex items-center justify-between gap-3">
+                      <p className="text-sm text-cargo-text font-semibold">{formatCurrency(expense.amount)}</p>
+                      <button type="button" onClick={() => onEditDailyExpense(row, expense)} className="inline-flex items-center gap-1 rounded-lg bg-primary-500/15 px-2.5 py-1.5 text-xs text-primary-300">
+                        <Pencil className="w-3.5 h-3.5" />
+                        Edit
+                      </button>
+                    </div>
+                    <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs text-cargo-muted">
+                      <span>{formatDate(expense.created_at)}</span>
+                      {expense.expense_date ? <span>Expense Date: {formatDate(expense.expense_date, 'date')}</span> : null}
+                      {expense.meter_reading ? <span>Meter: {Number(expense.meter_reading).toLocaleString()}</span> : null}
+                    </div>
+                    {expense.note ? <p className="mt-2 text-xs text-cargo-muted">{expense.note}</p> : null}
+                  </div>
+                ))}
+              </div>
             </div>
-          </div>
-        ))}
-      </div>
+          ))}
+        </div>
+      ) : (
+        <p className="text-sm text-cargo-muted">No entries yet.</p>
+      )}
     </div>
   );
 };
@@ -350,14 +389,24 @@ const SummaryCard = ({ icon: Icon, label, value, tone = 'text-cargo-text' }) => 
   </div>
 );
 
-const RequestCard = ({ row, busyId, onEdit, onStatusChange }) => {
+const RequestCard = ({
+  row,
+  busyId,
+  onEditCommission,
+  onStatusChange,
+  onEditTrip,
+  onEditExpense,
+  onAddExpense,
+  onEditDailyExpense,
+  onAddDailyExpense,
+}) => {
   const pending = row.status === 'pending';
   const distance = Math.max((Number(row.end_meter_reading) || 0) - (Number(row.start_meter_reading) || 0), 0);
   const varianceTone = getVarianceTone(row.freight_variance_direction);
   const reviewedAt = row.reviewed_at || row.updated_at;
 
   return (
-    <article className="rounded-xl   bg-cargo-card/50 p-3 space-y-5 hover:border-cargo-border/80 transition-all duration-200 shadow-sm">
+    <article className="rounded-xl bg-cargo-card/50 p-3 space-y-5 hover:border-cargo-border/80 transition-all duration-200 shadow-sm">
       <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-3">
         <div className="flex items-start gap-3">
           <div className={`mt-1 p-2 rounded-lg ${pending ? 'bg-cargo-accent/10' : row.status === 'approved' ? 'bg-cargo-success/10' : 'bg-cargo-danger/10'}`}>
@@ -372,8 +421,11 @@ const RequestCard = ({ row, busyId, onEdit, onStatusChange }) => {
                 <User className="w-3 h-3" />
                 {row.driver_full_name || row.driver_username || 'N/A'}
               </span>
+              <span className="flex items-center gap-1">
+                <Car className="w-3 h-3" />
+                Car: {row.car_number || 'No cargo assigned'}
+              </span>
               <span>Trip #{row.trip_id}</span>
-              <span>{row.car_number || 'No cargo assigned'}</span>
             </div>
           </div>
         </div>
@@ -386,6 +438,24 @@ const RequestCard = ({ row, busyId, onEdit, onStatusChange }) => {
             {row.status}
           </span>
         </div>
+      </div>
+
+      <div className="flex flex-wrap justify-end gap-2">
+        <button type="button" onClick={() => onEditTrip(row)} className="inline-flex items-center gap-2 rounded-lg bg-primary-500/15 px-3 py-2 text-sm text-primary-300">
+          <Pencil className="w-4 h-4" />
+          Edit Trip
+        </button>
+        {pending ? (
+          <button
+            type="button"
+            onClick={() => onEditCommission(row)}
+            disabled={busyId === row.request_id}
+            className="inline-flex items-center gap-2 rounded-lg bg-primary-500/15 px-3 py-2 text-sm text-primary-300 hover:bg-primary-500/20"
+          >
+            <Pencil className="w-4 h-4" />
+            Edit Request
+          </button>
+        ) : null}
       </div>
 
       <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
@@ -408,16 +478,12 @@ const RequestCard = ({ row, busyId, onEdit, onStatusChange }) => {
             <p className={`text-sm font-semibold mt-1.5 ${item.highlight ? 'text-cargo-success' : item.tone || 'text-cargo-text'}`}>
               {item.value}
             </p>
-            {item.subvalue ? (
-              <p className={`text-xs mt-1 ${item.tone || 'text-cargo-muted'}`}>
-                {item.subvalue}
-              </p>
-            ) : null}
+            {item.subvalue ? <p className={`text-xs mt-1 ${item.tone || 'text-cargo-muted'}`}>{item.subvalue}</p> : null}
           </div>
         ))}
       </div>
 
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
         <div className="rounded-lg border border-cargo-border bg-cargo-dark/20 p-3">
           <p className="text-[11px] text-cargo-muted uppercase tracking-wider font-medium flex items-center gap-1">
             <Gauge className="w-3 h-3" />
@@ -433,23 +499,29 @@ const RequestCard = ({ row, busyId, onEdit, onStatusChange }) => {
           <p className="text-sm text-cargo-text font-semibold mt-1.5">{row.end_meter_reading ? Number(row.end_meter_reading).toLocaleString() : 'N/A'}</p>
         </div>
         <div className="rounded-lg border border-cargo-border bg-cargo-dark/20 p-3">
+          <p className="text-[11px] text-cargo-muted uppercase tracking-wider font-medium flex items-center gap-1">
+            <MapPin className="w-3 h-3" />
+            Live Start
+          </p>
+          <p className="text-sm text-cargo-text font-semibold mt-1.5">{row.start_live_location || row.from_location || 'N/A'}</p>
+        </div>
+        <div className="rounded-lg border border-cargo-border bg-cargo-dark/20 p-3">
+          <p className="text-[11px] text-cargo-muted uppercase tracking-wider font-medium flex items-center gap-1">
+            <MapPin className="w-3 h-3" />
+            Actual End
+          </p>
+          <p className="text-sm text-cargo-text font-semibold mt-1.5">{row.end_location || row.end_live_location || 'N/A'}</p>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
+        <div className="rounded-lg border border-cargo-border bg-cargo-dark/20 p-3">
           <p className="text-[11px] text-cargo-muted uppercase tracking-wider font-medium">Driver Phone</p>
           <p className="text-sm text-cargo-text font-semibold mt-1.5">{row.driver_phone || 'N/A'}</p>
         </div>
         <div className="rounded-lg border border-cargo-border bg-cargo-dark/20 p-3">
           <p className="text-[11px] text-cargo-muted uppercase tracking-wider font-medium">License</p>
           <p className="text-sm text-cargo-text font-semibold mt-1.5">{row.license_number || 'N/A'}</p>
-        </div>
-      </div>
-
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
-        <div className="rounded-lg border border-cargo-border bg-cargo-dark/20 p-3">
-          <p className="text-[11px] text-cargo-muted uppercase tracking-wider font-medium">Commission %</p>
-          <p className="text-sm text-cargo-text font-semibold mt-1.5">{Number(row.commission_percentage || 0)}%</p>
-        </div>
-        <div className="rounded-lg border border-cargo-border bg-cargo-dark/20 p-3">
-          <p className="text-[11px] text-cargo-muted uppercase tracking-wider font-medium">Commission Amount</p>
-          <p className="text-sm text-cargo-text font-semibold mt-1.5">{formatCurrency(row.commission_amount)}</p>
         </div>
         <div className="rounded-lg border border-cargo-border bg-cargo-dark/20 p-3">
           <p className="text-[11px] text-cargo-muted uppercase tracking-wider font-medium">Load Details</p>
@@ -463,13 +535,26 @@ const RequestCard = ({ row, busyId, onEdit, onStatusChange }) => {
         </div>
       </div>
 
-     
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+        <div className="rounded-lg border border-cargo-border bg-cargo-dark/20 p-3">
+          <p className="text-[11px] text-cargo-muted uppercase tracking-wider font-medium">Commission %</p>
+          <p className="text-sm text-cargo-text font-semibold mt-1.5">{Number(row.commission_percentage || 0)}%</p>
+        </div>
+        <div className="rounded-lg border border-cargo-border bg-cargo-dark/20 p-3">
+          <p className="text-[11px] text-cargo-muted uppercase tracking-wider font-medium">Commission Amount</p>
+          <p className="text-sm text-cargo-text font-semibold mt-1.5">{formatCurrency(row.commission_amount)}</p>
+        </div>
+      </div>
+
 
       <FindingTripExpenseBreakdown
+        row={row}
         expenses={row.pending_next_trip_daily_expenses || []}
         totalExpenses={Number(row.pending_next_trip_expenses_total || 0)}
+        onEditDailyExpense={onEditDailyExpense}
+        onAddDailyExpense={onAddDailyExpense}
         title="Waiting For Next Trip Expenses"
-        description="These expenses are still independent because the next trip has not started yet, so they are not cut from this trip."
+        allowAdd
       />
 
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
@@ -479,7 +564,7 @@ const RequestCard = ({ row, busyId, onEdit, onStatusChange }) => {
         <MeterImageCard label="Load Photo" src={row.load_photo} alt="Load photo" />
       </div>
 
-      <ExpenseBreakdown expenses={row.expenses || []} />
+      <ExpenseBreakdown row={row} onEditExpense={onEditExpense} onAddExpense={onAddExpense} />
 
       {row.remarks ? (
         <div className="rounded-lg border border-cargo-border bg-cargo-dark/20 p-4">
@@ -493,15 +578,6 @@ const RequestCard = ({ row, busyId, onEdit, onStatusChange }) => {
 
       {pending ? (
         <div className="flex flex-wrap gap-2 pt-1">
-          <button
-            type="button"
-            onClick={() => onEdit(row)}
-            disabled={busyId === row.request_id}
-            className="inline-flex items-center gap-2 rounded-lg bg-primary-500/15 px-3 py-2 text-sm text-primary-300 hover:bg-primary-500/20"
-          >
-            <Pencil className="w-4 h-4" />
-            Edit
-          </button>
           <button
             type="button"
             onClick={() => onStatusChange(row.request_id, 'approved')}
@@ -526,11 +602,23 @@ const RequestCard = ({ row, busyId, onEdit, onStatusChange }) => {
   );
 };
 
-const RequestSection = ({ title, description, requests, emptyMessage, busyId, onEdit, onStatusChange }) => (
+const RequestSection = ({
+  title,
+  description,
+  requests,
+  emptyMessage,
+  busyId,
+  onEditCommission,
+  onStatusChange,
+  onEditTrip,
+  onEditExpense,
+  onAddExpense,
+  onEditDailyExpense,
+  onAddDailyExpense,
+}) => (
   <section className="space-y-4">
     <div>
       <h2 className="text-xl font-semibold text-cargo-text">{title}</h2>
-      <p className="text-sm text-cargo-muted mt-1">{description}</p>
     </div>
 
     {requests.length ? (
@@ -540,8 +628,13 @@ const RequestSection = ({ title, description, requests, emptyMessage, busyId, on
             key={row.request_id}
             row={row}
             busyId={busyId}
-            onEdit={onEdit}
+            onEditCommission={onEditCommission}
             onStatusChange={onStatusChange}
+            onEditTrip={onEditTrip}
+            onEditExpense={onEditExpense}
+            onAddExpense={onAddExpense}
+            onEditDailyExpense={onEditDailyExpense}
+            onAddDailyExpense={onAddDailyExpense}
           />
         ))}
       </div>
@@ -554,27 +647,39 @@ const RequestSection = ({ title, description, requests, emptyMessage, busyId, on
 );
 
 const REQUEST_TABS = [
-  {
-    key: 'pending',
-    title: 'Pending Requests',
-    description: 'Requests waiting for review. You can edit, approve, or reject these.',
-    emptyMessage: 'No pending commission requests.',
-  },
-  {
-    key: 'approved',
-    title: 'Approved Requests',
-    emptyMessage: 'No approved commission requests yet.',
-  },
+  { key: 'pending', title: 'Pending Requests', description: 'Requests waiting for review and commission decision.', emptyMessage: 'No pending commission requests.' },
+  { key: 'approved', title: 'Approved Requests', description: 'Approved requests stay separate for review history.', emptyMessage: 'No approved commission requests yet.' },
 ];
 
 const AccountRequestsPage = () => {
-  const { get, put, loading } = useApi();
+  const { get, put, post, loading } = useApi();
   const [commissionRequests, setCommissionRequests] = useState([]);
   const [busyId, setBusyId] = useState(null);
   const [editingRequest, setEditingRequest] = useState(null);
   const [editForm, setEditForm] = useState({});
   const [savingEdit, setSavingEdit] = useState(false);
   const [activeTab, setActiveTab] = useState('pending');
+  const [editingTrip, setEditingTrip] = useState(null);
+  const [tripForm, setTripForm] = useState({
+    start_meter_reading: '',
+    end_meter_reading: '',
+    freight_charge: '',
+    from_location: '',
+    to_location: '',
+    notes: '',
+  });
+  const [expenseModal, setExpenseModal] = useState({ isOpen: false, tripId: null, expenseId: null, type: 'trip', driverId: null });
+  const [expenseForm, setExpenseForm] = useState({
+    category: 'diesel',
+    amount: '',
+    liters: '',
+    location: '',
+    notes: '',
+    expense_date: '',
+    meter_reading: '',
+  });
+  const [savingTrip, setSavingTrip] = useState(false);
+  const [savingExpense, setSavingExpense] = useState(false);
 
   const loadRequests = useCallback(async () => {
     const commissionResult = await get('/admin/driver-commission-requests');
@@ -600,7 +705,7 @@ const AccountRequestsPage = () => {
     loadRequests();
   };
 
-  const openEditModal = (row) => {
+  const openCommissionEditModal = (row) => {
     setEditingRequest(row);
     setEditForm({
       commission_percentage: row.commission_percentage ?? '',
@@ -610,7 +715,7 @@ const AccountRequestsPage = () => {
     });
   };
 
-  const closeEditModal = () => {
+  const closeCommissionEditModal = () => {
     setEditingRequest(null);
     setEditForm({});
   };
@@ -628,17 +733,125 @@ const AccountRequestsPage = () => {
       return;
     }
 
-    closeEditModal();
+    closeCommissionEditModal();
+    loadRequests();
+  };
+
+  const openTripModal = (row) => {
+    setEditingTrip(row);
+    setTripForm({
+      start_meter_reading: row.start_meter_reading ?? '',
+      end_meter_reading: row.end_meter_reading ?? '',
+      freight_charge: row.freight_charge ?? '',
+      from_location: row.from_location || '',
+      to_location: row.to_location || '',
+      notes: row.notes || '',
+    });
+  };
+
+  const closeTripModal = () => {
+    setEditingTrip(null);
+  };
+
+  const handleTripSave = async (e) => {
+    e.preventDefault();
+    if (!editingTrip?.trip_id) return;
+
+    setSavingTrip(true);
+    const result = await put(`/admin/trips/${editingTrip.trip_id}`, tripForm);
+    setSavingTrip(false);
+
+    if (!result.success) {
+      alert(result.error);
+      return;
+    }
+
+    closeTripModal();
+    loadRequests();
+  };
+
+  const openExpenseAddModal = (row) => {
+    setExpenseModal({ isOpen: true, tripId: row.trip_id, expenseId: null, type: 'trip', driverId: row.driver_id ?? null });
+    setExpenseForm({ category: 'diesel', amount: '', liters: '', location: '', notes: '', expense_date: '', meter_reading: '' });
+  };
+
+  const openExpenseEditModal = (row, expense) => {
+    setExpenseModal({ isOpen: true, tripId: row.trip_id, expenseId: expense.id, type: 'trip', driverId: row.driver_id ?? null });
+    setExpenseForm({
+      category: expense.category || 'diesel',
+      amount: expense.amount ?? '',
+      liters: expense.liters ?? '',
+      location: expense.location || '',
+      notes: expense.notes || '',
+      expense_date: '',
+      meter_reading: '',
+    });
+  };
+
+  const openDailyExpenseAddModal = (row) => {
+    setExpenseModal({ isOpen: true, tripId: row.trip_id, expenseId: null, type: 'daily', driverId: row.driver_id ?? null });
+    setExpenseForm({ category: 'food', amount: '', liters: '', location: '', notes: '', expense_date: '', meter_reading: '' });
+  };
+
+  const openDailyExpenseEditModal = (row, expense) => {
+    setExpenseModal({ isOpen: true, tripId: row.trip_id, expenseId: expense.id, type: 'daily', driverId: row.driver_id ?? null });
+    setExpenseForm({
+      category: expense.category || 'food',
+      amount: expense.amount ?? '',
+      liters: '',
+      location: '',
+      notes: expense.note || '',
+      expense_date: expense.expense_date ? String(expense.expense_date).slice(0, 10) : '',
+      meter_reading: expense.meter_reading ?? '',
+    });
+  };
+
+  const closeExpenseModal = () => {
+    setExpenseModal({ isOpen: false, tripId: null, expenseId: null, type: 'trip', driverId: null });
+  };
+
+  const handleExpenseSave = async (e) => {
+    e.preventDefault();
+    setSavingExpense(true);
+
+    const payload = expenseModal.type === 'daily'
+      ? {
+        driver_id: expenseModal.driverId,
+        category: expenseForm.category,
+        amount: expenseForm.amount,
+        note: expenseForm.notes,
+        expense_date: expenseForm.expense_date,
+        meter_reading: expenseForm.meter_reading,
+      }
+      : expenseForm;
+
+    const result = expenseModal.type === 'daily'
+      ? (
+        expenseModal.expenseId
+          ? await put(`/admin/drivers-expenses/${expenseModal.expenseId}`, payload)
+          : await post('/admin/drivers-expenses', payload)
+      )
+      : (
+        expenseModal.expenseId
+          ? await put(`/admin/trip-expenses/${expenseModal.expenseId}`, payload)
+          : await post(`/admin/trips/${expenseModal.tripId}/expenses`, payload)
+      );
+
+    setSavingExpense(false);
+
+    if (!result.success) {
+      alert(result.error);
+      return;
+    }
+
+    closeExpenseModal();
     loadRequests();
   };
 
   const pendingRequests = commissionRequests.filter((row) => row.status === 'pending');
   const approvedRequests = commissionRequests.filter((row) => row.status === 'approved');
   const rejectedRequests = commissionRequests.filter((row) => row.status === 'rejected');
-  const requestsByTab = {
-    pending: pendingRequests,
-    approved: approvedRequests,
-  };
+  const requestsByTab = { pending: pendingRequests, approved: approvedRequests };
   const activeTabConfig = REQUEST_TABS.find((tab) => tab.key === activeTab) || REQUEST_TABS[0];
 
   const summary = {
@@ -650,10 +863,9 @@ const AccountRequestsPage = () => {
 
   return (
     <>
-      <div className="space-y-6 pb-10 max-w-7xl" >
+      <div className="space-y-6 pb-10 max-w-7xl">
         <div className="rounded-xl border border-cargo-border bg-gradient-to-r from-cargo-card to-cargo-dark p-3">
           <h1 className="text-xl font-bold text-cargo-text">Commission Requests Review</h1>
-        
         </div>
 
         <div className="grid grid-cols-2 md:grid-cols-2 xl:grid-cols-4 gap-4">
@@ -664,7 +876,7 @@ const AccountRequestsPage = () => {
         </div>
 
         <div className="rounded-xl border border-cargo-border bg-cargo-card/40 p-3">
-          <div className="flex  gap-2">
+          <div className="flex gap-2">
             {REQUEST_TABS.map((tab) => (
               <button
                 key={tab.key}
@@ -690,8 +902,13 @@ const AccountRequestsPage = () => {
               requests={requestsByTab[activeTab] || []}
               emptyMessage={activeTabConfig.emptyMessage}
               busyId={busyId}
-              onEdit={openEditModal}
+              onEditCommission={openCommissionEditModal}
               onStatusChange={handleStatusChange}
+              onEditTrip={openTripModal}
+              onEditExpense={openExpenseEditModal}
+              onAddExpense={openExpenseAddModal}
+              onEditDailyExpense={openDailyExpenseEditModal}
+              onAddDailyExpense={openDailyExpenseAddModal}
             />
 
             {rejectedRequests.length ? (
@@ -701,19 +918,70 @@ const AccountRequestsPage = () => {
                 requests={rejectedRequests}
                 emptyMessage="No rejected commission requests."
                 busyId={busyId}
-                onEdit={openEditModal}
+                onEditCommission={openCommissionEditModal}
                 onStatusChange={handleStatusChange}
+                onEditTrip={openTripModal}
+                onEditExpense={openExpenseEditModal}
+                onAddExpense={openExpenseAddModal}
+                onEditDailyExpense={openDailyExpenseEditModal}
+                onAddDailyExpense={openDailyExpenseAddModal}
               />
             ) : null}
           </>
         )}
       </div>
 
+      <Modal isOpen={Boolean(editingTrip)} onClose={closeTripModal} title="Edit Trip">
+        <form onSubmit={handleTripSave} className="space-y-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+            <input type="number" min="0" step="0.01" value={tripForm.start_meter_reading} onChange={(e) => setTripForm((prev) => ({ ...prev, start_meter_reading: e.target.value }))} className="input-field w-full" placeholder="Start Meter Reading" />
+            <input type="number" min="0" step="0.01" value={tripForm.end_meter_reading} onChange={(e) => setTripForm((prev) => ({ ...prev, end_meter_reading: e.target.value }))} className="input-field w-full" placeholder="End Meter Reading" />
+            <input type="text" value={tripForm.from_location} onChange={(e) => setTripForm((prev) => ({ ...prev, from_location: e.target.value }))} className="input-field w-full" placeholder="From Location" />
+            <input type="text" value={tripForm.to_location} onChange={(e) => setTripForm((prev) => ({ ...prev, to_location: e.target.value }))} className="input-field w-full" placeholder="To Location" />
+            <input type="number" min="0" step="0.01" value={tripForm.freight_charge} onChange={(e) => setTripForm((prev) => ({ ...prev, freight_charge: e.target.value }))} className="input-field w-full md:col-span-2" placeholder="Freight Charge" />
+          </div>
+          <textarea value={tripForm.notes} onChange={(e) => setTripForm((prev) => ({ ...prev, notes: e.target.value }))} className="input-field w-full min-h-24" placeholder="Notes" />
+          <div className="flex gap-3">
+            <button type="button" onClick={closeTripModal} className="flex-1 btn-secondary">Cancel</button>
+            <button type="submit" disabled={savingTrip} className="flex-1 btn-primary">{savingTrip ? 'Saving...' : 'Save Trip'}</button>
+          </div>
+        </form>
+      </Modal>
+
       <Modal
-        isOpen={Boolean(editingRequest)}
-        onClose={closeEditModal}
-        title="Edit Commission Request"
+        isOpen={expenseModal.isOpen}
+        onClose={closeExpenseModal}
+        title={expenseModal.type === 'daily' ? (expenseModal.expenseId ? 'Edit While Looking For Next Trip Expense' : 'Add While Looking For Next Trip Expense') : (expenseModal.expenseId ? 'Edit Trip Expense' : 'Add Trip Expense')}
       >
+        <form onSubmit={handleExpenseSave} className="space-y-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+            <select value={expenseForm.category} onChange={(e) => setExpenseForm((prev) => ({ ...prev, category: e.target.value }))} className="input-field w-full">
+              {(expenseModal.type === 'daily' ? dailyExpenseCategories : tripExpenseCategories).map((category) => (
+                <option key={category} value={category}>{formatCategoryLabel(category)}</option>
+              ))}
+            </select>
+            <input type="number" min="0" step="0.01" value={expenseForm.amount} onChange={(e) => setExpenseForm((prev) => ({ ...prev, amount: e.target.value }))} className="input-field w-full" placeholder="Amount" />
+            {expenseModal.type === 'daily' ? (
+              <>
+                <input type="date" value={expenseForm.expense_date} onChange={(e) => setExpenseForm((prev) => ({ ...prev, expense_date: e.target.value }))} className="input-field w-full" />
+                <input type="number" min="0" step="0.01" value={expenseForm.meter_reading} onChange={(e) => setExpenseForm((prev) => ({ ...prev, meter_reading: e.target.value }))} className="input-field w-full" placeholder="Meter Reading" />
+              </>
+            ) : (
+              <>
+                <input type="number" min="0" step="0.01" value={expenseForm.liters} onChange={(e) => setExpenseForm((prev) => ({ ...prev, liters: e.target.value }))} className="input-field w-full" placeholder="Liters" />
+                <input type="text" value={expenseForm.location} onChange={(e) => setExpenseForm((prev) => ({ ...prev, location: e.target.value }))} className="input-field w-full" placeholder="Location" />
+              </>
+            )}
+          </div>
+          <textarea value={expenseForm.notes} onChange={(e) => setExpenseForm((prev) => ({ ...prev, notes: e.target.value }))} className="input-field w-full min-h-24" placeholder={expenseModal.type === 'daily' ? 'Name / Notes' : 'Notes'} />
+          <div className="flex gap-3">
+            <button type="button" onClick={closeExpenseModal} className="flex-1 btn-secondary">Cancel</button>
+            <button type="submit" disabled={savingExpense} className="flex-1 btn-primary">{savingExpense ? 'Saving...' : expenseModal.expenseId ? 'Save Expense' : 'Add Expense'}</button>
+          </div>
+        </form>
+      </Modal>
+
+      <Modal isOpen={Boolean(editingRequest)} onClose={closeCommissionEditModal} title="Edit Commission Request">
         <form onSubmit={handleEditSave} className="space-y-4">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
             <input
@@ -753,7 +1021,7 @@ const AccountRequestsPage = () => {
           />
 
           <div className="flex gap-3">
-            <button type="button" onClick={closeEditModal} className="flex-1 btn-secondary">Cancel</button>
+            <button type="button" onClick={closeCommissionEditModal} className="flex-1 btn-secondary">Cancel</button>
             <button type="submit" disabled={savingEdit} className="flex-1 btn-primary">
               {savingEdit ? 'Saving...' : 'Save Changes'}
             </button>
