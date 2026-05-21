@@ -491,10 +491,6 @@ const TripCard = ({ trip }) => {
         </div>
       </div>
 
-      <FindingTripExpenseBreakdown
-        expenses={trip.daily_expenses || []}
-        totalExpenses={Number(trip.between_trip_expenses_total || 0)}
-      />
 
       <FindingTripExpenseBreakdown
         expenses={trip.pending_next_trip_daily_expenses || []}

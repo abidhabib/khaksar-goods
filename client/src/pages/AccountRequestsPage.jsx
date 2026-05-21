@@ -463,10 +463,7 @@ const RequestCard = ({ row, busyId, onEdit, onStatusChange }) => {
         </div>
       </div>
 
-      <FindingTripExpenseBreakdown
-        expenses={row.daily_expenses || []}
-        totalExpenses={Number(row.between_trip_expenses_total || 0)}
-      />
+     
 
       <FindingTripExpenseBreakdown
         expenses={row.pending_next_trip_daily_expenses || []}

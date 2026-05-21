@@ -305,83 +305,7 @@ const ExpenseBreakdown = ({ trip, onEditExpense, onAddExpense }) => {
   );
 };
 
-const FindingTripExpenseBreakdown = ({ trip, onEditDailyExpense }) => {
-  const expenses = sortExpensesByCategory(trip.daily_expenses || [], dailyExpenseCategories);
-  const totalExpenses = Number(trip.between_trip_expenses_total ?? 0);
-  const groupedExpenses = groupExpensesByCategory(expenses, dailyExpenseCategories, 'expense_image');
 
-  if (!groupedExpenses.length) {
-    return null;
-  }
-
-  return (
-    <div className="rounded-xl border border-cargo-border bg-cargo-dark/30 p-4 space-y-4">
-      <div className="flex items-center justify-between">
-        <p className="text-sm text-cargo-text font-semibold flex items-center gap-2">
-          <Receipt className="w-4 h-4 text-cargo-success" />
-          Finding This Trip Expenses
-        </p>
-        <p className="text-sm text-cargo-muted font-medium">Total: {formatCurrency(totalExpenses)}</p>
-      </div>
-
-      <p className="text-xs text-cargo-muted">
-        These expenses were spent while finding and preparing this trip, and they are cut from this trip.
-      </p>
-
-      {groupedExpenses.length ? (
-        <div className="space-y-4">
-          {groupedExpenses.map((group) => (
-            <div key={group.category} className="rounded-lg border border-cargo-border/60 bg-cargo-card/30 p-4 space-y-3">
-              <div className="flex items-center justify-between gap-3">
-                <div className="flex items-center gap-2">
-                  <div className="w-2 h-2 rounded-full bg-cargo-success/60" />
-                  <p className="text-sm text-cargo-text font-semibold">{formatCategoryLabel(group.category)}</p>
-                </div>
-                <p className="text-sm text-cargo-muted">Total: {formatCurrency(group.total)}</p>
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                {group.items.map((expense) => (
-                  <div
-                    key={`daily-${expense.id}`}
-                    className="rounded-lg bg-cargo-card/40 hover:border-cargo-border transition-colors"
-                  >
-                    {expense.expense_image ? (
-                      <div className="mb-3">
-                        <ClickableImage
-                          src={expense.expense_image}
-                          alt={`${expense.category} expense`}
-                          className="h-28"
-                        />
-                      </div>
-                    ) : null}
-                    <div className="flex items-center justify-between gap-3">
-                      <p className="text-sm text-cargo-text font-semibold">{formatCurrency(expense.amount)}</p>
-                      <button type="button" onClick={() => onEditDailyExpense(trip, expense)} className="inline-flex items-center gap-1 rounded-lg bg-primary-500/15 px-2.5 py-1.5 text-xs text-primary-300">
-                        <Pencil className="w-3.5 h-3.5" />
-                        Edit
-                      </button>
-                    </div>
-                    <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs text-cargo-muted">
-                      <span>{formatDate(expense.created_at)}</span>
-                      {expense.expense_date ? <span>Expense Date: {formatDate(expense.expense_date, 'PPP')}</span> : null}
-                      {expense.meter_reading ? <span>Meter: {Number(expense.meter_reading).toLocaleString()}</span> : null}
-                    </div>
-                    {expense.note ? (
-                      <p className="mt-2 text-xs text-cargo-muted">{expense.note}</p>
-                    ) : null}
-                  </div>
-                ))}
-              </div>
-            </div>
-          ))}
-        </div>
-      ) : (
-        <p className="text-sm text-cargo-muted">No finding-trip expenses linked to this trip.</p>
-      )}
-    </div>
-  );
-};
 
 const PendingNextTripExpenseBreakdown = ({ trip, onEditDailyExpense, onAddDailyExpense }) => {
   const expenses = sortExpensesByCategory(trip.pending_next_trip_daily_expenses || [], dailyExpenseCategories);
@@ -605,7 +529,6 @@ const TripCard = ({ trip, status = 'completed', onEditTrip, onEditExpense, onAdd
         </div>
       </div>
 
-      <FindingTripExpenseBreakdown trip={trip} onEditDailyExpense={onEditDailyExpense} />
       {!isOngoing ? (
         <PendingNextTripExpenseBreakdown trip={trip} onEditDailyExpense={onEditDailyExpense} onAddDailyExpense={onAddDailyExpense} />
       ) : null}
