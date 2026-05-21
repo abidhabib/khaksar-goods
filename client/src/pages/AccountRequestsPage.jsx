@@ -57,9 +57,21 @@ const expenseCategoryOrder = [
   'bilty_commission',
 ];
 
-const sortExpensesByCategory = (expenses = []) => [...expenses].sort((left, right) => {
-  const leftIndex = expenseCategoryOrder.indexOf(left.category);
-  const rightIndex = expenseCategoryOrder.indexOf(right.category);
+const dailyExpenseCategories = [
+  'cargo_service',
+  'mobile',
+  'moboil_change',
+  'vehicle_maintenance',
+  'mechanic',
+  'medical',
+  'food',
+  'cargo_security_guard',
+  'other',
+];
+
+const sortExpensesByCategory = (expenses = [], orderedCategories = expenseCategoryOrder) => [...expenses].sort((left, right) => {
+  const leftIndex = orderedCategories.indexOf(left.category);
+  const rightIndex = orderedCategories.indexOf(right.category);
 
   if (leftIndex === -1 && rightIndex === -1) {
     return String(left.category || '').localeCompare(String(right.category || ''));
@@ -73,8 +85,8 @@ const sortExpensesByCategory = (expenses = []) => [...expenses].sort((left, righ
 });
 
 const sortExpenseEntriesForDisplay = (expenses = []) => [...expenses].sort((left, right) => {
-  const leftHasImage = Boolean(left.receipt_image);
-  const rightHasImage = Boolean(right.receipt_image);
+  const leftHasImage = Boolean(left.receipt_image || left.expense_image);
+  const rightHasImage = Boolean(right.receipt_image || right.expense_image);
 
   if (leftHasImage !== rightHasImage) {
     return leftHasImage ? -1 : 1;
@@ -83,10 +95,10 @@ const sortExpenseEntriesForDisplay = (expenses = []) => [...expenses].sort((left
   return (new Date(left.created_at).getTime() || 0) - (new Date(right.created_at).getTime() || 0);
 });
 
-const groupExpensesByCategory = (expenses = []) => {
+const groupExpensesByCategory = (expenses = [], orderedCategories = expenseCategoryOrder) => {
   const grouped = new Map();
 
-  sortExpensesByCategory(expenses).forEach((expense) => {
+  sortExpensesByCategory(expenses, orderedCategories).forEach((expense) => {
     const key = expense.category || 'other';
     if (!grouped.has(key)) {
       grouped.set(key, []);
@@ -264,6 +276,70 @@ const ExpenseBreakdown = ({ expenses }) => {
   );
 };
 
+const FindingTripExpenseBreakdown = ({ expenses = [], totalExpenses = 0, title = 'Finding This Trip Expenses', description = 'These expenses were spent while finding and preparing this trip, and they are cut from this trip.' }) => {
+  const groupedExpenses = groupExpensesByCategory(expenses, dailyExpenseCategories);
+
+  if (!groupedExpenses.length) {
+    return null;
+  }
+
+  return (
+    <div className="rounded-xl border border-cargo-border bg-cargo-dark/30 p-4 space-y-4">
+      <div className="flex items-center justify-between gap-3">
+        <div>
+          <p className="text-sm text-cargo-text font-semibold flex items-center gap-2">
+            <Receipt className="w-4 h-4 text-cargo-success" />
+            {title}
+          </p>
+          <p className="text-xs text-cargo-muted mt-1">{description}</p>
+        </div>
+        <p className="text-sm text-cargo-muted font-medium">Total: {formatCurrency(totalExpenses)}</p>
+      </div>
+
+      <div className="space-y-4">
+        {groupedExpenses.map((group) => (
+          <div key={group.category} className="rounded-lg border border-cargo-border/60 bg-cargo-card/30 p-4 space-y-3">
+            <div className="flex items-center justify-between gap-3">
+              <div className="flex items-center gap-2">
+                <div className="w-2 h-2 rounded-full bg-cargo-success/60" />
+                <p className="text-sm text-cargo-text font-semibold">{formatCategoryLabel(group.category)}</p>
+              </div>
+              <p className="text-sm text-cargo-muted">Total: {formatCurrency(group.total)}</p>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+              {group.items.map((expense) => (
+                <div key={expense.id} className="rounded-lg border border-cargo-border/60 bg-cargo-card/40 p-3 hover:border-cargo-border transition-colors">
+                  {expense.expense_image ? (
+                    <div className="mb-3">
+                      <ClickableImage
+                        src={expense.expense_image}
+                        alt={`${expense.category} expense`}
+                        className="h-28"
+                      />
+                    </div>
+                  ) : null}
+                  <div className="flex items-center justify-between gap-3">
+                    <p className="text-sm text-cargo-text font-semibold">{formatCurrency(expense.amount)}</p>
+                    <p className="text-xs text-cargo-muted">{formatDate(expense.created_at)}</p>
+                  </div>
+                  <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs text-cargo-muted">
+                    {expense.expense_date ? <span>Expense Date: {formatDate(expense.expense_date)}</span> : null}
+                    {expense.meter_reading ? <span>Meter: {Number(expense.meter_reading).toLocaleString()}</span> : null}
+                  </div>
+                  {expense.note ? (
+                    <p className="mt-2 text-xs text-cargo-muted">{expense.note}</p>
+                  ) : null}
+                </div>
+              ))}
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+};
+
 const SummaryCard = ({ icon: Icon, label, value, tone = 'text-cargo-text' }) => (
   <div className="rounded-xl border border-cargo-border bg-cargo-card/60 p-4">
     <p className="text-sm text-cargo-muted flex items-center gap-2">
@@ -387,6 +463,18 @@ const RequestCard = ({ row, busyId, onEdit, onStatusChange }) => {
         </div>
       </div>
 
+      <FindingTripExpenseBreakdown
+        expenses={row.daily_expenses || []}
+        totalExpenses={Number(row.between_trip_expenses_total || 0)}
+      />
+
+      <FindingTripExpenseBreakdown
+        expenses={row.pending_next_trip_daily_expenses || []}
+        totalExpenses={Number(row.pending_next_trip_expenses_total || 0)}
+        title="Waiting For Next Trip Expenses"
+        description="These expenses are still independent because the next trip has not started yet, so they are not cut from this trip."
+      />
+
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
         <MeterImageCard label="Start Meter Photo" src={row.start_meter_image} alt="Start meter" />
         <MeterImageCard label="End Meter Photo" src={row.end_meter_image} alt="End meter" />
@@ -478,7 +566,6 @@ const REQUEST_TABS = [
   {
     key: 'approved',
     title: 'Approved Requests',
-    description: 'Already approved requests, kept separately for quick audit and review.',
     emptyMessage: 'No approved commission requests yet.',
   },
 ];
@@ -567,14 +654,12 @@ const AccountRequestsPage = () => {
   return (
     <>
       <div className="space-y-6 pb-10 max-w-7xl" >
-        <div className="rounded-xl border border-cargo-border bg-gradient-to-r from-cargo-card to-cargo-dark p-5">
-          <h1 className="text-2xl font-bold text-cargo-text">Commission Requests Review</h1>
-          <p className="text-sm text-cargo-muted mt-2">
-            Review trip-based commission requests with trip details, expense breakdown, and separate pending and approved history.
-          </p>
+        <div className="rounded-xl border border-cargo-border bg-gradient-to-r from-cargo-card to-cargo-dark p-3">
+          <h1 className="text-xl font-bold text-cargo-text">Commission Requests Review</h1>
+        
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
+        <div className="grid grid-cols-2 md:grid-cols-2 xl:grid-cols-4 gap-4">
           <SummaryCard icon={Receipt} label="Total Requests" value={summary.total.toLocaleString()} />
           <SummaryCard icon={Clock3} label="Pending Review" value={summary.pending.toLocaleString()} tone="text-cargo-accent" />
           <SummaryCard icon={CheckCircle2} label="Approved Requests" value={summary.approved.toLocaleString()} tone="text-cargo-success" />
@@ -582,7 +667,7 @@ const AccountRequestsPage = () => {
         </div>
 
         <div className="rounded-xl border border-cargo-border bg-cargo-card/40 p-3">
-          <div className="flex flex-wrap gap-2">
+          <div className="flex  gap-2">
             {REQUEST_TABS.map((tab) => (
               <button
                 key={tab.key}

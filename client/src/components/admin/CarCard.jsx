@@ -11,6 +11,11 @@ const formatRemainingKm = (value) => {
   return Number.isFinite(numericValue) ? `${numericValue.toLocaleString()} km` : '-- km';
 };
 
+const formatKm = (value) => {
+  const numericValue = Number(value);
+  return Number.isFinite(numericValue) ? `${numericValue.toLocaleString()} km` : '0 km';
+};
+
 const CarCard = ({ car, onEdit, onDelete, onAssign, onViewHistory }) => {
   const statusColors = {
     active: 'bg-cargo-success/20 text-cargo-success',
@@ -19,6 +24,8 @@ const CarCard = ({ car, onEdit, onDelete, onAssign, onViewHistory }) => {
   };
   const moboilRemainingKm = car.moboil_status?.remaining_km;
   const moboilNeedsChange = Boolean(car.moboil_status?.needs_change);
+  const latestWastedKm = Number(car.latest_wasted_km) || 0;
+  const totalWastedKm = Number(car.total_wasted_km) || 0;
 
   const tripStatusLabel = car.trip_status === 'ongoing'
     ? `Ongoing: ${car.ongoing_from_location} -> ${car.ongoing_to_location}`
@@ -83,6 +90,14 @@ const CarCard = ({ car, onEdit, onDelete, onAssign, onViewHistory }) => {
           <span className={moboilNeedsChange ? 'text-cargo-danger font-medium' : 'text-emerald-400'}>
             Oil Change Remaining: {formatRemainingKm(moboilRemainingKm)}
           </span>
+        </div>
+        <div className="flex items-center gap-2 text-sm">
+          <TrendingUp className="w-4 h-4 text-cargo-accent" />
+          <span className="text-cargo-text">Latest wasted: {formatKm(latestWastedKm)}</span>
+        </div>
+        <div className="flex items-center gap-2 text-sm">
+          <TrendingUp className="w-4 h-4 text-cargo-danger" />
+          <span className="text-cargo-text">Total wasted: {formatKm(totalWastedKm)}</span>
         </div>
       </div>
 

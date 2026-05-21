@@ -371,7 +371,7 @@ const attachDriverTimelineExpensesToTrips = async (trips) => {
             driverIds
         ),
         pool.execute(
-            `SELECT id, driver_id, category, amount, meter_reading, note, expense_image, expense_date, created_at
+            `SELECT id, driver_id, applied_trip_id, category, amount, meter_reading, note, expense_image, expense_date, created_at
              FROM driver_daily_expense_entries
              WHERE driver_id IN (${placeholders})
              ORDER BY driver_id ASC, created_at ASC, id ASC`,
@@ -689,6 +689,16 @@ const startTrip = async (req, res) => {
             return res.status(400).json({ message: 'Assigned cargo not found' });
         }
 
+        const [previousCompletedTrips] = await connection.execute(
+            `SELECT id, ended_at
+             FROM trips
+             WHERE driver_id = ? AND status = 'completed' AND ended_at IS NOT NULL
+             ORDER BY ended_at DESC, id DESC
+             LIMIT 1`,
+            [driver_id]
+        );
+        const previousCompletedTrip = previousCompletedTrips[0] || null;
+
         // Create trip
         const [tripResult] = await connection.execute(
             `INSERT INTO trips 
@@ -715,7 +725,25 @@ const startTrip = async (req, res) => {
                 null
             ]
         );
- await connection.execute(
+
+        const [[createdTrip]] = await connection.execute(
+            'SELECT started_at FROM trips WHERE id = ? LIMIT 1',
+            [tripResult.insertId]
+        );
+
+        if (previousCompletedTrip?.ended_at && createdTrip?.started_at) {
+            await connection.execute(
+                `UPDATE driver_daily_expense_entries
+                 SET applied_trip_id = ?
+                 WHERE driver_id = ?
+                   AND applied_trip_id IS NULL
+                   AND created_at >= ?
+                   AND created_at < ?`,
+                [tripResult.insertId, driver_id, previousCompletedTrip.ended_at, createdTrip.started_at]
+            );
+        }
+
+        await connection.execute(
             'UPDATE cars SET current_meter_reading = ? WHERE id = ?',
             [meterReadingValue, car_id]
         );

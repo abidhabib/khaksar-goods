@@ -387,6 +387,44 @@ const buildMoboilStatus = ({
     };
 };
 
+const buildCarWastedKmStats = (trips = []) => {
+    const sortedTrips = [...trips].sort((left, right) => {
+        const leftEndedAt = new Date(left.ended_at || left.started_at || 0).getTime() || 0;
+        const rightEndedAt = new Date(right.ended_at || right.started_at || 0).getTime() || 0;
+
+        if (leftEndedAt !== rightEndedAt) {
+            return leftEndedAt - rightEndedAt;
+        }
+
+        return (Number(left.id) || 0) - (Number(right.id) || 0);
+    });
+
+    let totalWastedKm = 0;
+    let latestWastedKm = 0;
+
+    for (let index = 1; index < sortedTrips.length; index += 1) {
+        const previousEndMeter = Number(sortedTrips[index - 1]?.end_meter_reading);
+        const currentStartMeter = Number(sortedTrips[index]?.start_meter_reading);
+
+        if (!Number.isFinite(previousEndMeter) || !Number.isFinite(currentStartMeter)) {
+            continue;
+        }
+
+        const wastedKm = Math.max(0, currentStartMeter - previousEndMeter);
+        if (wastedKm <= 0) {
+            continue;
+        }
+
+        totalWastedKm += wastedKm;
+        latestWastedKm = wastedKm;
+    }
+
+    return {
+        total_wasted_km: Number(totalWastedKm.toFixed(2)),
+        latest_wasted_km: Number(latestWastedKm.toFixed(2))
+    };
+};
+
 const applyTripNetIncomeFormula = (trip) => {
     const freightCharge = Number(trip?.freight_charge) || 0;
     const tripExpensesTotal = Number(
@@ -596,10 +634,43 @@ const getAllCars = async (req, res) => {
             )
             ORDER BY c.created_at DESC
         `);
+        const carIds = cars
+            .map((car) => Number(car.id))
+            .filter(Number.isFinite);
+        const wastedKmStatsByCarId = new Map();
+
+        if (carIds.length) {
+            const placeholders = carIds.map(() => '?').join(', ');
+            const [tripRows] = await pool.execute(
+                `SELECT id, car_id, start_meter_reading, end_meter_reading, started_at, ended_at
+                 FROM trips
+                 WHERE car_id IN (${placeholders}) AND status = 'completed'
+                 ORDER BY car_id ASC, ended_at ASC, started_at ASC, id ASC`,
+                carIds
+            );
+
+            const tripsByCarId = tripRows.reduce((map, trip) => {
+                const carId = Number(trip.car_id);
+                if (!map.has(carId)) {
+                    map.set(carId, []);
+                }
+                map.get(carId).push(trip);
+                return map;
+            }, new Map());
+
+            for (const [carId, carTrips] of tripsByCarId.entries()) {
+                wastedKmStatsByCarId.set(carId, buildCarWastedKmStats(carTrips));
+            }
+        }
+
         res.json({
             success: true,
             cars: cars.map((car) => ({
                 ...car,
+                ...(wastedKmStatsByCarId.get(Number(car.id)) || {
+                    total_wasted_km: 0,
+                    latest_wasted_km: 0
+                }),
                 overall_average_km_per_liter: computeAverageKmPerLiter(
                     car.total_distance_for_average,
                     car.total_diesel_liters
@@ -2978,7 +3049,7 @@ const attachExpensesToTrips = async (trips) => {
             driverIds
         ),
         pool.execute(
-            `SELECT id, driver_id, category, amount, meter_reading, note, expense_image, expense_date, created_at
+            `SELECT id, driver_id, applied_trip_id, category, amount, meter_reading, note, expense_image, expense_date, created_at
              FROM driver_daily_expense_entries
              WHERE driver_id IN (${driverPlaceholders})
              ORDER BY driver_id ASC, created_at ASC, id ASC`,

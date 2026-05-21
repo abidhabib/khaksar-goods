@@ -96,10 +96,22 @@ const ensureDriverDailyExpenseEntriesTable = async (connection) => {
 
 const ensureDriverDailyExpenseEntryColumns = async (connection, databaseName) => {
     await ensureColumns(connection, databaseName, 'driver_daily_expense_entries', [
+        { name: 'applied_trip_id', definition: 'INT NULL AFTER driver_id' },
         { name: 'meter_reading', definition: 'DECIMAL(10,2) NULL AFTER amount' },
         { name: 'note', definition: 'TEXT NULL AFTER meter_reading' },
         { name: 'expense_image', definition: 'VARCHAR(500) NULL AFTER note' }
     ]);
+
+    await ensureForeignKey(
+        connection,
+        databaseName,
+        'driver_daily_expense_entries',
+        'fk_driver_daily_expense_entries_applied_trip',
+        `ALTER TABLE driver_daily_expense_entries
+         ADD CONSTRAINT fk_driver_daily_expense_entries_applied_trip
+         FOREIGN KEY (applied_trip_id) REFERENCES trips(id)
+         ON DELETE SET NULL`
+    );
 };
 
 const ensureDriverPaymentSubmissionsTable = async (connection) => {
