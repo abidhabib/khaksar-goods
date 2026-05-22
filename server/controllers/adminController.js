@@ -1471,7 +1471,7 @@ const addHelper = async (req, res) => {
         const [result] = await pool.execute(
             `INSERT INTO helpers
                 (helper_name, phone_number, salary_amount, available_balance, next_salary_credit_date, status)
-             VALUES (?, ?, ?, 0.00, DATE_ADD(CURDATE(), INTERVAL 1 MONTH), 'active')`,
+             VALUES (?, ?, ?, 0.00, DATE_ADD(CURDATE(), INTERVAL 1 DAY), 'active')`,
             [helperName, phoneNumber, salaryAmount]
         );
 

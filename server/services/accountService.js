@@ -111,7 +111,7 @@ const syncDriverSalaryForDriver = async (connection, driverId) => {
 
 const syncHelperSalaryForHelper = async (connection, helperId) => {
     const [rows] = await connection.execute(
-        `SELECT id, salary_amount, available_balance, next_salary_credit_date, created_at
+        `SELECT id, salary_amount, available_balance, next_salary_credit_date, created_at, status
          FROM helpers
          WHERE id = ?
          LIMIT 1`,
@@ -123,14 +123,18 @@ const syncHelperSalaryForHelper = async (connection, helperId) => {
     }
 
     const helper = rows[0];
+    if (helper.status !== 'active') {
+        return helper;
+    }
+
     const monthlySalary = roundCurrency(helper.salary_amount);
     if (!(monthlySalary > 0)) {
         return helper;
     }
 
-    let nextDate = helper.next_salary_credit_date
-        ? toDateString(helper.next_salary_credit_date)
-        : toDateString(addMonths(helper.created_at || new Date(), 1));
+    const dailyAmount = roundCurrency(monthlySalary / 30);
+    const anchor = helper.next_salary_credit_date || helper.created_at || new Date();
+    let nextDate = toDateString(anchor);
     const today = toDateString(new Date());
 
     if (!nextDate || !today) {
@@ -152,16 +156,16 @@ const syncHelperSalaryForHelper = async (connection, helperId) => {
         );
 
         if (!existingRows.length) {
-            totalCredited = roundCurrency(totalCredited + monthlySalary);
+            totalCredited = roundCurrency(totalCredited + dailyAmount);
             await connection.execute(
                 `INSERT INTO helper_account_transactions
                     (helper_id, transaction_type, direction, amount, source_type, source_id, notes)
                  VALUES (?, 'salary_credit', 'credit', ?, 'salary_cycle', ?, ?)`,
-                [helperId, monthlySalary, sourceId, `Monthly salary credit for ${nextDate}`]
+                [helperId, dailyAmount, sourceId, `Daily salary credit for ${nextDate}`]
             );
         }
 
-        nextDate = toDateString(addMonths(nextDate, 1));
+        nextDate = toDateString(addDays(nextDate, 1));
     }
 
     if (totalCredited > 0) {
