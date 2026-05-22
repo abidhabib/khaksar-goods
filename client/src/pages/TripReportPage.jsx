@@ -18,6 +18,7 @@ import {
   TrendingUp,
   User,
   Wallet,
+  Trash2,
   X,
   ZoomIn,
 } from 'lucide-react';
@@ -211,7 +212,7 @@ const MeterImageCard = ({ label, src, alt }) => (
   </div>
 );
 
-const ExpenseBreakdown = ({ trip, onEditExpense, onAddExpense }) => {
+const ExpenseBreakdown = ({ trip, onEditExpense, onAddExpense, onDeleteExpense }) => {
   const biltyCommissionAmount = Number(trip.bilty_commission_amount) || 0;
   const expenses = sortExpensesByCategory([
     ...(trip.expenses || []),
@@ -267,10 +268,18 @@ const ExpenseBreakdown = ({ trip, onEditExpense, onAddExpense }) => {
                     ) : null}
                     <div className="flex items-center justify-between gap-3">
                       <p className="text-sm text-cargo-text font-medium">{formatCurrency(expense.amount)}</p>
-                      <button type="button" onClick={() => onEditExpense(trip, expense)} className="inline-flex items-center gap-1 rounded-lg bg-primary-500/15 px-2.5 py-1.5 text-xs text-primary-300">
-                        <Pencil className="w-3.5 h-3.5" />
-                        Edit
-                      </button>
+                      <div className="flex items-center gap-2">
+                        <button type="button" onClick={() => onEditExpense(trip, expense)} className="inline-flex items-center gap-1 rounded-lg bg-primary-500/15 px-2.5 py-1.5 text-xs text-primary-300">
+                          <Pencil className="w-3.5 h-3.5" />
+                          Edit
+                        </button>
+                        {String(expense.id).startsWith('bilty-') ? null : (
+                          <button type="button" onClick={() => onDeleteExpense(trip, expense)} className="inline-flex items-center gap-1 rounded-lg bg-cargo-danger/15 px-2.5 py-1.5 text-xs text-cargo-danger">
+                            <Trash2 className="w-3.5 h-3.5" />
+                            Delete
+                          </button>
+                        )}
+                      </div>
                     </div>
                     <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs text-cargo-muted">
                       <span>{formatDate(expense.created_at)}</span>
@@ -299,6 +308,7 @@ const FindingTripExpenseBreakdown = ({
   totalExpenses = 0,
   onEditDailyExpense,
   onAddDailyExpense,
+  onDeleteDailyExpense,
   title = 'Finding This Trip Expenses',
   description = 'These expenses were spent while finding and preparing this trip, and they are cut from this trip.',
   allowAdd = false,
@@ -351,10 +361,16 @@ const FindingTripExpenseBreakdown = ({
                     ) : null}
                     <div className="flex items-center justify-between gap-3">
                       <p className="text-sm text-cargo-text font-semibold">{formatCurrency(expense.amount)}</p>
-                      <button type="button" onClick={() => onEditDailyExpense(trip, expense)} className="inline-flex items-center gap-1 rounded-lg bg-primary-500/15 px-2.5 py-1.5 text-xs text-primary-300">
-                        <Pencil className="w-3.5 h-3.5" />
-                        Edit
-                      </button>
+                      <div className="flex items-center gap-2">
+                        <button type="button" onClick={() => onEditDailyExpense(trip, expense)} className="inline-flex items-center gap-1 rounded-lg bg-primary-500/15 px-2.5 py-1.5 text-xs text-primary-300">
+                          <Pencil className="w-3.5 h-3.5" />
+                          Edit
+                        </button>
+                        <button type="button" onClick={() => onDeleteDailyExpense(trip, expense)} className="inline-flex items-center gap-1 rounded-lg bg-cargo-danger/15 px-2.5 py-1.5 text-xs text-cargo-danger">
+                          <Trash2 className="w-3.5 h-3.5" />
+                          Delete
+                        </button>
+                      </div>
                     </div>
                     <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs text-cargo-muted">
                       <span>{formatDate(expense.created_at)}</span>
@@ -392,7 +408,7 @@ const StatBadge = ({ children, variant = 'default' }) => {
   );
 };
 
-const TripCard = ({ trip, onEditTrip, onEditExpense, onAddExpense, onEditDailyExpense, onAddDailyExpense }) => {
+const TripCard = ({ trip, onEditTrip, onEditExpense, onAddExpense, onDeleteExpense, onEditDailyExpense, onAddDailyExpense, onDeleteDailyExpense }) => {
   const isOngoing = trip.status === 'ongoing';
   const totalExpenses = Number(trip.total_expenses ?? 0);
   const net = Number(trip.net_profit ?? (Number(trip.freight_charge || 0) - totalExpenses));
@@ -499,6 +515,7 @@ const TripCard = ({ trip, onEditTrip, onEditExpense, onAddExpense, onEditDailyEx
         totalExpenses={Number(trip.pending_next_trip_expenses_total || 0)}
         onEditDailyExpense={onEditDailyExpense}
         onAddDailyExpense={onAddDailyExpense}
+        onDeleteDailyExpense={onDeleteDailyExpense}
         title="Waiting For Next Trip Expenses"
         description="These expenses are still independent because the next trip has not started yet, so they are not cut from this trip."
         allowAdd
@@ -524,7 +541,7 @@ const TripCard = ({ trip, onEditTrip, onEditExpense, onAddExpense, onEditDailyEx
         ))}
       </div>
 
-      <ExpenseBreakdown trip={trip} onEditExpense={onEditExpense} onAddExpense={onAddExpense} />
+      <ExpenseBreakdown trip={trip} onEditExpense={onEditExpense} onAddExpense={onAddExpense} onDeleteExpense={onDeleteExpense} />
 
       {trip.notes ? (
         <div className="rounded-lg border border-cargo-border bg-cargo-dark/20 p-4">
@@ -542,7 +559,7 @@ const TripCard = ({ trip, onEditTrip, onEditExpense, onAddExpense, onEditDailyEx
 const TripReportPage = () => {
   const navigate = useNavigate();
   const { id } = useParams();
-  const { get, post, put, loading } = useApi();
+  const { get, post, put, del, loading } = useApi();
   const [trip, setTrip] = useState(null);
   const [editingTrip, setEditingTrip] = useState(null);
   const [savingTrip, setSavingTrip] = useState(false);
@@ -683,6 +700,34 @@ const TripReportPage = () => {
     fetchTripReport();
   };
 
+  const handleTripExpenseDelete = async (_tripRow, expense) => {
+    if (!expense?.id || String(expense.id).startsWith('bilty-') || !window.confirm('Delete this trip expense?')) {
+      return;
+    }
+
+    const result = await del(`/admin/trip-expenses/${expense.id}`);
+    if (!result.success) {
+      alert(result.error);
+      return;
+    }
+
+    fetchTripReport();
+  };
+
+  const handleDailyExpenseDelete = async (_tripRow, expense) => {
+    if (!expense?.id || !window.confirm('Delete this daily expense?')) {
+      return;
+    }
+
+    const result = await del(`/admin/drivers-expenses/${expense.id}`);
+    if (!result.success) {
+      alert(result.error);
+      return;
+    }
+
+    fetchTripReport();
+  };
+
   if (loading && !trip) {
     return (
       <div className="flex items-center justify-center h-96">
@@ -720,8 +765,10 @@ const TripReportPage = () => {
           onEditTrip={openTripModal}
           onEditExpense={openExpenseEditModal}
           onAddExpense={openExpenseAddModal}
+          onDeleteExpense={handleTripExpenseDelete}
           onEditDailyExpense={openDailyExpenseEditModal}
           onAddDailyExpense={openDailyExpenseAddModal}
+          onDeleteDailyExpense={handleDailyExpenseDelete}
         />
       </div>
 

@@ -146,6 +146,94 @@ const fetchTripWithExpensesById = async (tripId) => {
     return trip;
 };
 
+const recalculateDriverCommissionRequestsForDriver = async (driverId) => {
+    const normalizedDriverId = Number(driverId);
+    if (!normalizedDriverId) {
+        return;
+    }
+
+    const [driverRows] = await pool.execute(
+        `SELECT id, commission_percentage
+         FROM drivers
+         WHERE id = ?
+         LIMIT 1`,
+        [normalizedDriverId]
+    );
+
+    if (!driverRows.length) {
+        return;
+    }
+
+    const commissionPercentage = Number(driverRows[0]?.commission_percentage) || 0;
+
+    const [tripRows] = await pool.execute(
+        `SELECT
+            t.id,
+            t.driver_id,
+            t.status,
+            t.started_at,
+            t.ended_at,
+            t.start_meter_reading,
+            t.end_meter_reading,
+            t.freight_charge,
+            COALESCE(exp.total_expenses, 0) AS total_expenses
+         FROM trips t
+         LEFT JOIN (
+             SELECT trip_id, SUM(amount) AS total_expenses
+             FROM expenses
+             GROUP BY trip_id
+         ) exp ON exp.trip_id = t.id
+         WHERE t.driver_id = ?
+           AND t.status = 'completed'
+         ORDER BY t.started_at ASC, t.id ASC`,
+        [normalizedDriverId]
+    );
+
+    if (!tripRows.length) {
+        return;
+    }
+
+    const tripsWithExpenses = await attachExpensesToTrips(tripRows);
+
+    for (const trip of tripsWithExpenses) {
+        const tripId = Number(trip.id);
+        if (!tripId) {
+            continue;
+        }
+
+        const netProfit = roundCurrency(
+            trip.net_profit !== undefined && trip.net_profit !== null
+                ? Number(trip.net_profit)
+                : (Number(trip.freight_charge) || 0) - (Number(trip.total_expenses) || 0)
+        );
+
+        const commissionAmount = netProfit > 0 && commissionPercentage > 0
+            ? roundCurrency((netProfit * commissionPercentage) / 100)
+            : 0;
+
+        if (commissionAmount > 0) {
+            await pool.execute(
+                `INSERT INTO driver_commission_requests
+                    (driver_id, trip_id, commission_percentage, net_profit, commission_amount, status)
+                 VALUES (?, ?, ?, ?, ?, 'pending')
+                 ON DUPLICATE KEY UPDATE
+                    commission_percentage = VALUES(commission_percentage),
+                    net_profit = VALUES(net_profit),
+                    commission_amount = VALUES(commission_amount)`,
+                [normalizedDriverId, tripId, commissionPercentage, netProfit, commissionAmount]
+            );
+            continue;
+        }
+
+        await pool.execute(
+            `UPDATE driver_commission_requests
+             SET commission_percentage = ?, net_profit = ?, commission_amount = ?
+             WHERE trip_id = ?`,
+            [commissionPercentage, netProfit, commissionAmount, tripId]
+        );
+    }
+};
+
 const syncDriverHelperAssignment = async (connection, driverId, helperId) => {
     const normalizedHelperId = helperId ? Number(helperId) : null;
 
@@ -2673,6 +2761,7 @@ const updateTripCorrection = async (req, res) => {
         );
 
         await syncCarCurrentMeterFromTrips(connection, trip.car_id);
+        await recalculateDriverCommissionRequestsForDriver(trip.driver_id);
         const updatedTrip = await fetchTripWithExpensesById(tripId);
 
         res.json({
@@ -2696,7 +2785,7 @@ const addTripExpenseByAdmin = async (req, res) => {
         const locationValue = toNullableString(req.body?.location);
         const notesValue = toNullableString(req.body?.notes);
 
-        const [tripRows] = await pool.execute('SELECT id FROM trips WHERE id = ? LIMIT 1', [tripId]);
+        const [tripRows] = await pool.execute('SELECT id, driver_id FROM trips WHERE id = ? LIMIT 1', [tripId]);
         if (!tripRows.length) {
             return res.status(404).json({ message: 'Trip not found' });
         }
@@ -2726,6 +2815,8 @@ const addTripExpenseByAdmin = async (req, res) => {
             [result.insertId]
         );
 
+        await recalculateDriverCommissionRequestsForDriver(tripRows[0].driver_id);
+
         res.json({
             success: true,
             message: 'Trip expense added successfully',
@@ -2748,7 +2839,14 @@ const updateTripExpenseByAdmin = async (req, res) => {
         const locationValue = toNullableString(req.body?.location);
         const notesValue = toNullableString(req.body?.notes);
 
-        const [rows] = await pool.execute('SELECT id FROM expenses WHERE id = ? LIMIT 1', [expenseId]);
+        const [rows] = await pool.execute(
+            `SELECT e.id, t.driver_id
+             FROM expenses e
+             JOIN trips t ON t.id = e.trip_id
+             WHERE e.id = ?
+             LIMIT 1`,
+            [expenseId]
+        );
         if (!rows.length) {
             return res.status(404).json({ message: 'Expense not found' });
         }
@@ -2779,6 +2877,8 @@ const updateTripExpenseByAdmin = async (req, res) => {
             [expenseId]
         );
 
+        await recalculateDriverCommissionRequestsForDriver(rows[0].driver_id);
+
         res.json({
             success: true,
             message: 'Trip expense updated successfully',
@@ -2786,6 +2886,34 @@ const updateTripExpenseByAdmin = async (req, res) => {
                 ...expense,
                 amount: Number(expense.amount) || 0
             }
+        });
+    } catch (error) {
+        res.status(500).json({ message: 'Server error', error: error.message });
+    }
+};
+
+const deleteTripExpenseByAdmin = async (req, res) => {
+    try {
+        const expenseId = Number(req.params.id);
+        const [rows] = await pool.execute(
+            `SELECT e.id, t.driver_id
+             FROM expenses e
+             JOIN trips t ON t.id = e.trip_id
+             WHERE e.id = ?
+             LIMIT 1`,
+            [expenseId]
+        );
+
+        if (!rows.length) {
+            return res.status(404).json({ message: 'Expense not found' });
+        }
+
+        await pool.execute('DELETE FROM expenses WHERE id = ?', [expenseId]);
+        await recalculateDriverCommissionRequestsForDriver(rows[0].driver_id);
+
+        res.json({
+            success: true,
+            message: 'Trip expense deleted successfully'
         });
     } catch (error) {
         res.status(500).json({ message: 'Server error', error: error.message });
@@ -2838,6 +2966,8 @@ const addDriverDailyExpenseByAdmin = async (req, res) => {
             [driverId, category, amountValue, meterReadingValue, noteValue, expenseDate]
         );
 
+        await recalculateDriverCommissionRequestsForDriver(driverId);
+
         res.json({
             success: true,
             message: 'Driver daily expense added successfully',
@@ -2867,7 +2997,7 @@ const updateDriverDailyExpenseByAdmin = async (req, res) => {
         const expenseDate = toNullableString(req.body?.expense_date);
 
         const [rows] = await pool.execute(
-            'SELECT id FROM driver_daily_expense_entries WHERE id = ? LIMIT 1',
+            'SELECT id, driver_id FROM driver_daily_expense_entries WHERE id = ? LIMIT 1',
             [entryId]
         );
         if (!rows.length) {
@@ -2893,7 +3023,42 @@ const updateDriverDailyExpenseByAdmin = async (req, res) => {
             [category, amountValue, meterReadingValue, noteValue, expenseDate, entryId]
         );
 
+        await recalculateDriverCommissionRequestsForDriver(rows[0].driver_id);
+
         res.json({ success: true, message: 'Driver daily expense updated successfully' });
+    } catch (error) {
+        res.status(500).json({ message: 'Server error', error: error.message });
+    }
+};
+
+const deleteDriverDailyExpenseByAdmin = async (req, res) => {
+    try {
+        const schemaConnection = await pool.getConnection();
+        try {
+            await ensureDriverDailyExpenseEntriesTable(schemaConnection);
+            const [[databaseRow]] = await schemaConnection.query('SELECT DATABASE() AS database_name');
+            await ensureDriverDailyExpenseEntryColumns(schemaConnection, databaseRow?.database_name);
+        } finally {
+            schemaConnection.release();
+        }
+
+        const entryId = Number(req.params.id);
+        const [rows] = await pool.execute(
+            'SELECT id, driver_id FROM driver_daily_expense_entries WHERE id = ? LIMIT 1',
+            [entryId]
+        );
+
+        if (!rows.length) {
+            return res.status(404).json({ message: 'Driver daily expense not found' });
+        }
+
+        await pool.execute('DELETE FROM driver_daily_expense_entries WHERE id = ?', [entryId]);
+        await recalculateDriverCommissionRequestsForDriver(rows[0].driver_id);
+
+        res.json({
+            success: true,
+            message: 'Driver daily expense deleted successfully'
+        });
     } catch (error) {
         res.status(500).json({ message: 'Server error', error: error.message });
     }
@@ -3608,8 +3773,10 @@ module.exports = {
     updateTripCorrection,
     addTripExpenseByAdmin,
     updateTripExpenseByAdmin,
+    deleteTripExpenseByAdmin,
     addDriverDailyExpenseByAdmin,
     updateDriverDailyExpenseByAdmin,
+    deleteDriverDailyExpenseByAdmin,
     
     // Dashboard
     getDashboardStats,

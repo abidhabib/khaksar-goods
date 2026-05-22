@@ -32,8 +32,10 @@ const {
     updateTripCorrection,
     addTripExpenseByAdmin,
     updateTripExpenseByAdmin,
+    deleteTripExpenseByAdmin,
     addDriverDailyExpenseByAdmin,
     updateDriverDailyExpenseByAdmin,
+    deleteDriverDailyExpenseByAdmin,
     
     getDashboardStats,
     getReportsData,
@@ -76,6 +78,7 @@ router.get('/drivers/:id/report', authMiddleware, adminOnly, getDriverReport);
 router.get('/drivers-expenses', authMiddleware, adminOnly, getDriversExpenseReport);
 router.post('/drivers-expenses', authMiddleware, adminOnly, addDriverDailyExpenseByAdmin);
 router.put('/drivers-expenses/:id', authMiddleware, adminOnly, updateDriverDailyExpenseByAdmin);
+router.delete('/drivers-expenses/:id', authMiddleware, adminOnly, deleteDriverDailyExpenseByAdmin);
 router.get('/driver-commission-requests', authMiddleware, adminOnly, getDriverCommissionRequests);
 router.put('/driver-commission-requests/:id', authMiddleware, adminOnly, updateDriverCommissionRequest);
 router.put('/driver-commission-requests/:id/status', authMiddleware, adminOnly, updateDriverCommissionRequestStatus);
@@ -91,5 +94,6 @@ router.put('/payment-submissions/:id/status', authMiddleware, adminOnly, updateD
 router.put('/trips/:id', authMiddleware, adminOnly, updateTripCorrection);
 router.post('/trips/:id/expenses', authMiddleware, adminOnly, addTripExpenseByAdmin);
 router.put('/trip-expenses/:id', authMiddleware, adminOnly, updateTripExpenseByAdmin);
+router.delete('/trip-expenses/:id', authMiddleware, adminOnly, deleteTripExpenseByAdmin);
 
 module.exports = router;
