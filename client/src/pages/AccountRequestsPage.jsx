@@ -561,19 +561,6 @@ const RequestCard = ({
           <p className="text-sm text-cargo-text font-semibold mt-1.5">{formatCurrency(row.commission_amount)}</p>
         </div>
       </div>
-
-
-      <FindingTripExpenseBreakdown
-        row={row}
-        expenses={row.pending_next_trip_daily_expenses || []}
-        totalExpenses={Number(row.pending_next_trip_expenses_total || 0)}
-        onEditDailyExpense={onEditDailyExpense}
-        onAddDailyExpense={onAddDailyExpense}
-        onDeleteDailyExpense={onDeleteDailyExpense}
-        title="Waiting For Next Trip Expenses"
-        allowAdd
-      />
-
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
         <MeterImageCard label="Start Meter Photo" src={row.start_meter_image} alt="Start meter" />
         <MeterImageCard label="End Meter Photo" src={row.end_meter_image} alt="End meter" />
@@ -642,20 +629,31 @@ const RequestSection = ({
     {requests.length ? (
       <div className="space-y-4">
         {requests.map((row) => (
-          <RequestCard
-            key={row.request_id}
-            row={row}
-            busyId={busyId}
-            onEditCommission={onEditCommission}
-            onStatusChange={onStatusChange}
-            onEditTrip={onEditTrip}
-            onEditExpense={onEditExpense}
-            onAddExpense={onAddExpense}
-            onDeleteExpense={onDeleteExpense}
-            onEditDailyExpense={onEditDailyExpense}
-            onAddDailyExpense={onAddDailyExpense}
-            onDeleteDailyExpense={onDeleteDailyExpense}
-          />
+          <div key={row.request_id} className="space-y-4">
+            <FindingTripExpenseBreakdown
+              row={row}
+              expenses={row.pending_next_trip_daily_expenses || []}
+              totalExpenses={Number(row.pending_next_trip_expenses_total || 0)}
+              onEditDailyExpense={onEditDailyExpense}
+              onAddDailyExpense={onAddDailyExpense}
+              onDeleteDailyExpense={onDeleteDailyExpense}
+              title="Waiting For Next Trip Expenses"
+              allowAdd
+            />
+            <RequestCard
+              row={row}
+              busyId={busyId}
+              onEditCommission={onEditCommission}
+              onStatusChange={onStatusChange}
+              onEditTrip={onEditTrip}
+              onEditExpense={onEditExpense}
+              onAddExpense={onAddExpense}
+              onDeleteExpense={onDeleteExpense}
+              onEditDailyExpense={onEditDailyExpense}
+              onAddDailyExpense={onAddDailyExpense}
+              onDeleteDailyExpense={onDeleteDailyExpense}
+            />
+          </div>
         ))}
       </div>
     ) : (

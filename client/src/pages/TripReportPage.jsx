@@ -508,19 +508,6 @@ const TripCard = ({ trip, onEditTrip, onEditExpense, onAddExpense, onDeleteExpen
         </div>
       </div>
 
-  
-      <FindingTripExpenseBreakdown
-        trip={trip}
-        expenses={trip.pending_next_trip_daily_expenses || []}
-        totalExpenses={Number(trip.pending_next_trip_expenses_total || 0)}
-        onEditDailyExpense={onEditDailyExpense}
-        onAddDailyExpense={onAddDailyExpense}
-        onDeleteDailyExpense={onDeleteDailyExpense}
-        title="Waiting For Next Trip Expenses"
-        description="These expenses are still independent because the next trip has not started yet, so they are not cut from this trip."
-        allowAdd
-      />
-
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
         <MeterImageCard label="Start Meter Photo" src={trip.start_meter_image} alt="Start meter" />
         <MeterImageCard label="End Meter Photo" src={trip.end_meter_image} alt="End meter" />
@@ -759,6 +746,18 @@ const TripReportPage = () => {
             <h1 className="text-2xl font-bold text-cargo-text">Trip Report</h1>
           </div>
         </div>
+
+        <FindingTripExpenseBreakdown
+          trip={trip}
+          expenses={trip.pending_next_trip_daily_expenses || []}
+          totalExpenses={Number(trip.pending_next_trip_expenses_total || 0)}
+          onEditDailyExpense={openDailyExpenseEditModal}
+          onAddDailyExpense={openDailyExpenseAddModal}
+          onDeleteDailyExpense={handleDailyExpenseDelete}
+          title="Waiting For Next Trip Expenses"
+          description="These expenses are still independent because the next trip has not started yet, so they are not cut from this trip."
+          allowAdd
+        />
 
         <TripCard
           trip={trip}

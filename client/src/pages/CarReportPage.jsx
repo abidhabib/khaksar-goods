@@ -540,9 +540,6 @@ const TripCard = ({ trip, status = 'completed', onEditTrip, onEditExpense, onAdd
         </div>
       </div>
 
-      {!isOngoing ? (
-        <PendingNextTripExpenseBreakdown trip={trip} onEditDailyExpense={onEditDailyExpense} onAddDailyExpense={onAddDailyExpense} onDeleteDailyExpense={onDeleteDailyExpense} />
-      ) : null}
       {/* Images */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
         <MeterImageCard label="Start Meter Photo" src={trip.start_meter_image} alt="Start meter" />
@@ -1006,18 +1003,25 @@ const CarReportPage = () => {
             </h2>
             {completedTrips.length ? (
               completedTrips.map((trip) => (
-                <TripCard
-                  key={trip.id}
-                  trip={trip}
-                  status="completed"
-                  onEditTrip={openTripModal}
-                  onEditExpense={openExpenseEditModal}
-                  onAddExpense={openExpenseAddModal}
-                  onDeleteExpense={handleTripExpenseDelete}
-                  onEditDailyExpense={openDailyExpenseEditModal}
-                  onAddDailyExpense={openDailyExpenseAddModal}
-                  onDeleteDailyExpense={handleDailyExpenseDelete}
-                />
+                <div key={trip.id} className="space-y-4">
+                  <PendingNextTripExpenseBreakdown
+                    trip={trip}
+                    onEditDailyExpense={openDailyExpenseEditModal}
+                    onAddDailyExpense={openDailyExpenseAddModal}
+                    onDeleteDailyExpense={handleDailyExpenseDelete}
+                  />
+                  <TripCard
+                    trip={trip}
+                    status="completed"
+                    onEditTrip={openTripModal}
+                    onEditExpense={openExpenseEditModal}
+                    onAddExpense={openExpenseAddModal}
+                    onDeleteExpense={handleTripExpenseDelete}
+                    onEditDailyExpense={openDailyExpenseEditModal}
+                    onAddDailyExpense={openDailyExpenseAddModal}
+                    onDeleteDailyExpense={handleDailyExpenseDelete}
+                  />
+                </div>
               ))
             ) : (
               <p className="text-cargo-muted">No completed trips in this period.</p>
