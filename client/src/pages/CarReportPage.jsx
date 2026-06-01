@@ -214,25 +214,25 @@ const ClickableImage = ({ src, alt, className = '' }) => {
   );
 };
 
-const MeterImageCard = ({ label, src, alt }) => (
-  <div>
-    <p className="text-xs text-cargo-muted mb-2 font-medium tracking-wide uppercase">{label}</p>
-    <ClickableImage src={src} alt={alt} className="h-36" />
+const InlineImagePreview = ({ src, alt, className = 'h-16 w-16' }) => (
+  <div className="shrink-0">
+    <ClickableImage src={src} alt={alt} className={className} />
   </div>
 );
 
 const ExpenseBreakdown = ({ trip, onEditExpense, onAddExpense, onDeleteExpense }) => {
   const biltyCommissionAmount = Number(trip.bilty_commission_amount) || 0;
+  const hasStoredBiltyCommissionExpense = (trip.expenses || []).some((expense) => expense.category === 'bilty_commission');
   const expenses = sortExpensesByCategory([
     ...(trip.expenses || []),
-    ...(biltyCommissionAmount > 0 ? [{
+    ...(!hasStoredBiltyCommissionExpense && biltyCommissionAmount > 0 ? [{
       id: `bilty-${trip.id}`,
       category: 'bilty_commission',
       amount: biltyCommissionAmount,
       created_at: trip.ended_at || trip.started_at,
       location: null,
       liters: null,
-      receipt_image: null,
+      receipt_image: trip.bilty_slip_image || null,
     }] : []),
   ], tripExpenseCategories);
   const totalExpenses = Number(trip.trip_expenses_total ?? trip.total_expenses ?? 0);
@@ -277,7 +277,7 @@ const ExpenseBreakdown = ({ trip, onEditExpense, onAddExpense, onDeleteExpense }
                         <ClickableImage
                           src={expense.receipt_image}
                           alt={`${expense.category} receipt`}
-                          className="h-28"
+                          className="h-20"
                         />
                       </div>
                     ) : null}
@@ -363,7 +363,7 @@ const PendingNextTripExpenseBreakdown = ({ trip, onEditDailyExpense, onAddDailyE
                       <ClickableImage
                         src={expense.expense_image}
                         alt={`${expense.category} expense`}
-                        className="h-28"
+                        className="h-20"
                       />
                     </div>
                   ) : null}
@@ -497,19 +497,25 @@ const TripCard = ({ trip, status = 'completed', onEditTrip, onEditExpense, onAdd
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
-        <div className="rounded-lg border border-cargo-border bg-cargo-dark/20 p-3">
-          <p className="text-[11px] text-cargo-muted uppercase tracking-wider font-medium flex items-center gap-1">
-            <Gauge className="w-3 h-3" />Start Meter
-          </p>
-          <p className="text-sm text-cargo-text font-semibold mt-1.5">{(trip.start_meter_reading || 0).toLocaleString()}</p>
+        <div className="rounded-lg border border-cargo-border bg-cargo-dark/20 p-3 flex items-start justify-between gap-3">
+          <div className="min-w-0">
+            <p className="text-[11px] text-cargo-muted uppercase tracking-wider font-medium flex items-center gap-1">
+              <Gauge className="w-3 h-3" />Start Meter
+            </p>
+            <p className="text-sm text-cargo-text font-semibold mt-1.5">{(trip.start_meter_reading || 0).toLocaleString()}</p>
+          </div>
+          <InlineImagePreview src={trip.start_meter_image} alt="Start meter" />
         </div>
-        <div className="rounded-lg border border-cargo-border bg-cargo-dark/20 p-3">
-          <p className="text-[11px] text-cargo-muted uppercase tracking-wider font-medium flex items-center gap-1">
-            <Gauge className="w-3 h-3" />End Meter
-          </p>
-          <p className="text-sm text-cargo-text font-semibold mt-1.5">
-            {trip.end_meter_reading ? trip.end_meter_reading.toLocaleString() : isOngoing ? 'Pending' : 'N/A'}
-          </p>
+        <div className="rounded-lg border border-cargo-border bg-cargo-dark/20 p-3 flex items-start justify-between gap-3">
+          <div className="min-w-0">
+            <p className="text-[11px] text-cargo-muted uppercase tracking-wider font-medium flex items-center gap-1">
+              <Gauge className="w-3 h-3" />End Meter
+            </p>
+            <p className="text-sm text-cargo-text font-semibold mt-1.5">
+              {trip.end_meter_reading ? trip.end_meter_reading.toLocaleString() : isOngoing ? 'Pending' : 'N/A'}
+            </p>
+          </div>
+          <InlineImagePreview src={trip.end_meter_image} alt="End meter" />
         </div>
         <div className="rounded-lg border border-cargo-border bg-cargo-dark/20 p-3">
           <p className="text-[11px] text-cargo-muted uppercase tracking-wider font-medium flex items-center gap-1">
@@ -525,10 +531,13 @@ const TripCard = ({ trip, status = 'completed', onEditTrip, onEditExpense, onAdd
         </div>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-        <div className="rounded-lg border border-cargo-border bg-cargo-dark/20 p-3">
-          <p className="text-[11px] text-cargo-muted uppercase tracking-wider font-medium">Load Details</p>
-          <p className="text-sm text-cargo-text font-semibold mt-1.5">{loadSummary || 'N/A'}</p>
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
+        <div className="rounded-lg border border-cargo-border bg-cargo-dark/20 p-3 flex items-start justify-between gap-3">
+          <div className="min-w-0">
+            <p className="text-[11px] text-cargo-muted uppercase tracking-wider font-medium">Load Details</p>
+            <p className="text-sm text-cargo-text font-semibold mt-1.5">{loadSummary || 'N/A'}</p>
+          </div>
+          <InlineImagePreview src={trip.load_photo} alt="Load photo" />
         </div>
         <div className="rounded-lg border border-cargo-border bg-cargo-dark/20 p-3">
           <p className="text-[11px] text-cargo-muted uppercase tracking-wider font-medium">Expected Freight</p>
@@ -540,13 +549,6 @@ const TripCard = ({ trip, status = 'completed', onEditTrip, onEditExpense, onAdd
         </div>
       </div>
 
-      {/* Images */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        <MeterImageCard label="Start Meter Photo" src={trip.start_meter_image} alt="Start meter" />
-        <MeterImageCard label="End Meter Photo" src={trip.end_meter_image} alt="End meter" />
-        <MeterImageCard label="Bilty Slip" src={trip.bilty_slip_image} alt="Bilty slip" />
-        <MeterImageCard label="Load Photo" src={trip.load_photo} alt="Load photo" />
-      </div>
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
         {[
           { label: 'Diesel Liters', value: `${Number(trip.total_diesel_liters || 0).toLocaleString()} L` },
@@ -970,7 +972,7 @@ const CarReportPage = () => {
           </div>
 
           {/* Ongoing Trips */}
-          <div className="card space-y-5">
+          <div className="space-y-5">
             <h2 className="text-lg font-semibold text-cargo-text flex items-center gap-2">
               <Clock3 className="w-5 h-5 text-cargo-accent" />
               Ongoing Trips
@@ -996,7 +998,7 @@ const CarReportPage = () => {
           </div>
 
           {/* Completed Trips */}
-          <div className="card space-y-5">
+          <div className="space-y-5">
             <h2 className="text-lg font-semibold text-cargo-text flex items-center gap-2">
               <CheckCircle2 className="w-5 h-5 text-cargo-success" />
               Completed Trip Records

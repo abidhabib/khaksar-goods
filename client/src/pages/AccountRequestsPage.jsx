@@ -210,25 +210,25 @@ const ClickableImage = ({ src, alt, className = '' }) => {
   );
 };
 
-const MeterImageCard = ({ label, src, alt }) => (
-  <div>
-    <p className="text-xs text-cargo-muted mb-2 font-medium tracking-wide uppercase">{label}</p>
-    <ClickableImage src={src} alt={alt} className="h-36" />
+const InlineImagePreview = ({ src, alt, className = 'h-16 w-16' }) => (
+  <div className="shrink-0">
+    <ClickableImage src={src} alt={alt} className={className} />
   </div>
 );
 
 const ExpenseBreakdown = ({ row, onEditExpense, onAddExpense, onDeleteExpense }) => {
   const biltyCommissionAmount = Number(row.bilty_commission_amount) || 0;
+  const hasStoredBiltyCommissionExpense = (row.expenses || []).some((expense) => expense.category === 'bilty_commission');
   const expenses = sortExpensesByCategory([
     ...(row.expenses || []),
-    ...(biltyCommissionAmount > 0 ? [{
+    ...(!hasStoredBiltyCommissionExpense && biltyCommissionAmount > 0 ? [{
       id: `bilty-${row.trip_id}`,
       category: 'bilty_commission',
       amount: biltyCommissionAmount,
       created_at: row.ended_at || row.started_at,
       location: null,
       liters: null,
-      receipt_image: null,
+      receipt_image: row.bilty_slip_image || null,
       notes: null,
     }] : []),
   ], tripExpenseCategories);
@@ -268,7 +268,7 @@ const ExpenseBreakdown = ({ row, onEditExpense, onAddExpense, onDeleteExpense })
                   <div key={expense.id} className="rounded-lg bg-cargo-card/40 p-3 hover:border-cargo-border transition-colors">
                     {expense.receipt_image ? (
                       <div className="mb-3">
-                        <ClickableImage src={expense.receipt_image} alt={`${expense.category} receipt`} className="h-28" />
+                        <ClickableImage src={expense.receipt_image} alt={`${expense.category} receipt`} className="h-20" />
                       </div>
                     ) : null}
                     <div className="flex items-center justify-between gap-3">
@@ -358,7 +358,7 @@ const FindingTripExpenseBreakdown = ({
                   <div key={expense.id} className="rounded-lg border border-cargo-border/60 bg-cargo-card/40 p-3 hover:border-cargo-border transition-colors">
                     {expense.expense_image ? (
                       <div className="mb-3">
-                        <ClickableImage src={expense.expense_image} alt={`${expense.category} expense`} className="h-28" />
+                        <ClickableImage src={expense.expense_image} alt={`${expense.category} expense`} className="h-20" />
                       </div>
                     ) : null}
                     <div className="flex items-center justify-between gap-3">
@@ -500,19 +500,25 @@ const RequestCard = ({
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
-        <div className="rounded-lg border border-cargo-border bg-cargo-dark/20 p-3">
-          <p className="text-[11px] text-cargo-muted uppercase tracking-wider font-medium flex items-center gap-1">
-            <Gauge className="w-3 h-3" />
-            Start Meter
-          </p>
-          <p className="text-sm text-cargo-text font-semibold mt-1.5">{(Number(row.start_meter_reading) || 0).toLocaleString()}</p>
+        <div className="rounded-lg border border-cargo-border bg-cargo-dark/20 p-3 flex items-start justify-between gap-3">
+          <div className="min-w-0">
+            <p className="text-[11px] text-cargo-muted uppercase tracking-wider font-medium flex items-center gap-1">
+              <Gauge className="w-3 h-3" />
+              Start Meter
+            </p>
+            <p className="text-sm text-cargo-text font-semibold mt-1.5">{(Number(row.start_meter_reading) || 0).toLocaleString()}</p>
+          </div>
+          <InlineImagePreview src={row.start_meter_image} alt="Start meter" />
         </div>
-        <div className="rounded-lg border border-cargo-border bg-cargo-dark/20 p-3">
-          <p className="text-[11px] text-cargo-muted uppercase tracking-wider font-medium flex items-center gap-1">
-            <Gauge className="w-3 h-3" />
-            End Meter
-          </p>
-          <p className="text-sm text-cargo-text font-semibold mt-1.5">{row.end_meter_reading ? Number(row.end_meter_reading).toLocaleString() : 'N/A'}</p>
+        <div className="rounded-lg border border-cargo-border bg-cargo-dark/20 p-3 flex items-start justify-between gap-3">
+          <div className="min-w-0">
+            <p className="text-[11px] text-cargo-muted uppercase tracking-wider font-medium flex items-center gap-1">
+              <Gauge className="w-3 h-3" />
+              End Meter
+            </p>
+            <p className="text-sm text-cargo-text font-semibold mt-1.5">{row.end_meter_reading ? Number(row.end_meter_reading).toLocaleString() : 'N/A'}</p>
+          </div>
+          <InlineImagePreview src={row.end_meter_image} alt="End meter" />
         </div>
         <div className="rounded-lg border border-cargo-border bg-cargo-dark/20 p-3">
           <p className="text-[11px] text-cargo-muted uppercase tracking-wider font-medium flex items-center gap-1">
@@ -539,11 +545,14 @@ const RequestCard = ({
           <p className="text-[11px] text-cargo-muted uppercase tracking-wider font-medium">License</p>
           <p className="text-sm text-cargo-text font-semibold mt-1.5">{row.license_number || 'N/A'}</p>
         </div>
-        <div className="rounded-lg border border-cargo-border bg-cargo-dark/20 p-3">
-          <p className="text-[11px] text-cargo-muted uppercase tracking-wider font-medium">Load Details</p>
-          <p className="text-sm text-cargo-text font-semibold mt-1.5">
-            {[row.load_name, row.load_weight].filter(Boolean).join(' • ') || 'N/A'}
-          </p>
+        <div className="rounded-lg border border-cargo-border bg-cargo-dark/20 p-3 flex items-start justify-between gap-3">
+          <div className="min-w-0">
+            <p className="text-[11px] text-cargo-muted uppercase tracking-wider font-medium">Load Details</p>
+            <p className="text-sm text-cargo-text font-semibold mt-1.5">
+              {[row.load_name, row.load_weight].filter(Boolean).join(' • ') || 'N/A'}
+            </p>
+          </div>
+          <InlineImagePreview src={row.load_photo} alt="Load photo" />
         </div>
         <div className="rounded-lg border border-cargo-border bg-cargo-dark/20 p-3">
           <p className="text-[11px] text-cargo-muted uppercase tracking-wider font-medium">Reviewed By</p>
@@ -561,13 +570,6 @@ const RequestCard = ({
           <p className="text-sm text-cargo-text font-semibold mt-1.5">{formatCurrency(row.commission_amount)}</p>
         </div>
       </div>
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        <MeterImageCard label="Start Meter Photo" src={row.start_meter_image} alt="Start meter" />
-        <MeterImageCard label="End Meter Photo" src={row.end_meter_image} alt="End meter" />
-        <MeterImageCard label="Bilty Slip" src={row.bilty_slip_image} alt="Bilty slip" />
-        <MeterImageCard label="Load Photo" src={row.load_photo} alt="Load photo" />
-      </div>
-
       <ExpenseBreakdown row={row} onEditExpense={onEditExpense} onAddExpense={onAddExpense} onDeleteExpense={onDeleteExpense} />
 
       {row.remarks ? (

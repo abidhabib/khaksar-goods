@@ -520,7 +520,10 @@ const applyTripNetIncomeFormula = (trip) => {
     ) || 0;
     const betweenTripExpensesTotal = Number(trip?.between_trip_expenses_total) || 0;
     const biltyCommissionAmount = Number(trip?.bilty_commission_amount) || 0;
-    const totalExpenses = tripExpensesTotal + betweenTripExpensesTotal + biltyCommissionAmount;
+    const hasStoredBiltyCommissionExpense = Array.isArray(trip?.expenses)
+        && trip.expenses.some((expense) => expense?.category === 'bilty_commission');
+    const effectiveBiltyCommissionAmount = hasStoredBiltyCommissionExpense ? 0 : biltyCommissionAmount;
+    const totalExpenses = tripExpensesTotal + betweenTripExpensesTotal + effectiveBiltyCommissionAmount;
     const netIncome = freightCharge - totalExpenses;
 
     return {
