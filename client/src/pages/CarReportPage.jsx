@@ -23,9 +23,11 @@ import {
   Pencil,
   Plus,
   Trash2,
+  ExternalLink,
 } from 'lucide-react';
 import { useApi } from '../hooks/useApi';
 import Modal from '../components/common/Modal';
+import { buildGoogleMapsUrl } from '../utils/maps';
 
 const formatCurrency = (value) => `Rs ${Number(value || 0).toLocaleString()}`;
 
@@ -220,6 +222,25 @@ const InlineImagePreview = ({ src, alt, className = 'h-16 w-16' }) => (
   </div>
 );
 
+const MapLink = ({ coordinates, label = 'Open Map' }) => {
+  const href = buildGoogleMapsUrl(coordinates);
+  if (!href) {
+    return null;
+  }
+
+  return (
+    <a
+      href={href}
+      target="_blank"
+      rel="noreferrer"
+      className="inline-flex items-center gap-1 text-xs text-primary-300 hover:text-primary-200 mt-2"
+    >
+      <ExternalLink className="w-3 h-3" />
+      {label}
+    </a>
+  );
+};
+
 const ExpenseBreakdown = ({ trip, onEditExpense, onAddExpense, onDeleteExpense }) => {
   const biltyCommissionAmount = Number(trip.bilty_commission_amount) || 0;
   const hasStoredBiltyCommissionExpense = (trip.expenses || []).some((expense) => expense.category === 'bilty_commission');
@@ -299,6 +320,7 @@ const ExpenseBreakdown = ({ trip, onEditExpense, onAddExpense, onDeleteExpense }
                       {expense.liters ? <span>Liters: {Number(expense.liters).toLocaleString()}</span> : null}
                       {expense.location ? <span>Location: {expense.location}</span> : null}
                     </div>
+                    <MapLink coordinates={expense.coordinates} />
                   </div>
                 ))}
               </div>
@@ -503,6 +525,8 @@ const TripCard = ({ trip, status = 'completed', onEditTrip, onEditExpense, onAdd
               <Gauge className="w-3 h-3" />Start Meter
             </p>
             <p className="text-sm text-cargo-text font-semibold mt-1.5">{(trip.start_meter_reading || 0).toLocaleString()}</p>
+            <p className="text-xs text-cargo-muted mt-1">{trip.start_live_location || trip.from_location || 'N/A'}</p>
+            <MapLink coordinates={trip.start_coordinates} />
           </div>
           <InlineImagePreview src={trip.start_meter_image} alt="Start meter" />
         </div>
@@ -514,6 +538,8 @@ const TripCard = ({ trip, status = 'completed', onEditTrip, onEditExpense, onAdd
             <p className="text-sm text-cargo-text font-semibold mt-1.5">
               {trip.end_meter_reading ? trip.end_meter_reading.toLocaleString() : isOngoing ? 'Pending' : 'N/A'}
             </p>
+            <p className="text-xs text-cargo-muted mt-1">{actualEndLocation || (isOngoing ? 'In progress' : 'N/A')}</p>
+            <MapLink coordinates={trip.end_coordinates} />
           </div>
           <InlineImagePreview src={trip.end_meter_image} alt="End meter" />
         </div>
@@ -536,6 +562,8 @@ const TripCard = ({ trip, status = 'completed', onEditTrip, onEditExpense, onAdd
           <div className="min-w-0">
             <p className="text-[11px] text-cargo-muted uppercase tracking-wider font-medium">Load Details</p>
             <p className="text-sm text-cargo-text font-semibold mt-1.5">{loadSummary || 'N/A'}</p>
+            <p className="text-xs text-cargo-muted mt-1">{trip.load_live_location || 'No load location'}</p>
+            <MapLink coordinates={trip.load_coordinates} />
           </div>
           <InlineImagePreview src={trip.load_photo} alt="Load photo" />
         </div>

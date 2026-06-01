@@ -20,9 +20,11 @@ import {
   X,
   XCircle,
   ZoomIn,
+  ExternalLink,
 } from 'lucide-react';
 import Modal from '../components/common/Modal';
 import { useApi } from '../hooks/useApi';
+import { buildGoogleMapsUrl } from '../utils/maps';
 
 const formatCurrency = (value) => `Rs ${Number(value || 0).toLocaleString()}`;
 
@@ -216,6 +218,25 @@ const InlineImagePreview = ({ src, alt, className = 'h-16 w-16' }) => (
   </div>
 );
 
+const MapLink = ({ coordinates, label = 'Open Map' }) => {
+  const href = buildGoogleMapsUrl(coordinates);
+  if (!href) {
+    return null;
+  }
+
+  return (
+    <a
+      href={href}
+      target="_blank"
+      rel="noreferrer"
+      className="inline-flex items-center gap-1 text-xs text-primary-300 hover:text-primary-200 mt-2"
+    >
+      <ExternalLink className="w-3 h-3" />
+      {label}
+    </a>
+  );
+};
+
 const ExpenseBreakdown = ({ row, onEditExpense, onAddExpense, onDeleteExpense }) => {
   const biltyCommissionAmount = Number(row.bilty_commission_amount) || 0;
   const hasStoredBiltyCommissionExpense = (row.expenses || []).some((expense) => expense.category === 'bilty_commission');
@@ -291,6 +312,7 @@ const ExpenseBreakdown = ({ row, onEditExpense, onAddExpense, onDeleteExpense })
                       {expense.liters ? <span>Liters: {Number(expense.liters).toLocaleString()}</span> : null}
                       {expense.location ? <span>Location: {expense.location}</span> : null}
                     </div>
+                    <MapLink coordinates={expense.coordinates} />
                     {expense.notes ? <p className="mt-2 text-xs text-cargo-muted">{expense.notes}</p> : null}
                   </div>
                 ))}
@@ -507,6 +529,8 @@ const RequestCard = ({
               Start Meter
             </p>
             <p className="text-sm text-cargo-text font-semibold mt-1.5">{(Number(row.start_meter_reading) || 0).toLocaleString()}</p>
+            <p className="text-xs text-cargo-muted mt-1">{row.start_live_location || row.from_location || 'N/A'}</p>
+            <MapLink coordinates={row.start_coordinates} />
           </div>
           <InlineImagePreview src={row.start_meter_image} alt="Start meter" />
         </div>
@@ -517,6 +541,8 @@ const RequestCard = ({
               End Meter
             </p>
             <p className="text-sm text-cargo-text font-semibold mt-1.5">{row.end_meter_reading ? Number(row.end_meter_reading).toLocaleString() : 'N/A'}</p>
+            <p className="text-xs text-cargo-muted mt-1">{row.end_location || row.end_live_location || 'N/A'}</p>
+            <MapLink coordinates={row.end_coordinates} />
           </div>
           <InlineImagePreview src={row.end_meter_image} alt="End meter" />
         </div>
@@ -551,6 +577,8 @@ const RequestCard = ({
             <p className="text-sm text-cargo-text font-semibold mt-1.5">
               {[row.load_name, row.load_weight].filter(Boolean).join(' • ') || 'N/A'}
             </p>
+            <p className="text-xs text-cargo-muted mt-1">{row.load_live_location || 'No load location'}</p>
+            <MapLink coordinates={row.load_coordinates} />
           </div>
           <InlineImagePreview src={row.load_photo} alt="Load photo" />
         </div>
