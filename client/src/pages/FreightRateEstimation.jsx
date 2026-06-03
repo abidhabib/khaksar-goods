@@ -237,7 +237,7 @@ const FreightRateEstimation = () => {
                   {sortedRates.map((rate) => (
                     <tr key={rate.id} className="border-b border-cargo-border/60">
                       <td className="py-4 pr-4 text-cargo-text font-medium">{rate.weight_ton} ton</td>
-                      <td className="py-4 pr-4 text-cargo-text">Rs {formatCurrency(rate.rate_per_km)}</td>
+                      <td className="py-4 pr-4 text-cargo-text">{formatCurrency(rate.rate_per_km)}</td>
                       <td className="py-4 pr-4 text-cargo-muted">{rate.notes || '-'}</td>
                       <td className="py-4">
                         <div className="flex items-center justify-end gap-2">

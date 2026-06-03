@@ -224,11 +224,26 @@ const MapLink = ({ coordinates, label = 'Open Map' }) => {
       href={href}
       target="_blank"
       rel="noreferrer"
-      className="inline-flex items-center gap-1 text-xs text-primary-300 hover:text-primary-200 mt-2"
+      className="inline-flex items-center gap-1 text-xs text-primary-300 hover:text-primary-200"
     >
       <ExternalLink className="w-3 h-3" />
       {label}
     </a>
+  );
+};
+
+const RightSideStack = ({ actions = null, image = null, mapCoordinates = null }) => {
+  const hasMap = Boolean(buildGoogleMapsUrl(mapCoordinates));
+  if (!actions && !image && !hasMap) {
+    return null;
+  }
+
+  return (
+    <div className="shrink-0 flex flex-col items-end gap-2">
+      {actions}
+      {image}
+      {hasMap ? <MapLink coordinates={mapCoordinates} /> : null}
+    </div>
   );
 };
 
@@ -252,7 +267,7 @@ const ExpenseBreakdown = ({ trip, onEditExpense, onAddExpense, onDeleteExpense }
   const groupedExpenses = groupExpensesByCategory(expenses, tripExpenseCategories, 'receipt_image');
 
   return (
-    <div className="rounded-xl border border-cargo-border bg-cargo-dark/30 p-4 space-y-4">
+    <div className="rounded-xl border border-cargo-border bg-cargo-dark/30 p-2 space-y-4">
       <div className="flex items-center justify-between">
         <p className="text-sm text-cargo-text font-semibold flex items-center gap-2">
           <Receipt className="w-4 h-4 text-cargo-muted" />
@@ -262,7 +277,7 @@ const ExpenseBreakdown = ({ trip, onEditExpense, onAddExpense, onDeleteExpense }
           <p className="text-sm text-cargo-muted font-medium">Total: {formatCurrency(totalExpenses)}</p>
           <button type="button" onClick={() => onAddExpense(trip)} className="inline-flex items-center gap-1 rounded-lg bg-primary-500/15 px-3 py-2 text-primary-300">
             <Plus className="w-4 h-4" />
-            Add Expense
+            Add 
           </button>
         </div>
       </div>
@@ -270,7 +285,7 @@ const ExpenseBreakdown = ({ trip, onEditExpense, onAddExpense, onDeleteExpense }
       {groupedExpenses.length ? (
         <div className="space-y-4">
           {groupedExpenses.map((group) => (
-            <div key={group.category} className="rounded-lg border border-cargo-border/60 bg-cargo-card/30 p-4 space-y-3">
+            <div key={group.category} className="rounded-lg border border-cargo-border/60 bg-cargo-card/30 p-2 space-y-3">
               <div className="flex items-center justify-between gap-3">
                 <div className="flex items-center gap-2">
                   <div className="w-2 h-2 rounded-full bg-cargo-accent/60" />
@@ -282,32 +297,38 @@ const ExpenseBreakdown = ({ trip, onEditExpense, onAddExpense, onDeleteExpense }
               <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                 {group.items.map((expense) => (
                   <div key={expense.id} className="rounded-lg bg-cargo-card/40 hover:border-cargo-border transition-colors p-3">
-                    {expense.receipt_image ? (
-                      <div className="mb-3">
-                        <ClickableImage src={expense.receipt_image} alt={`${expense.category} receipt`} className="h-20" />
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-center gap-3">
+                          <p className="text-sm text-cargo-text font-medium">{formatCurrency(expense.amount)}</p>
+                        </div>
+                        <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs text-cargo-muted">
+                          <span>{formatDate(expense.created_at)}</span>
+                          {expense.liters ? <span>Liters: {Number(expense.liters).toLocaleString()}</span> : null}
+                          {expense.location ? <span>Location: {expense.location}</span> : null}
+                        </div>
                       </div>
-                    ) : null}
-                    <div className="flex items-center justify-between gap-3">
-                      <p className="text-sm text-cargo-text font-medium">{formatCurrency(expense.amount)}</p>
-                      <div className="flex items-center gap-2">
-                        <button type="button" onClick={() => onEditExpense(trip, expense)} className="inline-flex items-center gap-1 rounded-lg bg-primary-500/15 px-2.5 py-1.5 text-xs text-primary-300">
-                          <Pencil className="w-3.5 h-3.5" />
-                          Edit
-                        </button>
-                        {String(expense.id).startsWith('bilty-') ? null : (
-                          <button type="button" onClick={() => onDeleteExpense(trip, expense)} className="inline-flex items-center gap-1 rounded-lg bg-cargo-danger/15 px-2.5 py-1.5 text-xs text-cargo-danger">
-                            <Trash2 className="w-3.5 h-3.5" />
-                            Delete
-                          </button>
+                      <RightSideStack
+                        actions={(
+                          <div className="flex items-center gap-2">
+                            <button type="button" onClick={() => onEditExpense(trip, expense)} className="inline-flex items-center gap-1 rounded-lg bg-primary-500/15 px-2.5 py-1.5 text-xs text-primary-300">
+                              <Pencil className="w-3.5 h-3.5" />
+                              Edit
+                            </button>
+                            {String(expense.id).startsWith('bilty-') ? null : (
+                              <button type="button" onClick={() => onDeleteExpense(trip, expense)} className="inline-flex items-center gap-1 rounded-lg bg-cargo-danger/15 px-2.5 py-1.5 text-xs text-cargo-danger">
+                                <Trash2 className="w-3.5 h-3.5" />
+                                Delete
+                              </button>
+                            )}
+                          </div>
                         )}
-                      </div>
+                        image={expense.receipt_image ? (
+                          <ClickableImage src={expense.receipt_image} alt={`${expense.category} receipt`} className="h-16 w-16" />
+                        ) : null}
+                        mapCoordinates={expense.coordinates}
+                      />
                     </div>
-                    <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs text-cargo-muted">
-                      <span>{formatDate(expense.created_at)}</span>
-                      {expense.liters ? <span>Liters: {Number(expense.liters).toLocaleString()}</span> : null}
-                      {expense.location ? <span>Location: {expense.location}</span> : null}
-                    </div>
-                    <MapLink coordinates={expense.coordinates} />
                     {expense.notes ? (
                       <p className="mt-2 text-xs text-cargo-muted">{expense.notes}</p>
                     ) : null}
@@ -336,26 +357,34 @@ const FindingTripExpenseBreakdown = ({
   allowAdd = false,
 }) => {
   const groupedExpenses = groupExpensesByCategory(expenses, dailyExpenseCategories, 'expense_image');
+  const nextTripTag = title === 'Waiting For Next Trip Expenses' && trip?.pending_next_trip_target_trip_id
+    ? `Trip #${trip.pending_next_trip_target_trip_id}`
+    : null;
 
   if (!groupedExpenses.length && !allowAdd) {
     return null;
   }
 
   return (
-    <div className="rounded-xl border border-cargo-border bg-cargo-dark/30 p-4 space-y-4">
+    <div className="rounded-xl border border-cargo-border bg-cargo-dark/30 p-2 space-y-4">
       <div className="flex items-center justify-between gap-3">
         <div>
           <p className="text-sm text-cargo-text font-semibold flex items-center gap-2">
             <Receipt className="w-4 h-4 text-cargo-success" />
             {title}
           </p>
+          {nextTripTag ? (
+            <span className="inline-flex mt-2 text-[11px] px-2 py-0.5 rounded-full bg-primary-600/10 text-primary-300">
+              {nextTripTag}
+            </span>
+          ) : null}
         </div>
         <div className="flex items-center gap-3">
           <p className="text-sm text-cargo-muted font-medium">Total: {formatCurrency(totalExpenses)}</p>
           {allowAdd ? (
             <button type="button" onClick={() => onAddDailyExpense(trip)} className="inline-flex items-center gap-1 rounded-lg bg-primary-500/15 px-3 py-2 text-primary-300">
               <Plus className="w-4 h-4" />
-              Add Expense
+              Add
             </button>
           ) : null}
         </div>
@@ -364,7 +393,7 @@ const FindingTripExpenseBreakdown = ({
       {groupedExpenses.length ? (
         <div className="space-y-4">
           {groupedExpenses.map((group) => (
-            <div key={group.category} className="rounded-lg border border-cargo-border/60 bg-cargo-card/30 p-4 space-y-3">
+            <div key={group.category} className="rounded-lg border border-cargo-border/60 bg-cargo-card/30 p-2 space-y-3">
               <div className="flex items-center justify-between gap-3">
                 <div className="flex items-center gap-2">
                   <div className="w-2 h-2 rounded-full bg-cargo-success/60" />
@@ -374,33 +403,39 @@ const FindingTripExpenseBreakdown = ({
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                {group.items.map((expense) => (
-                  <div key={expense.id} className="rounded-lg border border-cargo-border/60 bg-cargo-card/40 p-3 hover:border-cargo-border transition-colors">
-                    {expense.expense_image ? (
-                      <div className="mb-3">
-                        <ClickableImage src={expense.expense_image} alt={`${expense.category} expense`} className="h-20" />
+              {group.items.map((expense) => (
+                <div key={expense.id} className="rounded-lg border border-cargo-border/60 bg-cargo-card/40 p-3 hover:border-cargo-border transition-colors">
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center gap-3">
+                        <p className="text-sm text-cargo-text font-semibold">{formatCurrency(expense.amount)}</p>
                       </div>
-                    ) : null}
-                    <div className="flex items-center justify-between gap-3">
-                      <p className="text-sm text-cargo-text font-semibold">{formatCurrency(expense.amount)}</p>
-                      <div className="flex items-center gap-2">
-                        <button type="button" onClick={() => onEditDailyExpense(trip, expense)} className="inline-flex items-center gap-1 rounded-lg bg-primary-500/15 px-2.5 py-1.5 text-xs text-primary-300">
-                          <Pencil className="w-3.5 h-3.5" />
-                          Edit
-                        </button>
-                        <button type="button" onClick={() => onDeleteDailyExpense(trip, expense)} className="inline-flex items-center gap-1 rounded-lg bg-cargo-danger/15 px-2.5 py-1.5 text-xs text-cargo-danger">
-                          <Trash2 className="w-3.5 h-3.5" />
-                          Delete
-                        </button>
+                      <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs text-cargo-muted">
+                        <span>{formatDate(expense.created_at)}</span>
+                        {expense.expense_date ? <span>{formatDate(expense.expense_date, 'PPP')}</span> : null}
+                        {expense.meter_reading ? <span>Meter: {Number(expense.meter_reading).toLocaleString()}</span> : null}
                       </div>
                     </div>
-                    <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs text-cargo-muted">
-                      <span>{formatDate(expense.created_at)}</span>
-                      {expense.expense_date ? <span>Expense Date: {formatDate(expense.expense_date, 'PPP')}</span> : null}
-                      {expense.meter_reading ? <span>Meter: {Number(expense.meter_reading).toLocaleString()}</span> : null}
-                    </div>
-                    {expense.note ? (
-                      <p className="mt-2 text-xs text-cargo-muted">{expense.note}</p>
+                    <RightSideStack
+                      actions={(
+                        <div className="flex items-center gap-2">
+                          <button type="button" onClick={() => onEditDailyExpense(trip, expense)} className="inline-flex items-center gap-1 rounded-lg bg-primary-500/15 px-2.5 py-1.5 text-xs text-primary-300">
+                            <Pencil className="w-3.5 h-3.5" />
+                            Edit
+                          </button>
+                          <button type="button" onClick={() => onDeleteDailyExpense(trip, expense)} className="inline-flex items-center gap-1 rounded-lg bg-cargo-danger/15 px-2.5 py-1.5 text-xs text-cargo-danger">
+                            <Trash2 className="w-3.5 h-3.5" />
+                            Delete
+                          </button>
+                        </div>
+                      )}
+                      image={expense.expense_image ? (
+                        <ClickableImage src={expense.expense_image} alt={`${expense.category} expense`} className="h-16 w-16" />
+                      ) : null}
+                    />
+                  </div>
+                  {expense.note ? (
+                    <p className="mt-2 text-xs text-cargo-muted">{expense.note}</p>
                     ) : null}
                   </div>
                 ))}
@@ -502,18 +537,22 @@ const TripCard = ({ trip, onEditTrip, onEditExpense, onAddExpense, onDeleteExpen
             <p className="text-[11px] text-cargo-muted uppercase tracking-wider font-medium flex items-center gap-1"><Gauge className="w-3 h-3" />Start Meter</p>
             <p className="text-sm text-cargo-text font-semibold mt-1.5">{(Number(trip.start_meter_reading) || 0).toLocaleString()}</p>
             <p className="text-xs text-cargo-muted mt-1">{trip.start_live_location || trip.from_location || 'N/A'}</p>
-            <MapLink coordinates={trip.start_coordinates} />
           </div>
-          <InlineImagePreview src={trip.start_meter_image} alt="Start meter" />
+          <RightSideStack
+            image={<InlineImagePreview src={trip.start_meter_image} alt="Start meter" />}
+            mapCoordinates={trip.start_coordinates}
+          />
         </div>
         <div className="rounded-lg border border-cargo-border bg-cargo-dark/20 p-3 flex items-start justify-between gap-3">
           <div className="min-w-0">
             <p className="text-[11px] text-cargo-muted uppercase tracking-wider font-medium flex items-center gap-1"><Gauge className="w-3 h-3" />End Meter</p>
             <p className="text-sm text-cargo-text font-semibold mt-1.5">{trip.end_meter_reading ? Number(trip.end_meter_reading).toLocaleString() : isOngoing ? 'Pending' : 'N/A'}</p>
             <p className="text-xs text-cargo-muted mt-1">{actualEndLocation || (isOngoing ? 'In progress' : 'N/A')}</p>
-            <MapLink coordinates={trip.end_coordinates} />
           </div>
-          <InlineImagePreview src={trip.end_meter_image} alt="End meter" />
+          <RightSideStack
+            image={<InlineImagePreview src={trip.end_meter_image} alt="End meter" />}
+            mapCoordinates={trip.end_coordinates}
+          />
         </div>
         <div className="rounded-lg border border-cargo-border bg-cargo-dark/20 p-3">
           <p className="text-[11px] text-cargo-muted uppercase tracking-wider font-medium flex items-center gap-1"><MapPin className="w-3 h-3" />Live Start</p>
@@ -531,9 +570,11 @@ const TripCard = ({ trip, onEditTrip, onEditExpense, onAddExpense, onDeleteExpen
             <p className="text-[11px] text-cargo-muted uppercase tracking-wider font-medium">Load Details</p>
             <p className="text-sm text-cargo-text font-semibold mt-1.5">{loadSummary || 'N/A'}</p>
             <p className="text-xs text-cargo-muted mt-1">{trip.load_live_location || 'No load location'}</p>
-            <MapLink coordinates={trip.load_coordinates} />
           </div>
-          <InlineImagePreview src={trip.load_photo} alt="Load photo" />
+          <RightSideStack
+            image={<InlineImagePreview src={trip.load_photo} alt="Load photo" />}
+            mapCoordinates={trip.load_coordinates}
+          />
         </div>
         <div className="rounded-lg border border-cargo-border bg-cargo-dark/20 p-3">
           <p className="text-[11px] text-cargo-muted uppercase tracking-wider font-medium">Expected Freight</p>

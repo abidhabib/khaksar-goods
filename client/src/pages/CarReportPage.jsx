@@ -31,18 +31,13 @@ import { buildGoogleMapsUrl } from '../utils/maps';
 
 const formatCurrency = (value) => `Rs ${Number(value || 0).toLocaleString()}`;
 
-const formatDate = (value, pattern = 'PPP p') => {
-  if (!value) {
-    return 'N/A';
-  }
-
+const formatDate = (value, pattern = 'PP p') => {
+  if (!value) return 'N/A';
   const date = new Date(value);
-  if (Number.isNaN(date.getTime())) {
-    return 'N/A';
-  }
-
+  if (Number.isNaN(date.getTime())) return 'N/A';
   return format(date, pattern);
 };
+
 const formatAverage = (value) => {
   const numericValue = Number(value || 0);
   return numericValue > 0 ? `${numericValue.toFixed(2)} km/L` : 'N/A';
@@ -50,17 +45,14 @@ const formatAverage = (value) => {
 
 const formatVariancePercent = (value) => {
   const numericValue = Number(value);
-  if (!Number.isFinite(numericValue)) {
-    return 'N/A';
-  }
-
+  if (!Number.isFinite(numericValue)) return 'N/A';
   return `${numericValue > 0 ? '+' : ''}${numericValue.toFixed(2)}%`;
 };
 
 const getVarianceTone = (direction) => {
-  if (direction === 'up') return 'text-cargo-success';
-  if (direction === 'down') return 'text-cargo-danger';
-  return 'text-cargo-muted';
+  if (direction === 'up') return 'text-emerald-400';
+  if (direction === 'down') return 'text-rose-400';
+  return 'text-slate-400';
 };
 
 const formatCategoryLabel = (value) =>
@@ -68,43 +60,34 @@ const formatCategoryLabel = (value) =>
     .replace(/_/g, ' ')
     .replace(/\b\w/g, (char) => char.toUpperCase());
 
-const sortExpensesByCategory = (expenses = [], orderedCategories = []) => [...expenses].sort((left, right) => {
-  const leftIndex = orderedCategories.indexOf(left.category);
-  const rightIndex = orderedCategories.indexOf(right.category);
+const sortExpensesByCategory = (expenses = [], orderedCategories = []) =>
+  [...expenses].sort((left, right) => {
+    const leftIndex = orderedCategories.indexOf(left.category);
+    const rightIndex = orderedCategories.indexOf(right.category);
+    if (leftIndex === -1 && rightIndex === -1) {
+      return String(left.category || '').localeCompare(String(right.category || ''));
+    }
+    if (leftIndex === -1) return 1;
+    if (rightIndex === -1) return -1;
+    if (leftIndex !== rightIndex) return leftIndex - rightIndex;
+    return (new Date(left.created_at).getTime() || 0) - (new Date(right.created_at).getTime() || 0);
+  });
 
-  if (leftIndex === -1 && rightIndex === -1) {
-    return String(left.category || '').localeCompare(String(right.category || ''));
-  }
-
-  if (leftIndex === -1) return 1;
-  if (rightIndex === -1) return -1;
-  if (leftIndex !== rightIndex) return leftIndex - rightIndex;
-
-  return (new Date(left.created_at).getTime() || 0) - (new Date(right.created_at).getTime() || 0);
-});
-
-const sortExpenseEntriesForDisplay = (expenses = [], imageKey) => [...expenses].sort((left, right) => {
-  const leftHasImage = Boolean(left[imageKey]);
-  const rightHasImage = Boolean(right[imageKey]);
-
-  if (leftHasImage !== rightHasImage) {
-    return leftHasImage ? -1 : 1;
-  }
-
-  return (new Date(left.created_at).getTime() || 0) - (new Date(right.created_at).getTime() || 0);
-});
+const sortExpenseEntriesForDisplay = (expenses = [], imageKey) =>
+  [...expenses].sort((left, right) => {
+    const leftHasImage = Boolean(left[imageKey]);
+    const rightHasImage = Boolean(right[imageKey]);
+    if (leftHasImage !== rightHasImage) return leftHasImage ? -1 : 1;
+    return (new Date(left.created_at).getTime() || 0) - (new Date(right.created_at).getTime() || 0);
+  });
 
 const groupExpensesByCategory = (expenses = [], orderedCategories = [], imageKey) => {
   const grouped = new Map();
-
   sortExpensesByCategory(expenses, orderedCategories).forEach((expense) => {
     const key = expense.category || 'other';
-    if (!grouped.has(key)) {
-      grouped.set(key, []);
-    }
+    if (!grouped.has(key)) grouped.set(key, []);
     grouped.get(key).push(expense);
   });
-
   return Array.from(grouped.entries()).map(([category, items]) => ({
     category,
     items: sortExpenseEntriesForDisplay(items, imageKey),
@@ -156,7 +139,7 @@ const ImageModal = ({ src, alt, isOpen, onClose }) => {
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm animate-in fade-in duration-200"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/85 backdrop-blur-sm animate-in fade-in duration-200"
       onClick={onClose}
     >
       <div
@@ -165,9 +148,9 @@ const ImageModal = ({ src, alt, isOpen, onClose }) => {
       >
         <button
           onClick={onClose}
-          className="absolute -top-12 right-0 p-2 rounded-full bg-white/10 hover:bg-white/20 text-white transition-colors"
+          className="absolute -top-10 right-0 p-1.5 rounded-full bg-white/10 hover:bg-white/20 text-white transition-colors"
         >
-          <X className="w-5 h-5" />
+          <X className="w-4 h-4" />
         </button>
         <img
           src={src}
@@ -175,7 +158,7 @@ const ImageModal = ({ src, alt, isOpen, onClose }) => {
           className="block max-w-full max-h-[90vh] object-contain object-center rounded-lg shadow-2xl border border-white/10"
         />
         {alt && (
-          <p className="absolute bottom-0 left-0 right-0 bg-black/60 text-white text-sm px-4 py-2 rounded-b-lg backdrop-blur-sm">
+          <p className="absolute bottom-0 left-0 right-0 bg-black/60 text-white text-xs px-4 py-2 rounded-b-lg backdrop-blur-sm">
             {alt}
           </p>
         )}
@@ -190,7 +173,7 @@ const ClickableImage = ({ src, alt, className = '' }) => {
 
   if (!src) {
     return (
-      <div className={`rounded-lg border border-dashed border-cargo-border flex items-center justify-center text-xs text-cargo-muted bg-cargo-dark/20 ${className}`}>
+      <div className={`rounded-md border border-dashed border-slate-600 flex items-center justify-center text-[11px] text-slate-500 bg-slate-800/30 ${className}`}>
         No image
       </div>
     );
@@ -199,7 +182,7 @@ const ClickableImage = ({ src, alt, className = '' }) => {
   return (
     <>
       <div
-        className={`relative group cursor-pointer overflow-hidden rounded-lg border border-cargo-border ${className}`}
+        className={`relative group cursor-pointer overflow-hidden rounded-md border border-slate-600 ${className}`}
         onClick={() => setIsOpen(true)}
       >
         <img
@@ -208,7 +191,7 @@ const ClickableImage = ({ src, alt, className = '' }) => {
           className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
         />
         <div className="absolute inset-0 bg-black/0 group-hover:bg-black/30 transition-colors duration-200 flex items-center justify-center">
-          <ZoomIn className="w-6 h-6 text-white opacity-0 group-hover:opacity-100 transition-opacity duration-200 drop-shadow-lg" />
+          <ZoomIn className="w-5 h-5 text-white opacity-0 group-hover:opacity-100 transition-opacity duration-200 drop-shadow-lg" />
         </div>
       </div>
       <ImageModal src={src} alt={alt} isOpen={isOpen} onClose={() => setIsOpen(false)} />
@@ -216,7 +199,7 @@ const ClickableImage = ({ src, alt, className = '' }) => {
   );
 };
 
-const InlineImagePreview = ({ src, alt, className = 'h-16 w-16' }) => (
+const InlineImagePreview = ({ src, alt, className = 'h-14 w-14' }) => (
   <div className="shrink-0">
     <ClickableImage src={src} alt={alt} className={className} />
   </div>
@@ -224,16 +207,14 @@ const InlineImagePreview = ({ src, alt, className = 'h-16 w-16' }) => (
 
 const MapLink = ({ coordinates, label = 'Open Map' }) => {
   const href = buildGoogleMapsUrl(coordinates);
-  if (!href) {
-    return null;
-  }
+  if (!href) return null;
 
   return (
     <a
       href={href}
       target="_blank"
       rel="noreferrer"
-      className="inline-flex items-center gap-1 text-xs text-primary-300 hover:text-primary-200 mt-2"
+      className="inline-flex items-center gap-1 text-[11px] text-sky-400 hover:text-sky-300 transition-colors"
     >
       <ExternalLink className="w-3 h-3" />
       {label}
@@ -241,86 +222,116 @@ const MapLink = ({ coordinates, label = 'Open Map' }) => {
   );
 };
 
+/* ─── Action Buttons ─── */
+const ActionBtn = ({ onClick, icon: Icon, label, variant = 'default' }) => {
+  const styles = {
+    default: 'bg-sky-500/10 text-sky-400 hover:bg-sky-500/20',
+    danger: 'bg-rose-500/10 text-rose-400 hover:bg-rose-500/20',
+  };
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={`inline-flex items-center gap-1 rounded-md px-2 py-1 text-[11px] font-medium transition-colors ${styles[variant]}`}
+    >
+      <Icon className="w-3 h-3" />
+      {label}
+    </button>
+  );
+};
+
 const ExpenseBreakdown = ({ trip, onEditExpense, onAddExpense, onDeleteExpense }) => {
   const biltyCommissionAmount = Number(trip.bilty_commission_amount) || 0;
-  const hasStoredBiltyCommissionExpense = (trip.expenses || []).some((expense) => expense.category === 'bilty_commission');
-  const expenses = sortExpensesByCategory([
-    ...(trip.expenses || []),
-    ...(!hasStoredBiltyCommissionExpense && biltyCommissionAmount > 0 ? [{
-      id: `bilty-${trip.id}`,
-      category: 'bilty_commission',
-      amount: biltyCommissionAmount,
-      created_at: trip.ended_at || trip.started_at,
-      location: null,
-      liters: null,
-      receipt_image: trip.bilty_slip_image || null,
-    }] : []),
-  ], tripExpenseCategories);
+  const hasStoredBiltyCommissionExpense = (trip.expenses || []).some(
+    (expense) => expense.category === 'bilty_commission'
+  );
+  const expenses = sortExpensesByCategory(
+    [
+      ...(trip.expenses || []),
+      ...(!hasStoredBiltyCommissionExpense && biltyCommissionAmount > 0
+        ? [
+            {
+              id: `bilty-${trip.id}`,
+              category: 'bilty_commission',
+              amount: biltyCommissionAmount,
+              created_at: trip.ended_at || trip.started_at,
+              location: null,
+              liters: null,
+              receipt_image: trip.bilty_slip_image || null,
+            },
+          ]
+        : []),
+    ],
+    tripExpenseCategories
+  );
   const totalExpenses = Number(trip.trip_expenses_total ?? trip.total_expenses ?? 0);
   const groupedExpenses = groupExpensesByCategory(expenses, tripExpenseCategories, 'receipt_image');
 
   return (
-    <div className="rounded-xl border border-cargo-border bg-cargo-dark/30 p-4 space-y-4">
+    <div className="rounded-lg border border-slate-700 bg-slate-800/20 p-3 space-y-3">
       <div className="flex items-center justify-between">
-        <p className="text-sm text-cargo-text font-semibold flex items-center gap-2">
-          <Receipt className="w-4 h-4 text-cargo-muted" />
+        <p className="text-sm text-slate-200 font-semibold flex items-center gap-2">
+          <Receipt className="w-4 h-4 text-slate-400" />
           Expense Breakdown
         </p>
-        <div className="flex items-center gap-3">
-          <p className="text-sm text-cargo-muted font-medium">Total: {formatCurrency(totalExpenses)}</p>
-          <button type="button" onClick={() => onAddExpense(trip)} className="inline-flex items-center gap-1 rounded-lg bg-primary-500/15 px-3 py-2 text-primary-300">
-            <Plus className="w-4 h-4" />
-            Add Expense
+        <div className="flex items-center gap-2">
+          <p className="text-xs text-slate-400 font-medium">{formatCurrency(totalExpenses)}</p>
+          <button
+            type="button"
+            onClick={() => onAddExpense(trip)}
+            className="inline-flex items-center gap-1 rounded-md bg-sky-500/10 px-2 py-1 text-xs text-sky-400 hover:bg-sky-500/20 transition-colors"
+          >
+            <Plus className="w-3.5 h-3.5" />
+            Add
           </button>
         </div>
       </div>
 
       {groupedExpenses.length ? (
-        <div className="space-y-4">
+        <div className="space-y-3">
           {groupedExpenses.map((group) => (
-            <div key={group.category} className="rounded-lg border border-cargo-border/60 bg-cargo-card/30 p-4 space-y-3">
+            <div key={group.category} className="rounded-md border border-slate-700/60 bg-slate-800/30 p-2 space-y-2">
               <div className="flex items-center justify-between gap-3">
                 <div className="flex items-center gap-2">
-                  <div className="w-2 h-2 rounded-full bg-cargo-accent/60" />
-                  <p className="text-sm text-cargo-text font-semibold">{formatCategoryLabel(group.category)}</p>
+                  <div className="w-1.5 h-1.5 rounded-full bg-sky-400/60" />
+                  <p className="text-xs text-slate-200 font-semibold">{formatCategoryLabel(group.category)}</p>
                 </div>
-                <p className="text-sm text-cargo-muted">Total: {formatCurrency(group.total)}</p>
+                <p className="text-xs text-slate-400">{formatCurrency(group.total)}</p>
               </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
                 {group.items.map((expense) => (
                   <div
                     key={expense.id}
-                    className="rounded-lg bg-cargo-card/40 p-3 hover:border-cargo-border transition-colors"
+                    className="rounded-md bg-slate-800/50 p-2.5 border border-slate-700/40 hover:border-slate-600 transition-colors"
                   >
-                    {expense.receipt_image ? (
-                      <div className="mb-3">
-                        <ClickableImage
-                          src={expense.receipt_image}
-                          alt={`${expense.category} receipt`}
-                          className="h-20"
-                        />
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-center justify-between gap-2">
+                          <p className="text-sm text-slate-200 font-semibold">{formatCurrency(expense.amount)}</p>
+                          <div className="flex items-center gap-1">
+                            <ActionBtn onClick={() => onEditExpense(trip, expense)} icon={Pencil} label="Edit" />
+                            <ActionBtn onClick={() => onDeleteExpense(trip, expense)} icon={Trash2} label="Del" variant="danger" />
+                          </div>
+                        </div>
+                        <div className="mt-1.5 flex flex-wrap gap-x-3 gap-y-0.5 text-[11px] text-slate-400">
+                          <span>{formatDate(expense.created_at)}</span>
+                          {expense.liters ? <span>{Number(expense.liters).toLocaleString()} L</span> : null}
+                          {expense.location ? <span>{expense.location}</span> : null}
+                        </div>
                       </div>
-                    ) : null}
-                    <div className="flex items-center justify-between gap-3">
-                      <p className="text-sm text-cargo-text font-semibold">{formatCurrency(expense.amount)}</p>
-                      <div className="flex items-center gap-2">
-                        <button type="button" onClick={() => onEditExpense(trip, expense)} className="inline-flex items-center gap-1 rounded-lg bg-primary-500/15 px-2.5 py-1.5 text-xs text-primary-300">
-                          <Pencil className="w-3.5 h-3.5" />
-                          Edit
-                        </button>
-                        <button type="button" onClick={() => onDeleteExpense(trip, expense)} className="inline-flex items-center gap-1 rounded-lg bg-cargo-danger/15 px-2.5 py-1.5 text-xs text-cargo-danger">
-                          <Trash2 className="w-3.5 h-3.5" />
-                          Delete
-                        </button>
+
+                      <div className="shrink-0 flex flex-col items-center gap-1">
+                        {expense.receipt_image ? (
+                          <ClickableImage
+                            src={expense.receipt_image}
+                            alt={`${expense.category} receipt`}
+                            className="h-12 w-12"
+                          />
+                        ) : null}
+                        <MapLink coordinates={expense.coordinates} />
                       </div>
                     </div>
-                    <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs text-cargo-muted">
-                      <span>{formatDate(expense.created_at)}</span>
-                      {expense.liters ? <span>Liters: {Number(expense.liters).toLocaleString()}</span> : null}
-                      {expense.location ? <span>Location: {expense.location}</span> : null}
-                    </div>
-                    <MapLink coordinates={expense.coordinates} />
                   </div>
                 ))}
               </div>
@@ -328,88 +339,100 @@ const ExpenseBreakdown = ({ trip, onEditExpense, onAddExpense, onDeleteExpense }
           ))}
         </div>
       ) : (
-        <p className="text-sm text-cargo-muted">No expense entries on this trip.</p>
+        <p className="text-xs text-slate-500">No expense entries on this trip.</p>
       )}
     </div>
   );
 };
 
-
-
-const PendingNextTripExpenseBreakdown = ({ trip, onEditDailyExpense, onAddDailyExpense, onDeleteDailyExpense }) => {
-  const expenses = sortExpensesByCategory(trip.pending_next_trip_daily_expenses || [], dailyExpenseCategories);
+const PendingNextTripExpenseBreakdown = ({
+  trip,
+  onEditDailyExpense,
+  onAddDailyExpense,
+  onDeleteDailyExpense,
+}) => {
+  const expenses = sortExpensesByCategory(
+    trip.pending_next_trip_daily_expenses || [],
+    dailyExpenseCategories
+  );
   const totalExpenses = Number(trip.pending_next_trip_expenses_total ?? 0);
   const groupedExpenses = groupExpensesByCategory(expenses, dailyExpenseCategories, 'expense_image');
+  const nextTripTag = trip.pending_next_trip_target_trip_id
+    ? `Trip #${trip.pending_next_trip_target_trip_id}`
+    : null;
 
-  if (!groupedExpenses.length) {
-    return null;
-  }
+  if (!groupedExpenses.length) return null;
 
   return (
-    <div className="rounded-xl border border-cargo-border bg-cargo-dark/30 p-4 space-y-4">
+    <div className="rounded-lg border border-slate-700 bg-slate-800/20 p-3 space-y-3">
       <div className="flex items-center justify-between">
-        <p className="text-sm text-cargo-text font-semibold flex items-center gap-2">
-          <Receipt className="w-4 h-4 text-cargo-accent" />
-          Waiting For Next Trip Expenses
-        </p>
-        <div className="flex items-center gap-3">
-          <p className="text-sm text-cargo-muted font-medium">Total: {formatCurrency(totalExpenses)}</p>
-          <button type="button" onClick={() => onAddDailyExpense(trip)} className="inline-flex items-center gap-1 rounded-lg bg-primary-500/15 px-3 py-2 text-primary-300">
-            <Plus className="w-4 h-4" />
-            Add Expense
+        <div className="flex items-center gap-2 flex-wrap">
+          <p className="text-sm text-slate-200 font-semibold flex items-center gap-2">
+            <Receipt className="w-4 h-4 text-sky-400" />
+            Waiting For Next Trip
+          </p>
+          {nextTripTag ? (
+            <span className="text-[16px] px-1.5 py-0.5 rounded-full bg-sky-600/10 text-sky-300 border border-sky-600/20">
+              {nextTripTag}
+            </span>
+          ) : null}
+        </div>
+        <div className="flex items-center gap-2">
+          <p className="text-xs text-slate-400 font-medium">{formatCurrency(totalExpenses)}</p>
+          <button
+            type="button"
+            onClick={() => onAddDailyExpense(trip)}
+            className="inline-flex items-center gap-1 rounded-md bg-sky-500/10 px-2 py-1 text-xs text-sky-400 hover:bg-sky-500/20 transition-colors"
+          >
+            <Plus className="w-3.5 h-3.5" />
+            Add
           </button>
         </div>
       </div>
 
-
-
-      <div className="space-y-4">
+      <div className="space-y-3">
         {groupedExpenses.map((group) => (
-          <div key={group.category} className="rounded-lg border border-cargo-border/60 bg-cargo-card/30 p-4 space-y-3">
+          <div key={group.category} className="rounded-md border border-slate-700/60 bg-slate-800/30 p-2 space-y-2">
             <div className="flex items-center justify-between gap-3">
               <div className="flex items-center gap-2">
-                <div className="w-2 h-2 rounded-full bg-cargo-accent/60" />
-                <p className="text-sm text-cargo-text font-semibold">{formatCategoryLabel(group.category)}</p>
+                <div className="w-1.5 h-1.5 rounded-full bg-sky-400/60" />
+                <p className="text-xs text-slate-200 font-semibold">{formatCategoryLabel(group.category)}</p>
               </div>
-              <p className="text-sm text-cargo-muted">Total: {formatCurrency(group.total)}</p>
+              <p className="text-xs text-slate-400">{formatCurrency(group.total)}</p>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
               {group.items.map((expense) => (
                 <div
                   key={`pending-${expense.id}`}
-                  className="rounded-lg bg-cargo-card/40 hover:border-cargo-border transition-colors"
+                  className="rounded-md bg-slate-800/50 border border-slate-700/40 hover:border-slate-600 transition-colors p-2"
                 >
-                  {expense.expense_image ? (
-                    <div className="mb-3">
-                      <ClickableImage
-                        src={expense.expense_image}
-                        alt={`${expense.category} expense`}
-                        className="h-20"
-                      />
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center justify-between gap-2">
+                        <p className="text-sm text-slate-200 font-semibold">{formatCurrency(expense.amount)}</p>
+                        <div className="flex items-center gap-1">
+                          <ActionBtn onClick={() => onEditDailyExpense(trip, expense)} icon={Pencil} label="Edit" />
+                          <ActionBtn onClick={() => onDeleteDailyExpense(trip, expense)} icon={Trash2} label="Del" variant="danger" />
+                        </div>
+                      </div>
+                      <div className="mt-1.5 flex flex-wrap gap-x-3 gap-y-0.5 text-[11px] text-slate-400">
+                        <span>{formatDate(expense.created_at)}</span>
+                        {expense.expense_date ? <span>{formatDate(expense.expense_date, 'PP')}</span> : null}
+                        {expense.meter_reading ? <span>Meter: {Number(expense.meter_reading).toLocaleString()}</span> : null}
+                      </div>
                     </div>
-                  ) : null}
-                  <div className="flex items-center justify-between gap-3">
-                    <p className="text-sm text-cargo-text font-semibold">{formatCurrency(expense.amount)}</p>
-                    <div className="flex items-center gap-2">
-                      <button type="button" onClick={() => onEditDailyExpense(trip, expense)} className="inline-flex items-center gap-1 rounded-lg bg-primary-500/15 px-2.5 py-1.5 text-xs text-primary-300">
-                        <Pencil className="w-3.5 h-3.5" />
-                        Edit
-                      </button>
-                      <button type="button" onClick={() => onDeleteDailyExpense(trip, expense)} className="inline-flex items-center gap-1 rounded-lg bg-cargo-danger/15 px-2.5 py-1.5 text-xs text-cargo-danger">
-                        <Trash2 className="w-3.5 h-3.5" />
-                        Delete
-                      </button>
-                    </div>
+                    {expense.expense_image ? (
+                      <div className="shrink-0 flex flex-col items-center gap-1">
+                        <ClickableImage
+                          src={expense.expense_image}
+                          alt={`${expense.category} expense`}
+                          className="h-12 w-12"
+                        />
+                      </div>
+                    ) : null}
                   </div>
-                  <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs text-cargo-muted">
-                    <span>{formatDate(expense.created_at)}</span>
-                    {expense.expense_date ? <span>Expense Date: {formatDate(expense.expense_date, 'PPP')}</span> : null}
-                    {expense.meter_reading ? <span>Meter: {Number(expense.meter_reading).toLocaleString()}</span> : null}
-                  </div>
-                  {expense.note ? (
-                    <p className="mt-2 text-xs text-cargo-muted">{expense.note}</p>
-                  ) : null}
+                  {expense.note ? <p className="mt-1.5 text-[11px] text-slate-400">{expense.note}</p> : null}
                 </div>
               ))}
             </div>
@@ -422,63 +445,97 @@ const PendingNextTripExpenseBreakdown = ({ trip, onEditDailyExpense, onAddDailyE
 
 const StatBadge = ({ children, variant = 'default' }) => {
   const variants = {
-    ongoing: 'bg-cargo-accent/15 text-cargo-accent border-cargo-accent/20',
-    completed: 'bg-cargo-success/15 text-cargo-success border-cargo-success/20',
-    default: 'bg-cargo-dark/40 text-cargo-muted border-cargo-border/60',
+    ongoing: 'bg-sky-500/10 text-sky-400 border-sky-500/20',
+    completed: 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20',
+    cancelled: 'bg-rose-500/10 text-rose-400 border-rose-500/20',
+    default: 'bg-slate-700/40 text-slate-400 border-slate-600/60',
   };
 
   return (
-    <span className={`inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold border ${variants[variant]}`}>
+    <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-[11px] font-semibold border ${variants[variant]}`}>
       {children}
     </span>
   );
 };
 
-const TripCard = ({ trip, status = 'completed', onEditTrip, onEditExpense, onAddExpense, onDeleteExpense, onEditDailyExpense, onAddDailyExpense, onDeleteDailyExpense }) => {
+const TripCard = ({
+  trip,
+  status = 'completed',
+  onEditTrip,
+  onEditExpense,
+  onAddExpense,
+  onDeleteExpense,
+  onEditDailyExpense,
+  onAddDailyExpense,
+  onDeleteDailyExpense,
+}) => {
   const isOngoing = status === 'ongoing';
   const totalExpenses = Number(trip.total_expenses ?? 0);
   const net = Number(trip.net_income ?? (Number(trip.freight_charge || 0) - totalExpenses));
   const actualEndLocation = trip.end_location || trip.end_live_location;
-  const loadSummary = [trip.load_name, trip.load_weight].filter(Boolean).join(' • ');
-  const statusVariant = trip.status === 'completed' ? 'completed' : trip.status === 'cancelled' ? 'cancelled' : 'ongoing';
+  const loadSummary = [trip.load_name, trip.load_weight].filter(Boolean).join(' · ');
+  const statusVariant =
+    trip.status === 'completed' ? 'completed' : trip.status === 'cancelled' ? 'cancelled' : 'ongoing';
   const varianceTone = getVarianceTone(trip.freight_variance_direction);
 
   return (
-    <article className="rounded-xl   bg-cargo-card/50 p-3 space-y-5 hover:border-cargo-border/80 transition-all duration-200 shadow-sm">
-      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
-        <div className="flex items-start gap-3">
-          <div className={`mt-1 p-2 rounded-lg ${isOngoing ? 'bg-cargo-accent/10' : trip.status === 'cancelled' ? 'bg-cargo-danger/10' : 'bg-cargo-success/10'}`}>
-            <Route className={`w-4 h-4 ${isOngoing ? 'text-cargo-accent' : trip.status === 'cancelled' ? 'text-cargo-danger' : 'text-cargo-success'}`} />
+    <article className="rounded-lg border border-slate-700 bg-slate-800/40 p-3 space-y-3 hover:border-slate-600 transition-all duration-200">
+      {/* Header */}
+      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-2">
+        <div className="flex items-start gap-2.5">
+          <div
+            className={`mt-0.5 p-1.5 rounded-md ${
+              isOngoing
+                ? 'bg-sky-500/10'
+                : trip.status === 'cancelled'
+                ? 'bg-rose-500/10'
+                : 'bg-emerald-500/10'
+            }`}
+          >
+            <Route
+              className={`w-4 h-4 ${
+                isOngoing
+                  ? 'text-sky-400'
+                  : trip.status === 'cancelled'
+                  ? 'text-rose-400'
+                  : 'text-emerald-400'
+              }`}
+            />
           </div>
           <div>
-            <p className="text-cargo-text font-bold text-base">
-              {trip.from_location} <span className="text-cargo-muted font-normal mx-1">→</span> {trip.to_location}
+            <p className=" font-bold text-base  text-amber-600">
+              {trip.from_location} <span className="text-slate-500 font-normal mx-1">→</span> {trip.to_location}
             </p>
-            <div className="mt-1 flex flex-wrap items-center gap-3 text-xs text-cargo-muted">
+            <div className="mt-0.5 flex flex-wrap items-center gap-2 text-[11px] text-slate-400">
               <span className="flex items-center gap-1">
                 <User className="w-3 h-3" />
                 {trip.driver_name || 'N/A'}
               </span>
               <span className="flex items-center gap-1">
                 <Car className="w-3 h-3" />
-                Car: {trip.car_number || 'N/A'}
+                {trip.car_number || 'N/A'}
               </span>
             </div>
           </div>
         </div>
-        <StatBadge variant={statusVariant}>
-          {String(trip.status || 'unknown').charAt(0).toUpperCase() + String(trip.status || 'unknown').slice(1)}
-        </StatBadge>
+        <div className="flex items-center gap-2">
+          <StatBadge variant={statusVariant}>
+            {String(trip.status || 'unknown').charAt(0).toUpperCase() +
+              String(trip.status || 'unknown').slice(1)}
+          </StatBadge>
+          <button
+            type="button"
+            onClick={() => onEditTrip(trip)}
+            className="inline-flex items-center gap-1 rounded-md bg-sky-500/10 px-2 py-1 text-[11px] text-sky-400 hover:bg-sky-500/20 transition-colors"
+          >
+            <Pencil className="w-3 h-3" />
+            Edit
+          </button>
+        </div>
       </div>
 
-      <div className="flex justify-end">
-        <button type="button" onClick={() => onEditTrip(trip)} className="inline-flex items-center gap-2 rounded-lg bg-primary-500/15 px-3 py-2 text-sm text-primary-300">
-          <Pencil className="w-4 h-4" />
-          Edit Trip
-        </button>
-      </div>
-
-      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
+      {/* Stats Grid */}
+      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-2">
         {[
           { label: 'Started', value: formatDate(trip.started_at), icon: Calendar },
           { label: 'Ended', value: isOngoing ? 'In progress' : formatDate(trip.ended_at), icon: Clock3 },
@@ -487,118 +544,128 @@ const TripCard = ({ trip, status = 'completed', onEditTrip, onEditExpense, onAdd
             value: formatCurrency(trip.freight_charge),
             subvalue: `↕ ${formatVariancePercent(trip.freight_variance_percentage)}`,
             icon: Wallet,
-            tone: varianceTone
+            tone: varianceTone,
           },
           { label: 'Expenses', value: formatCurrency(totalExpenses), icon: TrendingDown },
-          { label: 'Net income', value: formatCurrency(net), icon: TrendingUp, highlight: true },
+          { label: 'Net', value: formatCurrency(net), icon: TrendingUp, highlight: true },
           {
             label: 'Distance',
-            value: `${Math.max((Number(trip.end_meter_reading) || 0) - (Number(trip.start_meter_reading) || 0), 0).toLocaleString()} km`,
+            value: `${Math.max(
+              (Number(trip.end_meter_reading) || 0) - (Number(trip.start_meter_reading) || 0),
+              0
+            ).toLocaleString()} km`,
             subvalue: `Avg: ${formatAverage(trip.trip_average_km_per_liter)}`,
-            icon: Activity
+            icon: Activity,
           },
         ].map((item) => (
           <div
             key={item.label}
-            className={`rounded-lg border p-3 ${item.highlight ? 'border-cargo-success/30 bg-cargo-success/5' : 'border-cargo-border bg-cargo-dark/20'}`}
+            className={`rounded-md border p-2 ${
+              item.highlight
+                ? 'border-emerald-500/20 bg-emerald-500/5'
+                : 'border-slate-700 bg-slate-800/30'
+            }`}
           >
-            <p className="text-xs text-cargo-muted font-medium flex items-center gap-1">
+            <p className="text-[11px] text-slate-400 font-medium flex items-center gap-1">
               <item.icon className="w-3 h-3" />
               {item.label}
             </p>
-            <p className={`text-sm font-semibold mt-1.5 ${item.highlight ? 'text-cargo-success' : item.tone || 'text-cargo-text'}`}>
+            <p
+              className={`text-sm font-semibold mt-1 ${
+                item.highlight ? 'text-emerald-400' : item.tone || 'text-slate-200'
+              }`}
+            >
               {item.value}
             </p>
             {item.subvalue ? (
-              <p className={`text-xs mt-1 ${item.tone || 'text-cargo-muted'}`}>
-                {item.subvalue}
-              </p>
+              <p className={`text-[11px] mt-0.5 ${item.tone || 'text-slate-500'}`}>{item.subvalue}</p>
             ) : null}
           </div>
         ))}
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
-        <div className="rounded-lg border border-cargo-border bg-cargo-dark/20 p-3 flex items-start justify-between gap-3">
+      {/* Meter & Location Grid */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-2">
+        <div className="rounded-md border border-slate-700 bg-slate-800/30 p-2.5 flex items-start justify-between gap-2">
           <div className="min-w-0">
-            <p className="text-[11px] text-cargo-muted uppercase tracking-wider font-medium flex items-center gap-1">
-              <Gauge className="w-3 h-3" />Start Meter
+            <p className="text-[10px] text-slate-500 uppercase tracking-wider font-medium flex items-center gap-1">
+              <Gauge className="w-3 h-3" />
+              Start Meter
             </p>
-            <p className="text-sm text-cargo-text font-semibold mt-1.5">{(trip.start_meter_reading || 0).toLocaleString()}</p>
-            <p className="text-xs text-cargo-muted mt-1">{trip.start_live_location || trip.from_location || 'N/A'}</p>
+            <p className="text-sm text-slate-200 font-semibold mt-1">{(trip.start_meter_reading || 0).toLocaleString()}</p>
+            <p className="text-[11px] text-slate-400 mt-0.5">{trip.start_live_location || trip.from_location || 'N/A'}</p>
+          </div>
+          <div className="shrink-0 flex flex-col items-center gap-1">
+            <InlineImagePreview src={trip.start_meter_image} alt="Start meter" className="h-12 w-12" />
             <MapLink coordinates={trip.start_coordinates} />
           </div>
-          <InlineImagePreview src={trip.start_meter_image} alt="Start meter" />
         </div>
-        <div className="rounded-lg border border-cargo-border bg-cargo-dark/20 p-3 flex items-start justify-between gap-3">
+
+        <div className="rounded-md border border-slate-700 bg-slate-800/30 p-2.5 flex items-start justify-between gap-2">
           <div className="min-w-0">
-            <p className="text-[11px] text-cargo-muted uppercase tracking-wider font-medium flex items-center gap-1">
-              <Gauge className="w-3 h-3" />End Meter
+            <p className="text-[10px] text-slate-500 uppercase tracking-wider font-medium flex items-center gap-1">
+              <Gauge className="w-3 h-3" />
+              End Meter
             </p>
-            <p className="text-sm text-cargo-text font-semibold mt-1.5">
+            <p className="text-sm text-slate-200 font-semibold mt-1">
               {trip.end_meter_reading ? trip.end_meter_reading.toLocaleString() : isOngoing ? 'Pending' : 'N/A'}
             </p>
-            <p className="text-xs text-cargo-muted mt-1">{actualEndLocation || (isOngoing ? 'In progress' : 'N/A')}</p>
+            <p className="text-[11px] text-slate-400 mt-0.5">{actualEndLocation || (isOngoing ? 'In progress' : 'N/A')}</p>
+          </div>
+          <div className="shrink-0 flex flex-col items-center gap-1">
+            <InlineImagePreview src={trip.end_meter_image} alt="End meter" className="h-12 w-12" />
             <MapLink coordinates={trip.end_coordinates} />
           </div>
-          <InlineImagePreview src={trip.end_meter_image} alt="End meter" />
         </div>
-        <div className="rounded-lg border border-cargo-border bg-cargo-dark/20 p-3">
-          <p className="text-[11px] text-cargo-muted uppercase tracking-wider font-medium flex items-center gap-1">
-            <MapPin className="w-3 h-3" />Live Start
-          </p>
-          <p className="text-sm text-cargo-text font-semibold mt-1.5">{trip.start_live_location || trip.from_location || 'N/A'}</p>
-        </div>
-        <div className="rounded-lg border border-cargo-border bg-cargo-dark/20 p-3">
-          <p className="text-[11px] text-cargo-muted uppercase tracking-wider font-medium flex items-center gap-1">
-            <MapPin className="w-3 h-3" />Actual End
-          </p>
-          <p className="text-sm text-cargo-text font-semibold mt-1.5">{actualEndLocation || (isOngoing ? 'In progress' : 'N/A')}</p>
-        </div>
-      </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
-        <div className="rounded-lg border border-cargo-border bg-cargo-dark/20 p-3 flex items-start justify-between gap-3">
+       <div className="rounded-md border border-slate-700 bg-slate-800/30 p-2.5 flex items-start justify-between gap-2">
           <div className="min-w-0">
-            <p className="text-[11px] text-cargo-muted uppercase tracking-wider font-medium">Load Details</p>
-            <p className="text-sm text-cargo-text font-semibold mt-1.5">{loadSummary || 'N/A'}</p>
-            <p className="text-xs text-cargo-muted mt-1">{trip.load_live_location || 'No load location'}</p>
+            <p className="text-[10px] text-slate-500 uppercase tracking-wider font-medium">Load Details</p>
+            <p className="text-sm text-slate-200 font-semibold mt-1">{loadSummary || 'N/A'}</p>
+            <p className="text-[11px] text-slate-400 mt-0.5">{trip.load_live_location || 'No load location'}</p>
             <MapLink coordinates={trip.load_coordinates} />
           </div>
-          <InlineImagePreview src={trip.load_photo} alt="Load photo" />
+          <InlineImagePreview src={trip.load_photo} alt="Load photo" className="h-12 w-12" />
         </div>
-        <div className="rounded-lg border border-cargo-border bg-cargo-dark/20 p-3">
-          <p className="text-[11px] text-cargo-muted uppercase tracking-wider font-medium">Expected Freight</p>
-          <p className="text-sm text-cargo-text font-semibold mt-1.5">{trip.expected_freight_charge ? formatCurrency(trip.expected_freight_charge) : 'N/A'}</p>
+       
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
+        
+
+        <div className="rounded-md border border-slate-700 bg-slate-800/30 p-2.5">
+          <p className="text-[10px] text-slate-500 uppercase tracking-wider font-medium">Expected Freight</p>
+          <p className="text-sm text-slate-200 font-semibold mt-1">
+            {trip.expected_freight_charge ? formatCurrency(trip.expected_freight_charge) : 'N/A'}
+          </p>
         </div>
-        <div className="rounded-lg border border-cargo-border bg-cargo-dark/20 p-3">
-          <p className="text-[11px] text-cargo-muted uppercase tracking-wider font-medium">Variance Amount</p>
-          <p className={`text-sm font-semibold mt-1.5 ${varianceTone}`}>{trip.freight_variance_amount !== null && trip.freight_variance_amount !== undefined ? formatCurrency(trip.freight_variance_amount) : 'N/A'}</p>
+
+        <div className="rounded-md border border-slate-700 bg-slate-800/30 p-2.5">
+          <p className="text-[10px] text-slate-500 uppercase tracking-wider font-medium">Variance</p>
+          <p className={`text-sm font-semibold mt-1 ${varianceTone}`}>
+            {trip.freight_variance_amount !== null && trip.freight_variance_amount !== undefined
+              ? formatCurrency(trip.freight_variance_amount)
+              : 'N/A'}
+          </p>
         </div>
       </div>
 
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-        {[
-          { label: 'Diesel Liters', value: `${Number(trip.total_diesel_liters || 0).toLocaleString()} L` },
-          { label: 'Phone', value: trip.driver_phone || 'N/A' },
-          { label: 'License', value: trip.license_number || 'N/A' },
-        ].map((item) => (
-          <div key={item.label} className="rounded-lg border border-cargo-border bg-cargo-dark/20 p-3">
-            <p className="text-[11px] text-cargo-muted uppercase tracking-wider font-medium">{item.label}</p>
-            <p className="text-sm text-cargo-text font-semibold mt-1.5">{item.value}</p>
-          </div>
-        ))}
-      </div>
+      
 
-      <ExpenseBreakdown trip={trip} onEditExpense={onEditExpense} onAddExpense={onAddExpense} onDeleteExpense={onDeleteExpense} />
+      <ExpenseBreakdown
+        trip={trip}
+        onEditExpense={onEditExpense}
+        onAddExpense={onAddExpense}
+        onDeleteExpense={onDeleteExpense}
+      />
 
       {trip.notes ? (
-        <div className="rounded-lg border border-cargo-border bg-cargo-dark/20 p-4">
-          <p className="text-[11px] text-cargo-muted uppercase tracking-wider font-medium flex items-center gap-1 mb-2">
+        <div className="rounded-md border border-slate-700 bg-slate-800/30 p-3">
+          <p className="text-[10px] text-slate-500 uppercase tracking-wider font-medium flex items-center gap-1 mb-1.5">
             <FileText className="w-3 h-3" />
             Notes
           </p>
-          <p className="text-sm text-cargo-text whitespace-pre-wrap leading-relaxed">{trip.notes}</p>
+          <p className="text-sm text-slate-300 whitespace-pre-wrap leading-relaxed">{trip.notes}</p>
         </div>
       ) : null}
     </article>
@@ -609,14 +676,18 @@ const SummaryCard = ({ title, value, icon, highlight = false }) => {
   const IconComponent = icon;
 
   return (
-    <div className={`card group hover:border-cargo-border/80 transition-all duration-200 ${highlight ? 'border-cargo-success/30' : ''}`}>
+    <div
+      className={`rounded-lg border p-3 hover:border-slate-600 transition-all duration-200 ${
+        highlight ? 'border-emerald-500/20 bg-emerald-500/5' : 'border-slate-700 bg-slate-800/40'
+      }`}
+    >
       <div className="flex items-start justify-between">
         <div>
-          <p className="text-sm text-cargo-muted font-medium">{title}</p>
-          <p className={`text-2xl font-bold mt-2 ${highlight ? 'text-cargo-success' : 'text-cargo-text'}`}>{value}</p>
+          <p className="text-xs text-slate-400 font-medium">{title}</p>
+          <p className={`text-xl font-bold mt-1.5 ${highlight ? 'text-emerald-400' : 'text-slate-200'}`}>{value}</p>
         </div>
-        <div className={`p-2.5 rounded-lg ${highlight ? 'bg-cargo-success/10' : 'bg-cargo-dark/30'}`}>
-          <IconComponent className={`w-5 h-5 ${highlight ? 'text-cargo-success' : 'text-cargo-muted'}`} />
+        <div className={`p-2 rounded-md ${highlight ? 'bg-emerald-500/10' : 'bg-slate-700/30'}`}>
+          <IconComponent className={`w-4 h-4 ${highlight ? 'text-emerald-400' : 'text-slate-400'}`} />
         </div>
       </div>
     </div>
@@ -642,7 +713,13 @@ const CarReportPage = () => {
     to_location: '',
     notes: '',
   });
-  const [expenseModal, setExpenseModal] = useState({ isOpen: false, tripId: null, expenseId: null, type: 'trip', driverId: null });
+  const [expenseModal, setExpenseModal] = useState({
+    isOpen: false,
+    tripId: null,
+    expenseId: null,
+    type: 'trip',
+    driverId: null,
+  });
   const [expenseForm, setExpenseForm] = useState({
     category: 'diesel',
     amount: '',
@@ -655,41 +732,29 @@ const CarReportPage = () => {
   const [savingTrip, setSavingTrip] = useState(false);
   const [savingExpense, setSavingExpense] = useState(false);
 
-  const fetchReport = useCallback(async (activeFilters = filters) => {
-    const params = { period: activeFilters.period };
+  const fetchReport = useCallback(
+    async (activeFilters = filters) => {
+      const params = { period: activeFilters.period };
+      if (activeFilters.from_date) params.from_date = activeFilters.from_date;
+      if (activeFilters.to_date) params.to_date = activeFilters.to_date;
 
-    if (activeFilters.from_date) {
-      params.from_date = activeFilters.from_date;
-    }
-
-    if (activeFilters.to_date) {
-      params.to_date = activeFilters.to_date;
-    }
-
-    const result = await get(`/admin/cars/${id}/history`, { params });
-
-    if (result.success) {
-      setReportData(result.data);
-    } else {
-      alert(result.error);
-    }
-  }, [get, id, filters]);
+      const result = await get(`/admin/cars/${id}/history`, { params });
+      if (result.success) {
+        setReportData(result.data);
+      } else {
+        alert(result.error);
+      }
+    },
+    [get, id, filters]
+  );
 
   useEffect(() => {
     fetchReport({ period: 'all', from_date: '', to_date: '' });
   }, [id, fetchReport]);
 
   const trips = reportData?.trips || [];
-
-  const ongoingTrips = useMemo(
-    () => trips.filter((trip) => trip.status === 'ongoing'),
-    [trips]
-  );
-
-  const completedTrips = useMemo(
-    () => trips.filter((trip) => trip.status === 'completed'),
-    [trips]
-  );
+  const ongoingTrips = useMemo(() => trips.filter((trip) => trip.status === 'ongoing'), [trips]);
+  const completedTrips = useMemo(() => trips.filter((trip) => trip.status === 'completed'), [trips]);
 
   const openTripModal = (trip) => {
     setEditingTrip(trip);
@@ -703,9 +768,7 @@ const CarReportPage = () => {
     });
   };
 
-  const closeTripModal = () => {
-    setEditingTrip(null);
-  };
+  const closeTripModal = () => setEditingTrip(null);
 
   const handleTripSave = async (e) => {
     e.preventDefault();
@@ -713,18 +776,22 @@ const CarReportPage = () => {
     setSavingTrip(true);
     const result = await put(`/admin/trips/${editingTrip.id}`, tripForm);
     setSavingTrip(false);
-
     if (!result.success) {
       alert(result.error);
       return;
     }
-
     closeTripModal();
     fetchReport(filters);
   };
 
   const openExpenseAddModal = (trip) => {
-    setExpenseModal({ isOpen: true, tripId: trip.id, expenseId: null, type: 'trip', driverId: trip.driver_id ?? null });
+    setExpenseModal({
+      isOpen: true,
+      tripId: trip.id,
+      expenseId: null,
+      type: 'trip',
+      driverId: trip.driver_id ?? null,
+    });
     setExpenseForm({
       category: 'diesel',
       amount: '',
@@ -737,7 +804,13 @@ const CarReportPage = () => {
   };
 
   const openExpenseEditModal = (trip, expense) => {
-    setExpenseModal({ isOpen: true, tripId: trip.id, expenseId: expense.id, type: 'trip', driverId: trip.driver_id ?? null });
+    setExpenseModal({
+      isOpen: true,
+      tripId: trip.id,
+      expenseId: expense.id,
+      type: 'trip',
+      driverId: trip.driver_id ?? null,
+    });
     setExpenseForm({
       category: expense.category || 'diesel',
       amount: expense.amount ?? '',
@@ -750,7 +823,13 @@ const CarReportPage = () => {
   };
 
   const openDailyExpenseAddModal = (trip) => {
-    setExpenseModal({ isOpen: true, tripId: trip.id, expenseId: null, type: 'daily', driverId: trip.driver_id ?? null });
+    setExpenseModal({
+      isOpen: true,
+      tripId: trip.id,
+      expenseId: null,
+      type: 'daily',
+      driverId: trip.driver_id ?? null,
+    });
     setExpenseForm({
       category: 'food',
       amount: '',
@@ -763,7 +842,13 @@ const CarReportPage = () => {
   };
 
   const openDailyExpenseEditModal = (trip, expense) => {
-    setExpenseModal({ isOpen: true, tripId: trip.id, expenseId: expense.id, type: 'daily', driverId: trip.driver_id ?? null });
+    setExpenseModal({
+      isOpen: true,
+      tripId: trip.id,
+      expenseId: expense.id,
+      type: 'daily',
+      driverId: trip.driver_id ?? null,
+    });
     setExpenseForm({
       category: expense.category || 'food',
       amount: expense.amount ?? '',
@@ -775,105 +860,91 @@ const CarReportPage = () => {
     });
   };
 
-  const closeExpenseModal = () => {
+  const closeExpenseModal = () =>
     setExpenseModal({ isOpen: false, tripId: null, expenseId: null, type: 'trip', driverId: null });
-  };
 
   const handleExpenseSave = async (e) => {
     e.preventDefault();
     setSavingExpense(true);
-    const payload = expenseModal.type === 'daily'
-      ? {
-        driver_id: expenseModal.driverId,
-        category: expenseForm.category,
-        amount: expenseForm.amount,
-        note: expenseForm.notes,
-        expense_date: expenseForm.expense_date,
-        meter_reading: expenseForm.meter_reading,
-      }
-      : expenseForm;
-    const result = expenseModal.type === 'daily'
-      ? (
-        expenseModal.expenseId
+    const payload =
+      expenseModal.type === 'daily'
+        ? {
+            driver_id: expenseModal.driverId,
+            category: expenseForm.category,
+            amount: expenseForm.amount,
+            note: expenseForm.notes,
+            expense_date: expenseForm.expense_date,
+            meter_reading: expenseForm.meter_reading,
+          }
+        : expenseForm;
+    const result =
+      expenseModal.type === 'daily'
+        ? expenseModal.expenseId
           ? await put(`/admin/drivers-expenses/${expenseModal.expenseId}`, payload)
           : await post('/admin/drivers-expenses', payload)
-      )
-      : (
-        expenseModal.expenseId
-          ? await put(`/admin/trip-expenses/${expenseModal.expenseId}`, payload)
-          : await post(`/admin/trips/${expenseModal.tripId}/expenses`, payload)
-      );
+        : expenseModal.expenseId
+        ? await put(`/admin/trip-expenses/${expenseModal.expenseId}`, payload)
+        : await post(`/admin/trips/${expenseModal.tripId}/expenses`, payload);
     setSavingExpense(false);
 
     if (!result.success) {
       alert(result.error);
       return;
     }
-
     closeExpenseModal();
     fetchReport(filters);
   };
 
   const handleTripExpenseDelete = async (_trip, expense) => {
-    if (!expense?.id || !window.confirm('Delete this trip expense?')) {
-      return;
-    }
-
+    if (!expense?.id || !window.confirm('Delete this trip expense?')) return;
     const result = await del(`/admin/trip-expenses/${expense.id}`);
     if (!result.success) {
       alert(result.error);
       return;
     }
-
     fetchReport(filters);
   };
 
   const handleDailyExpenseDelete = async (_trip, expense) => {
-    if (!expense?.id || !window.confirm('Delete this daily expense?')) {
-      return;
-    }
-
+    if (!expense?.id || !window.confirm('Delete this daily expense?')) return;
     const result = await del(`/admin/drivers-expenses/${expense.id}`);
     if (!result.success) {
       alert(result.error);
       return;
     }
-
     fetchReport(filters);
   };
 
   return (
-    <div className="space-y-6 pb-10 max-w-7xl">
+    <div className="space-y-4 pb-8 max-w-7xl">
       {/* Header */}
-      <div className="rounded-xl border border-cargo-border bg-gradient-to-r from-cargo-card to-cargo-dark p-5 md:p-6 flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-        <div className="flex items-center gap-4">
+      <div className="rounded-lg border border-slate-700 bg-slate-800/60 p-4 flex flex-col md:flex-row md:items-center md:justify-between gap-3">
+        <div className="flex items-center gap-3">
           <button
             type="button"
             onClick={() => navigate('/cars')}
-            className="btn-secondary flex items-center gap-2 hover:bg-cargo-dark/50 transition-colors"
+            className="inline-flex items-center gap-1.5 rounded-md border border-slate-600 bg-slate-700/50 px-3 py-1.5 text-sm text-slate-300 hover:bg-slate-700 transition-colors"
           >
             <ArrowLeft className="w-4 h-4" />
             Back
           </button>
-          <div>
-            <h1 className="text-2xl font-bold text-cargo-text flex items-center gap-3">
-              <div className="p-2 rounded-lg bg-primary-500/10">
-                <Car className="w-6 h-6 text-primary-400" />
-              </div>
-              Cargo Report {reportData?.car?.car_number ? `- ${reportData.car.car_number}` : ''}
-            </h1>
-          </div>
+          <h1 className="text-xl font-bold text-slate-200 flex items-center gap-2.5">
+            <div className="p-1.5 rounded-md bg-sky-500/10">
+              <Car className="w-5 h-5 text-sky-400" />
+            </div>
+            Cargo Report {reportData?.car?.car_number ? `- ${reportData.car.car_number}` : ''}
+          </h1>
         </div>
       </div>
 
       {/* Filters */}
-      <div className="card grid grid-cols-1 md:grid-cols-4 gap-3">
+      <div className="rounded-lg border border-slate-700 bg-slate-800/40 p-3 grid grid-cols-1 md:grid-cols-4 gap-2">
         <div className="md:col-span-2 flex items-center gap-2">
-          <Filter className="w-4 h-4 text-cargo-muted" />
+          <Filter className="w-4 h-4 text-slate-400" />
           <select
             value={filters.period}
             onChange={(e) => setFilters((prev) => ({ ...prev, period: e.target.value }))}
-            className="input-field w-full"
+            className="w-full rounded-md border border-slate-600 bg-slate-800/60 px-3 py-2 text-sm text-slate-200 focus:outline-none focus:ring-1 focus:ring-sky-500"
           >
             <option value="all">All Time</option>
             <option value="today">Today</option>
@@ -886,108 +957,141 @@ const CarReportPage = () => {
           type="date"
           value={filters.from_date}
           onChange={(e) => setFilters((prev) => ({ ...prev, from_date: e.target.value }))}
-          className="input-field w-full"
+          className="w-full rounded-md border border-slate-600 bg-slate-800/60 px-3 py-2 text-sm text-slate-200 focus:outline-none focus:ring-1 focus:ring-sky-500"
         />
         <input
           type="date"
           value={filters.to_date}
           onChange={(e) => setFilters((prev) => ({ ...prev, to_date: e.target.value }))}
-          className="input-field w-full"
+          className="w-full rounded-md border border-slate-600 bg-slate-800/60 px-3 py-2 text-sm text-slate-200 focus:outline-none focus:ring-1 focus:ring-sky-500"
         />
-        <button type="button" onClick={() => fetchReport(filters)} className="btn-primary md:col-span-4">
+        <button
+          type="button"
+          onClick={() => fetchReport(filters)}
+          className="md:col-span-4 w-full rounded-md bg-sky-600 px-4 py-2 text-sm font-medium text-white hover:bg-sky-500 transition-colors"
+        >
           Apply Filter
         </button>
       </div>
 
       {loading && !reportData ? (
-        <div className="flex items-center justify-center h-64">
-          <div className="w-8 h-8 border-4 border-primary-600 border-t-transparent rounded-full animate-spin" />
+        <div className="flex items-center justify-center h-48">
+          <div className="w-7 h-7 border-3 border-sky-600 border-t-transparent rounded-full animate-spin" />
         </div>
       ) : (
         <>
           {/* Summary Cards */}
-          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
-            <SummaryCard title="Total Revenue" value={formatCurrency(reportData?.summary?.total_revenue)} icon={TrendingUp} />
-            <SummaryCard title="Total Expenses" value={formatCurrency(reportData?.summary?.total_expenses)} icon={TrendingDown} />
-            <SummaryCard title="Net Income" value={formatCurrency(reportData?.summary?.net_income)} icon={Wallet} highlight />
+          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-3">
+            <SummaryCard
+              title="Total Revenue"
+              value={formatCurrency(reportData?.summary?.total_revenue)}
+              icon={TrendingUp}
+            />
+            <SummaryCard
+              title="Total Expenses"
+              value={formatCurrency(reportData?.summary?.total_expenses)}
+              icon={TrendingDown}
+            />
+            <SummaryCard
+              title="Net Income"
+              value={formatCurrency(reportData?.summary?.net_income)}
+              icon={Wallet}
+              highlight
+            />
             <SummaryCard
               title="Trips / Distance"
-              value={`${reportData?.summary?.total_trips || 0} / ${(reportData?.summary?.total_distance || 0).toLocaleString()} km`}
+              value={`${reportData?.summary?.total_trips || 0} / ${(
+                reportData?.summary?.total_distance || 0
+              ).toLocaleString()} km`}
               icon={Activity}
             />
           </div>
 
           {/* Current Assignment + Trip Status */}
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-            <div className="card lg:col-span-2">
-              <h2 className="text-lg font-semibold text-cargo-text mb-4 flex items-center gap-2">
-                <User className="w-5 h-5 text-cargo-muted" />
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-3">
+            <div className="rounded-lg border border-slate-700 bg-slate-800/40 p-4 lg:col-span-2">
+              <h2 className="text-base font-semibold text-slate-200 mb-3 flex items-center gap-2">
+                <User className="w-4 h-4 text-slate-400" />
                 Current Assignment
               </h2>
-              <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
                 {[
-                  { label: 'Current Driver', value: reportData?.car?.current_driver_name || 'No active driver' },
+                  {
+                    label: 'Current Driver',
+                    value: reportData?.car?.current_driver_name || 'No active driver',
+                  },
                   { label: 'Phone', value: reportData?.car?.current_driver_phone || 'N/A' },
-                  { label: 'Current Meter', value: `${(reportData?.car?.current_meter_reading || 0).toLocaleString()} km` },
-                  { label: 'Overall Avg', value: formatAverage(reportData?.car?.overall_average_km_per_liter || reportData?.summary?.overall_average_km_per_liter) },
+                  {
+                    label: 'Current Meter',
+                    value: `${(reportData?.car?.current_meter_reading || 0).toLocaleString()} km`,
+                  },
+                  {
+                    label: 'Overall Avg',
+                    value: formatAverage(
+                      reportData?.car?.overall_average_km_per_liter ||
+                        reportData?.summary?.overall_average_km_per_liter
+                    ),
+                  },
                 ].map((item) => (
-                  <div key={item.label} className="rounded-lg border border-cargo-border bg-cargo-dark/20 p-4">
-                    <p className="text-[11px] text-cargo-muted uppercase tracking-wider font-medium">{item.label}</p>
-                    <p className="text-cargo-text mt-2 font-semibold">{item.value}</p>
+                  <div key={item.label} className="rounded-md border border-slate-700 bg-slate-800/30 p-3">
+                    <p className="text-[10px] text-slate-500 uppercase tracking-wider font-medium">{item.label}</p>
+                    <p className="text-sm text-slate-200 mt-1.5 font-semibold">{item.value}</p>
                   </div>
                 ))}
               </div>
             </div>
 
-            <div className="card">
-              <h2 className="text-lg font-semibold text-cargo-text mb-4 flex items-center gap-2">
-                <Activity className="w-5 h-5 text-cargo-muted" />
+            <div className="rounded-lg border border-slate-700 bg-slate-800/40 p-4">
+              <h2 className="text-base font-semibold text-slate-200 mb-3 flex items-center gap-2">
+                <Activity className="w-4 h-4 text-slate-400" />
                 Trip Status
               </h2>
-              <div className="space-y-3">
-                <div className="flex items-center justify-between rounded-lg border border-cargo-accent/20 bg-cargo-accent/5 p-4">
-                  <div className="flex items-center gap-2.5 text-cargo-accent">
-                    <Clock3 className="w-5 h-5" />
+              <div className="space-y-2">
+                <div className="flex items-center justify-between rounded-md border border-sky-500/20 bg-sky-500/5 p-3">
+                  <div className="flex items-center gap-2 text-sky-400">
+                    <Clock3 className="w-4 h-4" />
                     <span className="text-sm font-medium">Ongoing</span>
                   </div>
-                  <span className="text-cargo-text font-bold text-lg">{ongoingTrips.length}</span>
+                  <span className="text-slate-200 font-bold text-base">{ongoingTrips.length}</span>
                 </div>
-                <div className="flex items-center justify-between rounded-lg border border-cargo-success/20 bg-cargo-success/5 p-4">
-                  <div className="flex items-center gap-2.5 text-cargo-success">
-                    <CheckCircle2 className="w-5 h-5" />
+                <div className="flex items-center justify-between rounded-md border border-emerald-500/20 bg-emerald-500/5 p-3">
+                  <div className="flex items-center gap-2 text-emerald-400">
+                    <CheckCircle2 className="w-4 h-4" />
                     <span className="text-sm font-medium">Completed</span>
                   </div>
-                  <span className="text-cargo-text font-bold text-lg">{completedTrips.length}</span>
+                  <span className="text-slate-200 font-bold text-base">{completedTrips.length}</span>
                 </div>
               </div>
             </div>
           </div>
 
           {/* Driver Assignment History */}
-          <div className="card">
-            <h2 className="text-lg font-semibold text-cargo-text mb-4 flex items-center gap-2">
-              <Calendar className="w-5 h-5 text-cargo-muted" />
+          <div className="rounded-lg border border-slate-700 bg-slate-800/40 p-4">
+            <h2 className="text-base font-semibold text-slate-200 mb-3 flex items-center gap-2">
+              <Calendar className="w-4 h-4 text-slate-400" />
               Driver Assignment History
             </h2>
             {reportData?.assignments?.length ? (
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
                 {reportData.assignments.map((assignment) => (
                   <div
                     key={assignment.id}
-                    className="rounded-lg border border-cargo-border bg-cargo-dark/20 p-4 space-y-2 hover:border-cargo-border/80 transition-colors"
+                    className="rounded-md border border-slate-700 bg-slate-800/30 p-3 space-y-1.5 hover:border-slate-600 transition-colors"
                   >
-                    <p className="text-cargo-text font-semibold flex items-center gap-2">
-                      <User className="w-4 h-4 text-cargo-muted" />
+                    <p className="text-sm text-slate-200 font-semibold flex items-center gap-2">
+                      <User className="w-3.5 h-3.5 text-slate-400" />
                       {assignment.driver_name}
                     </p>
-                    <div className="flex flex-col gap-1">
-                      <p className="text-sm text-cargo-muted">
-                        <span className="text-cargo-text/60">Assigned:</span> {formatDate(assignment.assigned_at)}
+                    <div className="flex flex-col gap-0.5">
+                      <p className="text-xs text-slate-400">
+                        <span className="text-slate-500">Assigned:</span> {formatDate(assignment.assigned_at)}
                       </p>
-                      <p className="text-sm text-cargo-muted">
-                        <span className="text-cargo-text/60">Unassigned:</span>{' '}
-                        {assignment.unassigned_at ? formatDate(assignment.unassigned_at) : (
-                          <span className="text-cargo-accent font-medium">Currently assigned</span>
+                      <p className="text-xs text-slate-400">
+                        <span className="text-slate-500">Unassigned:</span>{' '}
+                        {assignment.unassigned_at ? (
+                          formatDate(assignment.unassigned_at)
+                        ) : (
+                          <span className="text-sky-400 font-medium">Currently assigned</span>
                         )}
                       </p>
                     </div>
@@ -995,14 +1099,14 @@ const CarReportPage = () => {
                 ))}
               </div>
             ) : (
-              <p className="text-cargo-muted">No assignment history found.</p>
+              <p className="text-sm text-slate-500">No assignment history found.</p>
             )}
           </div>
 
           {/* Ongoing Trips */}
-          <div className="space-y-5">
-            <h2 className="text-lg font-semibold text-cargo-text flex items-center gap-2">
-              <Clock3 className="w-5 h-5 text-cargo-accent" />
+          <div className="space-y-3">
+            <h2 className="text-base font-semibold text-slate-200 flex items-center gap-2">
+              <Clock3 className="w-4 h-4 text-sky-400" />
               Ongoing Trips
             </h2>
             {ongoingTrips.length ? (
@@ -1021,19 +1125,19 @@ const CarReportPage = () => {
                 />
               ))
             ) : (
-              <p className="text-cargo-muted">No ongoing trips in this period.</p>
+              <p className="text-sm text-slate-500">No ongoing trips in this period.</p>
             )}
           </div>
 
           {/* Completed Trips */}
-          <div className="space-y-5">
-            <h2 className="text-lg font-semibold text-cargo-text flex items-center gap-2">
-              <CheckCircle2 className="w-5 h-5 text-cargo-success" />
+          <div className="space-y-3">
+            <h2 className="text-base font-semibold text-slate-200 flex items-center gap-2">
+              <CheckCircle2 className="w-4 h-4 text-emerald-400" />
               Completed Trip Records
             </h2>
             {completedTrips.length ? (
               completedTrips.map((trip) => (
-                <div key={trip.id} className="space-y-4">
+                <div key={trip.id} className="space-y-3">
                   <PendingNextTripExpenseBreakdown
                     trip={trip}
                     onEditDailyExpense={openDailyExpenseEditModal}
@@ -1054,22 +1158,23 @@ const CarReportPage = () => {
                 </div>
               ))
             ) : (
-              <p className="text-cargo-muted">No completed trips in this period.</p>
+              <p className="text-sm text-slate-500">No completed trips in this period.</p>
             )}
           </div>
         </>
       )}
 
+      {/* Edit Trip Modal */}
       <Modal isOpen={Boolean(editingTrip)} onClose={closeTripModal} title="Edit Trip">
-        <form onSubmit={handleTripSave} className="space-y-4">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+        <form onSubmit={handleTripSave} className="space-y-3">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
             <input
               type="number"
               min="0"
               step="0.01"
               value={tripForm.start_meter_reading}
               onChange={(e) => setTripForm((prev) => ({ ...prev, start_meter_reading: e.target.value }))}
-              className="input-field w-full"
+              className="w-full rounded-md border border-slate-600 bg-slate-800/60 px-3 py-2 text-sm text-slate-200 focus:outline-none focus:ring-1 focus:ring-sky-500"
               placeholder="Start Meter Reading"
             />
             <input
@@ -1078,21 +1183,21 @@ const CarReportPage = () => {
               step="0.01"
               value={tripForm.end_meter_reading}
               onChange={(e) => setTripForm((prev) => ({ ...prev, end_meter_reading: e.target.value }))}
-              className="input-field w-full"
+              className="w-full rounded-md border border-slate-600 bg-slate-800/60 px-3 py-2 text-sm text-slate-200 focus:outline-none focus:ring-1 focus:ring-sky-500"
               placeholder="End Meter Reading"
             />
             <input
               type="text"
               value={tripForm.from_location}
               onChange={(e) => setTripForm((prev) => ({ ...prev, from_location: e.target.value }))}
-              className="input-field w-full"
+              className="w-full rounded-md border border-slate-600 bg-slate-800/60 px-3 py-2 text-sm text-slate-200 focus:outline-none focus:ring-1 focus:ring-sky-500"
               placeholder="From Location"
             />
             <input
               type="text"
               value={tripForm.to_location}
               onChange={(e) => setTripForm((prev) => ({ ...prev, to_location: e.target.value }))}
-              className="input-field w-full"
+              className="w-full rounded-md border border-slate-600 bg-slate-800/60 px-3 py-2 text-sm text-slate-200 focus:outline-none focus:ring-1 focus:ring-sky-500"
               placeholder="To Location"
             />
             <input
@@ -1101,35 +1206,60 @@ const CarReportPage = () => {
               step="0.01"
               value={tripForm.freight_charge}
               onChange={(e) => setTripForm((prev) => ({ ...prev, freight_charge: e.target.value }))}
-              className="input-field w-full md:col-span-2"
+              className="w-full md:col-span-2 rounded-md border border-slate-600 bg-slate-800/60 px-3 py-2 text-sm text-slate-200 focus:outline-none focus:ring-1 focus:ring-sky-500"
               placeholder="Freight Charge"
             />
           </div>
           <textarea
             value={tripForm.notes}
             onChange={(e) => setTripForm((prev) => ({ ...prev, notes: e.target.value }))}
-            className="input-field w-full min-h-24"
+            className="w-full rounded-md border border-slate-600 bg-slate-800/60 px-3 py-2 text-sm text-slate-200 focus:outline-none focus:ring-1 focus:ring-sky-500 min-h-20"
             placeholder="Notes"
           />
-          <div className="flex gap-3">
-            <button type="button" onClick={closeTripModal} className="flex-1 btn-secondary">Cancel</button>
-            <button type="submit" disabled={savingTrip} className="flex-1 btn-primary">
+          <div className="flex gap-2">
+            <button
+              type="button"
+              onClick={closeTripModal}
+              className="flex-1 rounded-md border border-slate-600 bg-slate-700/50 px-4 py-2 text-sm text-slate-300 hover:bg-slate-700 transition-colors"
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              disabled={savingTrip}
+              className="flex-1 rounded-md bg-sky-600 px-4 py-2 text-sm font-medium text-white hover:bg-sky-500 transition-colors disabled:opacity-50"
+            >
               {savingTrip ? 'Saving...' : 'Save Trip'}
             </button>
           </div>
         </form>
       </Modal>
 
-      <Modal isOpen={expenseModal.isOpen} onClose={closeExpenseModal} title={expenseModal.type === 'daily' ? (expenseModal.expenseId ? 'Edit While Looking For Next Trip Expense' : 'Add While Looking For Next Trip Expense') : (expenseModal.expenseId ? 'Edit Trip Expense' : 'Add Trip Expense')}>
-        <form onSubmit={handleExpenseSave} className="space-y-4">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+      {/* Expense Modal */}
+      <Modal
+        isOpen={expenseModal.isOpen}
+        onClose={closeExpenseModal}
+        title={
+          expenseModal.type === 'daily'
+            ? expenseModal.expenseId
+              ? 'Edit Waiting Expense'
+              : 'Add Waiting Expense'
+            : expenseModal.expenseId
+            ? 'Edit Trip Expense'
+            : 'Add Trip Expense'
+        }
+      >
+        <form onSubmit={handleExpenseSave} className="space-y-3">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
             <select
               value={expenseForm.category}
               onChange={(e) => setExpenseForm((prev) => ({ ...prev, category: e.target.value }))}
-              className="input-field w-full"
+              className="w-full rounded-md border border-slate-600 bg-slate-800/60 px-3 py-2 text-sm text-slate-200 focus:outline-none focus:ring-1 focus:ring-sky-500"
             >
               {(expenseModal.type === 'daily' ? dailyExpenseCategories : tripExpenseCategories).map((category) => (
-                <option key={category} value={category}>{formatCategoryLabel(category)}</option>
+                <option key={category} value={category}>
+                  {formatCategoryLabel(category)}
+                </option>
               ))}
             </select>
             <input
@@ -1138,7 +1268,7 @@ const CarReportPage = () => {
               step="0.01"
               value={expenseForm.amount}
               onChange={(e) => setExpenseForm((prev) => ({ ...prev, amount: e.target.value }))}
-              className="input-field w-full"
+              className="w-full rounded-md border border-slate-600 bg-slate-800/60 px-3 py-2 text-sm text-slate-200 focus:outline-none focus:ring-1 focus:ring-sky-500"
               placeholder="Amount"
             />
             {expenseModal.type === 'daily' ? (
@@ -1147,7 +1277,7 @@ const CarReportPage = () => {
                   type="date"
                   value={expenseForm.expense_date}
                   onChange={(e) => setExpenseForm((prev) => ({ ...prev, expense_date: e.target.value }))}
-                  className="input-field w-full"
+                  className="w-full rounded-md border border-slate-600 bg-slate-800/60 px-3 py-2 text-sm text-slate-200 focus:outline-none focus:ring-1 focus:ring-sky-500"
                 />
                 <input
                   type="number"
@@ -1155,7 +1285,7 @@ const CarReportPage = () => {
                   step="0.01"
                   value={expenseForm.meter_reading}
                   onChange={(e) => setExpenseForm((prev) => ({ ...prev, meter_reading: e.target.value }))}
-                  className="input-field w-full"
+                  className="w-full rounded-md border border-slate-600 bg-slate-800/60 px-3 py-2 text-sm text-slate-200 focus:outline-none focus:ring-1 focus:ring-sky-500"
                   placeholder="Meter Reading"
                 />
               </>
@@ -1167,14 +1297,14 @@ const CarReportPage = () => {
                   step="0.01"
                   value={expenseForm.liters}
                   onChange={(e) => setExpenseForm((prev) => ({ ...prev, liters: e.target.value }))}
-                  className="input-field w-full"
+                  className="w-full rounded-md border border-slate-600 bg-slate-800/60 px-3 py-2 text-sm text-slate-200 focus:outline-none focus:ring-1 focus:ring-sky-500"
                   placeholder="Liters"
                 />
                 <input
                   type="text"
                   value={expenseForm.location}
                   onChange={(e) => setExpenseForm((prev) => ({ ...prev, location: e.target.value }))}
-                  className="input-field w-full"
+                  className="w-full rounded-md border border-slate-600 bg-slate-800/60 px-3 py-2 text-sm text-slate-200 focus:outline-none focus:ring-1 focus:ring-sky-500"
                   placeholder="Location"
                 />
               </>
@@ -1183,12 +1313,22 @@ const CarReportPage = () => {
           <textarea
             value={expenseForm.notes}
             onChange={(e) => setExpenseForm((prev) => ({ ...prev, notes: e.target.value }))}
-            className="input-field w-full min-h-24"
+            className="w-full rounded-md border border-slate-600 bg-slate-800/60 px-3 py-2 text-sm text-slate-200 focus:outline-none focus:ring-1 focus:ring-sky-500 min-h-20"
             placeholder={expenseModal.type === 'daily' ? 'Name / Notes' : 'Notes'}
           />
-          <div className="flex gap-3">
-            <button type="button" onClick={closeExpenseModal} className="flex-1 btn-secondary">Cancel</button>
-            <button type="submit" disabled={savingExpense} className="flex-1 btn-primary">
+          <div className="flex gap-2">
+            <button
+              type="button"
+              onClick={closeExpenseModal}
+              className="flex-1 rounded-md border border-slate-600 bg-slate-700/50 px-4 py-2 text-sm text-slate-300 hover:bg-slate-700 transition-colors"
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              disabled={savingExpense}
+              className="flex-1 rounded-md bg-sky-600 px-4 py-2 text-sm font-medium text-white hover:bg-sky-500 transition-colors disabled:opacity-50"
+            >
               {savingExpense ? 'Saving...' : expenseModal.expenseId ? 'Save Expense' : 'Add Expense'}
             </button>
           </div>

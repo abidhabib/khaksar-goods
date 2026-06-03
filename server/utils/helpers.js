@@ -98,7 +98,8 @@ const attachBetweenTripDailyExpenses = (trips, timelineTrips = [], dailyExpenseE
     }
 
     const linkedByTripId = new Map();
-    const pendingByTripId = new Map();
+    const waitingByTripId = new Map();
+    const waitingTargetTripIdByTripId = new Map();
     for (const entry of dailyExpenseEntries) {
         const driverId = Number(entry?.driver_id);
         const amount = Number(entry?.amount) || 0;
@@ -134,6 +135,24 @@ const attachBetweenTripDailyExpenses = (trips, timelineTrips = [], dailyExpenseE
             continue;
         }
 
+        if (tripIds.has(targetWindow.completed_trip_id)) {
+            if (!waitingByTripId.has(targetWindow.completed_trip_id)) {
+                waitingByTripId.set(targetWindow.completed_trip_id, []);
+            }
+
+            waitingByTripId.get(targetWindow.completed_trip_id).push({
+                ...entry,
+                amount
+            });
+
+            if (!waitingTargetTripIdByTripId.has(targetWindow.completed_trip_id)) {
+                waitingTargetTripIdByTripId.set(
+                    targetWindow.completed_trip_id,
+                    Number.isFinite(targetWindow.next_trip_id) ? targetWindow.next_trip_id : null
+                );
+            }
+        }
+
         if (Number.isFinite(targetWindow.next_trip_id)) {
             if (tripIds.has(targetWindow.next_trip_id)) {
                 if (!linkedByTripId.has(targetWindow.next_trip_id)) {
@@ -147,26 +166,13 @@ const attachBetweenTripDailyExpenses = (trips, timelineTrips = [], dailyExpenseE
             }
             continue;
         }
-
-        if (!tripIds.has(targetWindow.completed_trip_id)) {
-            continue;
-        }
-
-        if (!pendingByTripId.has(targetWindow.completed_trip_id)) {
-            pendingByTripId.set(targetWindow.completed_trip_id, []);
-        }
-
-        pendingByTripId.get(targetWindow.completed_trip_id).push({
-            ...entry,
-            amount
-        });
     }
 
     return trips.map((trip) => {
         const tripId = Number(trip.id);
         const tripExpenses = Array.isArray(trip.expenses) ? trip.expenses : [];
         const dailyExpenses = linkedByTripId.get(tripId) || [];
-        const pendingNextTripDailyExpenses = pendingByTripId.get(tripId) || [];
+        const pendingNextTripDailyExpenses = waitingByTripId.get(tripId) || [];
         const baseTotalExpenses = Number(trip.total_expenses) || 0;
         const betweenTripExpensesTotal = dailyExpenses.reduce((sum, entry) => sum + (Number(entry.amount) || 0), 0);
         const pendingNextTripExpensesTotal = pendingNextTripDailyExpenses.reduce((sum, entry) => sum + (Number(entry.amount) || 0), 0);
@@ -188,6 +194,9 @@ const attachBetweenTripDailyExpenses = (trips, timelineTrips = [], dailyExpenseE
             daily_expenses: dailyExpenses,
             pending_next_trip_daily_expenses: pendingNextTripDailyExpenses,
             pending_next_trip_expenses_total: pendingNextTripExpensesTotal,
+            pending_next_trip_target_trip_id: waitingTargetTripIdByTripId.has(tripId)
+                ? waitingTargetTripIdByTripId.get(tripId)
+                : null,
             expenses: tripExpenses
         };
     });
