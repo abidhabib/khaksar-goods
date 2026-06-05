@@ -5,6 +5,8 @@ import android.os.Bundle;
 import android.view.View;
 import android.widget.Toast;
 
+import androidx.activity.result.ActivityResultLauncher;
+import androidx.activity.result.contract.ActivityResultContracts;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.core.graphics.Insets;
 import androidx.core.view.ViewCompat;
@@ -32,6 +34,14 @@ public class DriverAccountActivity extends AppCompatActivity {
     private String baseUrl;
     private double availableBalance;
     private double commissionBalance;
+    private final ActivityResultLauncher<Intent> cashoutLauncher = registerForActivityResult(
+            new ActivityResultContracts.StartActivityForResult(),
+            result -> {
+                if (result.getResultCode() == RESULT_OK) {
+                    fetchAccount();
+                }
+            }
+    );
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -72,6 +82,7 @@ public class DriverAccountActivity extends AppCompatActivity {
                     binding.contentScroll.getPaddingRight(),
                     contentBottomPadding + insets.bottom + getResources().getDimensionPixelSize(R.dimen.dashboard_bottom_padding)
             );
+            binding.swipeRefreshLayout.setProgressViewOffset(false, 0, topBarTopPadding + insets.top + 120);
             return windowInsets;
         });
     }
@@ -86,10 +97,11 @@ public class DriverAccountActivity extends AppCompatActivity {
                 startActivity(AccountHistoryActivity.newIntent(this, AccountHistoryActivity.MODE_DRIVER, AccountHistoryActivity.HISTORY_CASHOUT)));
         binding.commissionHistoryCard.setOnClickListener(v ->
                 startActivity(AccountHistoryActivity.newIntent(this, AccountHistoryActivity.MODE_DRIVER, AccountHistoryActivity.HISTORY_COMMISSION)));
+        binding.swipeRefreshLayout.setOnRefreshListener(this::fetchAccount);
     }
 
     private void openCashout(String mode, String balanceType, double balance) {
-        startActivity(AccountCashoutActivity.newIntent(this, mode, balanceType, balance));
+        cashoutLauncher.launch(AccountCashoutActivity.newIntent(this, mode, balanceType, balance));
     }
 
     private void fetchAccount() {
@@ -225,5 +237,6 @@ public class DriverAccountActivity extends AppCompatActivity {
 
     private void setLoading(boolean loading) {
         binding.loadingOverlay.setVisibility(loading ? View.VISIBLE : View.GONE);
+        binding.swipeRefreshLayout.setRefreshing(loading);
     }
 }

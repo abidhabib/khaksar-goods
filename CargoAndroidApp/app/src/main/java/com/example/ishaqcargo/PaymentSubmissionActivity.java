@@ -2,6 +2,7 @@ package com.example.ishaqcargo;
 
 import android.app.Dialog;
 import android.content.ContentResolver;
+import android.content.DialogInterface;
 import android.content.Intent;
 import android.net.Uri;
 import android.os.Bundle;
@@ -16,8 +17,10 @@ import android.widget.Toast;
 
 import androidx.activity.result.ActivityResultLauncher;
 import androidx.activity.result.contract.ActivityResultContracts;
+import androidx.appcompat.app.AlertDialog;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.core.graphics.Insets;
+import androidx.core.content.FileProvider;
 import androidx.core.view.ViewCompat;
 import androidx.core.view.WindowCompat;
 import androidx.core.view.WindowInsetsCompat;
@@ -30,6 +33,7 @@ import com.google.android.material.textfield.TextInputEditText;
 
 import org.json.JSONObject;
 
+import java.io.File;
 import java.io.IOException;
 import java.util.LinkedHashMap;
 import java.util.Locale;
@@ -44,11 +48,13 @@ public class PaymentSubmissionActivity extends AppCompatActivity {
     private static final String METHOD_CASH = "cash";
     private static final String METHOD_ACCOUNT = "account";
     private static final String STATE_IMAGE_URI = "state_image_uri";
+    private static final String STATE_PENDING_CAMERA_URI = "state_pending_camera_uri";
 
     private ActivityPaymentSubmissionBinding binding;
     private SessionManager sessionManager;
     private String baseUrl;
     private Uri paymentScreenshotUri;
+    private Uri pendingPaymentCameraUri;
     private Dialog activeAccountDialog;
     private TextView activeUploadHint;
     private ImageView activeScreenshotPreview;
@@ -61,13 +67,21 @@ public class PaymentSubmissionActivity extends AppCompatActivity {
                 }
 
                 paymentScreenshotUri = uri;
-                if (activeScreenshotPreview != null) {
-                    activeScreenshotPreview.setImageURI(paymentScreenshotUri);
-                    activeScreenshotPreview.setVisibility(View.VISIBLE);
+                bindPaymentScreenshotPreview();
+            }
+    );
+
+    private final ActivityResultLauncher<Uri> takePaymentScreenshotLauncher = registerForActivityResult(
+            new ActivityResultContracts.TakePicture(),
+            success -> {
+                if (!success || pendingPaymentCameraUri == null) {
+                    pendingPaymentCameraUri = null;
+                    return;
                 }
-                if (activeUploadHint != null) {
-                    activeUploadHint.setText(R.string.payment_change_screenshot_gallery);
-                }
+
+                paymentScreenshotUri = pendingPaymentCameraUri;
+                pendingPaymentCameraUri = null;
+                bindPaymentScreenshotPreview();
             }
     );
 
@@ -97,6 +111,7 @@ public class PaymentSubmissionActivity extends AppCompatActivity {
     protected void onSaveInstanceState(Bundle outState) {
         super.onSaveInstanceState(outState);
         outState.putString(STATE_IMAGE_URI, paymentScreenshotUri != null ? paymentScreenshotUri.toString() : null);
+        outState.putString(STATE_PENDING_CAMERA_URI, pendingPaymentCameraUri != null ? pendingPaymentCameraUri.toString() : null);
     }
 
     private void applyWindowInsets() {
@@ -179,17 +194,9 @@ public class PaymentSubmissionActivity extends AppCompatActivity {
         activeAccountDialog = dialog;
         activeUploadHint = uploadHint;
         activeScreenshotPreview = screenshotPreview;
+        bindPaymentScreenshotPreview();
 
-        if (paymentScreenshotUri != null) {
-            screenshotPreview.setImageURI(paymentScreenshotUri);
-            screenshotPreview.setVisibility(View.VISIBLE);
-            uploadHint.setText(R.string.payment_change_screenshot_gallery);
-        } else {
-            screenshotPreview.setVisibility(View.GONE);
-            uploadHint.setText(R.string.payment_add_screenshot_gallery);
-        }
-
-        View.OnClickListener pickListener = v -> pickScreenshotLauncher.launch("image/*");
+        View.OnClickListener pickListener = v -> showScreenshotSourceChooser();
         uploadHint.setOnClickListener(pickListener);
         screenshotPreview.setOnClickListener(pickListener);
 
@@ -201,8 +208,6 @@ public class PaymentSubmissionActivity extends AppCompatActivity {
                 amountInput.setError(getString(R.string.payment_amount_required));
                 return;
             }
-
-          
 
             if (paymentScreenshotUri == null) {
                 Toast.makeText(this, R.string.payment_screenshot_required, Toast.LENGTH_SHORT).show();
@@ -369,6 +374,69 @@ public class PaymentSubmissionActivity extends AppCompatActivity {
         if (!TextUtils.isEmpty(imageUri)) {
             paymentScreenshotUri = Uri.parse(imageUri);
         }
+
+        String pendingCameraUri = savedInstanceState.getString(STATE_PENDING_CAMERA_URI);
+        if (!TextUtils.isEmpty(pendingCameraUri)) {
+            pendingPaymentCameraUri = Uri.parse(pendingCameraUri);
+        }
+    }
+
+    private void showScreenshotSourceChooser() {
+        if (activeAccountDialog == null || !activeAccountDialog.isShowing()) {
+            return;
+        }
+
+        String[] options = new String[] {
+                getString(R.string.payment_pick_from_camera),
+                getString(R.string.payment_pick_from_gallery)
+        };
+
+        new AlertDialog.Builder(this)
+                .setTitle(R.string.payment_pick_screenshot_title)
+                .setItems(options, (DialogInterface dialog, int which) -> {
+                    if (which == 0) {
+                        openCameraForPaymentScreenshot();
+                        return;
+                    }
+                    pickScreenshotLauncher.launch("image/*");
+                })
+                .show();
+    }
+
+    private void openCameraForPaymentScreenshot() {
+        try {
+            pendingPaymentCameraUri = createTempImageUri("payment_screenshot_");
+            takePaymentScreenshotLauncher.launch(pendingPaymentCameraUri);
+        } catch (Exception exception) {
+            Toast.makeText(this, R.string.unable_to_open_camera, Toast.LENGTH_SHORT).show();
+        }
+    }
+
+    private Uri createTempImageUri(String prefix) throws IOException {
+        File mediaDir = new File(getFilesDir(), "payment-media");
+        if (!mediaDir.exists() && !mediaDir.mkdirs()) {
+            throw new IOException("Unable to create media directory");
+        }
+
+        File imageFile = File.createTempFile(prefix + System.currentTimeMillis(), ".jpg", mediaDir);
+        return FileProvider.getUriForFile(this, getPackageName() + ".fileprovider", imageFile);
+    }
+
+    private void bindPaymentScreenshotPreview() {
+        if (activeScreenshotPreview == null || activeUploadHint == null) {
+            return;
+        }
+
+        if (paymentScreenshotUri == null) {
+            activeScreenshotPreview.setImageDrawable(null);
+            activeScreenshotPreview.setVisibility(View.GONE);
+            activeUploadHint.setText(R.string.payment_add_screenshot_picker);
+            return;
+        }
+
+        activeScreenshotPreview.setImageURI(paymentScreenshotUri);
+        activeScreenshotPreview.setVisibility(View.VISIBLE);
+        activeUploadHint.setText(R.string.payment_change_screenshot_picker);
     }
 
     private void setLoading(boolean loading) {

@@ -3,7 +3,6 @@ import { useNavigate } from 'react-router-dom';
 import { useApi } from '../hooks/useApi';
 import StatCard from '../components/admin/StatCard';
 import TripTable from '../components/admin/TripTable';
-import ExpenseBreakdown from '../components/admin/ExpenseBreakdown';
 import { 
   Car, 
   Users, 
@@ -19,8 +18,7 @@ const AdminDashboard = () => {
   const navigate = useNavigate();
   const [stats, setStats] = useState(null);
   const [recentTrips, setRecentTrips] = useState([]);
-  const [revenueData, setRevenueData] = useState([]);
-  const [expenseBreakdown, setExpenseBreakdown] = useState([]);
+
 
   useEffect(() => {
     const fetchDashboardData = async () => {
@@ -28,8 +26,7 @@ const AdminDashboard = () => {
       if (result.success) {
         setStats(result.data.stats);
         setRecentTrips(result.data.recentTrips);
-        setRevenueData(result.data.revenueChart || []);
-        setExpenseBreakdown(result.data.expenseBreakdown || []);
+   
       }
     };
 
@@ -96,6 +93,12 @@ console.log(stats);
           icon={DollarSign}
           color="green"
         />
+        <StatCard
+          title="Company Amount"
+          value={`Rs ${Number(stats.total_company_amount || 0).toLocaleString()}`}
+          icon={DollarSign}
+          color="purple"
+        />
            <StatCard
           title="Going Trip"
           value={stats.ongoing_trips?.toLocaleString() || 0}
@@ -110,11 +113,9 @@ console.log(stats);
         />
       </div>
 
-      {/* Charts Row */}
          
           
      
-        <ExpenseBreakdown data={expenseBreakdown} />
 
       {/* Recent Trips Table */}
       <TripTable 

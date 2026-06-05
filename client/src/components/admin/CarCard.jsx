@@ -1,4 +1,4 @@
-import { Car, User, Gauge, TrendingUp, AlertCircle, FileText, MapPin } from 'lucide-react';
+import { Car, User, Gauge, TrendingUp, AlertCircle, FileText, MapPin, Coins } from 'lucide-react';
 import { formatLocationAgo, formatLocationSummary } from '../../utils/location';
 
 const formatAverage = (value) => {
@@ -15,6 +15,8 @@ const formatKm = (value) => {
   const numericValue = Number(value);
   return Number.isFinite(numericValue) ? `${numericValue.toLocaleString()} km` : '0 km';
 };
+
+const formatCurrency = (value) => `Rs ${Number(value || 0).toLocaleString()}`;
 
 const CarCard = ({ car, onEdit, onDelete, onAssign, onViewHistory }) => {
   const statusColors = {
@@ -50,25 +52,34 @@ const CarCard = ({ car, onEdit, onDelete, onAssign, onViewHistory }) => {
           </div>
         </div>
         
-        <div className="flex flex-wrap justify-end gap-2 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity">
-          <button
-            onClick={() => onViewHistory(car)}
-            className="p-2 text-cargo-muted hover:text-primary-400 hover:bg-primary-600/10 rounded-lg transition-colors"
-          >
-            <FileText className="w-4 h-4" />
-          </button>
-          <button 
-            onClick={() => onEdit(car)}
-            className="p-2 text-cargo-muted hover:text-primary-400 hover:bg-primary-600/10 rounded-lg transition-colors"
-          >
-            Edit
-          </button>
-          <button 
-            onClick={() => onDelete(car.id)}
-            className="p-2 text-cargo-muted hover:text-cargo-danger hover:bg-cargo-danger/10 rounded-lg transition-colors"
-          >
-            Delete
-          </button>
+        <div className="flex flex-col items-end gap-2">
+          <div className="rounded-lg border border-cargo-border bg-cargo-dark/30 p-2.5 min-w-[150px]">
+            <p className="text-[11px] uppercase tracking-wide text-cargo-muted flex items-center gap-1">
+              <Coins className="w-3.5 h-3.5" />
+              Company Amount
+            </p>
+            <p className="text-sm text-primary-300 font-semibold mt-1.5 text-right">{formatCurrency(car.company_amount)}</p>
+          </div>
+          <div className="flex flex-wrap justify-end gap-2 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity">
+            <button
+              onClick={() => onViewHistory(car)}
+              className="p-2 text-cargo-muted hover:text-primary-400 hover:bg-primary-600/10 rounded-lg transition-colors"
+            >
+              <FileText className="w-4 h-4" />
+            </button>
+            <button 
+              onClick={() => onEdit(car)}
+              className="p-2 text-cargo-muted hover:text-primary-400 hover:bg-primary-600/10 rounded-lg transition-colors"
+            >
+              Edit
+            </button>
+            <button 
+              onClick={() => onDelete(car.id)}
+              className="p-2 text-cargo-muted hover:text-cargo-danger hover:bg-cargo-danger/10 rounded-lg transition-colors"
+            >
+              Delete
+            </button>
+          </div>
         </div>
       </div>
 
@@ -79,7 +90,7 @@ const CarCard = ({ car, onEdit, onDelete, onAssign, onViewHistory }) => {
         </div>
         <div className="flex items-center gap-2 text-sm">
           <TrendingUp className="w-4 h-4 text-cargo-muted" />
-          <span className="text-cargo-text">{car.total_revenue?.toLocaleString()}</span>
+          <span className="text-cargo-text">Total Revenue: {formatCurrency(car.total_revenue)}</span>
         </div>
         <div className="flex items-center gap-2 text-sm col-span-2">
           <Gauge className="w-4 h-4 text-cargo-muted" />

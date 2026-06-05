@@ -4,7 +4,6 @@ import android.Manifest;
 import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.os.Bundle;
-import android.os.Build;
 import android.text.TextUtils;
 import android.view.View;
 import android.widget.Toast;
@@ -21,7 +20,6 @@ import androidx.core.widget.NestedScrollView;
 
 import com.example.ishaqcargo.databinding.ActivityDriverDashboardBinding;
 import com.example.ishaqcargo.network.ApiClient;
-import com.example.ishaqcargo.util.LocationSyncScheduler;
 import com.example.ishaqcargo.util.SessionManager;
 
 import org.json.JSONObject;
@@ -48,20 +46,7 @@ public class DriverDashboardActivity extends AppCompatActivity {
     private boolean leaveRestricted;
     private final ActivityResultLauncher<String[]> locationPermissionLauncher = registerForActivityResult(
             new ActivityResultContracts.RequestMultiplePermissions(),
-            result -> {
-                boolean hasForegroundPermission =
-                        Boolean.TRUE.equals(result.get(Manifest.permission.ACCESS_FINE_LOCATION))
-                                || Boolean.TRUE.equals(result.get(Manifest.permission.ACCESS_COARSE_LOCATION));
-
-                if (hasForegroundPermission) {
-                    requestBackgroundLocationPermissionIfNeeded();
-                    LocationSyncScheduler.schedule(getApplicationContext());
-                }
-            }
-    );
-    private final ActivityResultLauncher<String> backgroundLocationPermissionLauncher = registerForActivityResult(
-            new ActivityResultContracts.RequestPermission(),
-            granted -> LocationSyncScheduler.schedule(getApplicationContext())
+            result -> { }
     );
 
     private final ActivityResultLauncher<Intent> startTripLauncher = registerForActivityResult(
@@ -95,7 +80,6 @@ public class DriverDashboardActivity extends AppCompatActivity {
         applyWindowInsets();
 
         binding.logoutButton.setOnClickListener(v -> {
-            LocationSyncScheduler.cancel(getApplicationContext());
             sessionManager.clearSession();
             startActivity(new Intent(this, LoginActivity.class));
             finish();
@@ -198,8 +182,6 @@ public class DriverDashboardActivity extends AppCompatActivity {
 
     private void ensureLocationSyncSetup() {
         if (hasForegroundLocationPermission()) {
-            requestBackgroundLocationPermissionIfNeeded();
-            LocationSyncScheduler.schedule(getApplicationContext());
             return;
         }
 
@@ -212,18 +194,6 @@ public class DriverDashboardActivity extends AppCompatActivity {
     private boolean hasForegroundLocationPermission() {
         return ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED
                 || ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_COARSE_LOCATION) == PackageManager.PERMISSION_GRANTED;
-    }
-
-    private void requestBackgroundLocationPermissionIfNeeded() {
-        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) {
-            return;
-        }
-
-        if (ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_BACKGROUND_LOCATION) == PackageManager.PERMISSION_GRANTED) {
-            return;
-        }
-
-        backgroundLocationPermissionLauncher.launch(Manifest.permission.ACCESS_BACKGROUND_LOCATION);
     }
 
     private void fetchDashboard() {

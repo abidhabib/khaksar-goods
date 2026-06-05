@@ -21,6 +21,11 @@ const defaultForm = {
   status: 'active',
 };
 
+const defaultDepositForm = {
+  amount: '',
+  remarks: '',
+};
+
 const DriversManagement = () => {
   const { get, post, put, loading } = useApi();
   const navigate = useNavigate();
@@ -31,8 +36,10 @@ const DriversManagement = () => {
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [isAssignModalOpen, setIsAssignModalOpen] = useState(false);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [isDepositModalOpen, setIsDepositModalOpen] = useState(false);
   const [selectedDriver, setSelectedDriver] = useState(null);
   const [formData, setFormData] = useState(defaultForm);
+  const [depositForm, setDepositForm] = useState(defaultDepositForm);
 
   useEffect(() => {
     const loadPage = async () => {
@@ -64,6 +71,7 @@ const DriversManagement = () => {
   };
 
   const resetForm = () => setFormData(defaultForm);
+  const resetDepositForm = () => setDepositForm(defaultDepositForm);
 
   const refreshAll = async () => {
     await Promise.all([fetchDrivers(), fetchCars(), fetchHelpers()]);
@@ -146,6 +154,25 @@ const DriversManagement = () => {
     }
   };
 
+  const handleDeposit = async (e) => {
+    e.preventDefault();
+    if (!selectedDriver) return;
+
+    const result = await post(`/admin/drivers/${selectedDriver.id}/company-deposits`, {
+      amount: depositForm.amount,
+      remarks: depositForm.remarks,
+    });
+
+    if (result.success) {
+      setIsDepositModalOpen(false);
+      setSelectedDriver(null);
+      resetDepositForm();
+      refreshAll();
+    } else {
+      alert(result.error);
+    }
+  };
+
   const openAssignModal = (driver) => {
     setSelectedDriver(driver);
     setFormData((prev) => ({ ...prev, car_id: driver.car_id ? String(driver.car_id) : '' }));
@@ -172,7 +199,25 @@ const DriversManagement = () => {
     setIsEditModalOpen(true);
   };
 
+  const openDepositModal = (driver) => {
+    setSelectedDriver(driver);
+    resetDepositForm();
+    setIsDepositModalOpen(true);
+  };
+
   const openReportPage = (driverId) => navigate(`/drivers/${driverId}/report`);
+  const openCashoutPage = (driver) => navigate(`/drivers/${driver.id}/cashout-history`, {
+    state: {
+      driverName: driver.full_name || driver.username || '',
+      driverUsername: driver.username || '',
+    }
+  });
+  const openDepositHistoryPage = (driver) => navigate(`/drivers/${driver.id}/deposit-history`, {
+    state: {
+      driverName: driver.full_name || driver.username || '',
+      driverUsername: driver.username || '',
+    }
+  });
 
   const filteredDrivers = useMemo(() => drivers.filter((driver) => {
     const term = searchTerm.toLowerCase();
@@ -374,6 +419,9 @@ const DriversManagement = () => {
               onEdit={openEditModal}
               onAssign={openAssignModal}
               onViewReport={openReportPage}
+              onViewCashout={openCashoutPage}
+              onDeposit={openDepositModal}
+              onViewDeposits={openDepositHistoryPage}
             />
           ))}
         </div>
@@ -425,6 +473,41 @@ const DriversManagement = () => {
           <div className="flex gap-3 pt-4">
             <button type="button" onClick={() => setIsEditModalOpen(false)} className="flex-1 btn-secondary">Cancel</button>
             <button type="submit" className="flex-1 btn-primary">Save Changes</button>
+          </div>
+        </form>
+      </Modal>
+
+      <Modal
+        isOpen={isDepositModalOpen}
+        onClose={() => setIsDepositModalOpen(false)}
+        title={`Deposit Company Amount to ${selectedDriver?.full_name || selectedDriver?.username || ''}`}
+      >
+        <form onSubmit={handleDeposit} className="space-y-4">
+          <div>
+            <label className="block text-sm font-medium text-cargo-text mb-2">Deposit Amount</label>
+            <input
+              type="number"
+              min="0"
+              step="0.01"
+              required
+              value={depositForm.amount}
+              onChange={(e) => setDepositForm((prev) => ({ ...prev, amount: e.target.value }))}
+              className="input-field w-full"
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-cargo-text mb-2">Remarks</label>
+            <textarea
+              rows="4"
+              value={depositForm.remarks}
+              onChange={(e) => setDepositForm((prev) => ({ ...prev, remarks: e.target.value }))}
+              className="input-field w-full"
+              placeholder="Optional note for this deposit"
+            />
+          </div>
+          <div className="flex gap-3 pt-4">
+            <button type="button" onClick={() => setIsDepositModalOpen(false)} className="flex-1 btn-secondary">Cancel</button>
+            <button type="submit" className="flex-1 btn-primary">Save Deposit</button>
           </div>
         </form>
       </Modal>

@@ -264,11 +264,12 @@ const ExpenseBreakdown = ({ row, onEditExpense, onAddExpense, onDeleteExpense })
       created_at: row.ended_at || row.started_at,
       location: null,
       liters: null,
-      receipt_image: row.bilty_slip_image || null,
+      receipt_image: null,
       notes: null,
     }] : []),
   ], tripExpenseCategories);
-  const totalExpenses = Number(row.trip_expenses_total ?? row.total_expenses ?? 0);
+  const effectiveBiltyCommissionAmount = hasStoredBiltyCommissionExpense ? 0 : biltyCommissionAmount;
+  const totalExpenses = Number(row.trip_expenses_total ?? 0) + effectiveBiltyCommissionAmount;
   const groupedExpenses = groupExpensesByCategory(expenses, tripExpenseCategories, 'receipt_image');
 
   return (
@@ -360,6 +361,9 @@ const FindingTripExpenseBreakdown = ({
   const nextTripTag = title === 'Waiting For Next Trip Expenses' && row?.pending_next_trip_target_trip_id
     ? `Trip #${row.pending_next_trip_target_trip_id}`
     : null;
+  const wastedKm = title === 'Waiting For Next Trip Expenses'
+    ? Number(row?.pending_next_trip_wasted_km ?? 0)
+    : 0;
 
   if (!groupedExpenses.length && !allowAdd) {
     return null;
@@ -376,6 +380,11 @@ const FindingTripExpenseBreakdown = ({
           {nextTripTag ? (
             <span className="inline-flex mt-2 text-[11px] px-2 py-0.5 rounded-full bg-primary-600/10 text-primary-300">
               {nextTripTag}
+            </span>
+          ) : null}
+          {wastedKm > 0 ? (
+            <span className="inline-flex mt-2 ml-2 text-[11px] px-2 py-0.5 rounded-full bg-rose-600/10 text-rose-300 border border-rose-600/20">
+              Wasted {wastedKm.toLocaleString()} km
             </span>
           ) : null}
         </div>
@@ -460,6 +469,7 @@ const SummaryCard = ({ icon: Icon, label, value, tone = 'text-cargo-text' }) => 
 
 const RequestCard = ({
   row,
+  tripNumber,
   busyId,
   onEditCommission,
   onStatusChange,
@@ -473,6 +483,7 @@ const RequestCard = ({
 }) => {
   const pending = row.status === 'pending';
   const distance = Math.max((Number(row.end_meter_reading) || 0) - (Number(row.start_meter_reading) || 0), 0);
+  const wastedKm = Number(row.pending_next_trip_wasted_km ?? 0);
   const varianceTone = getVarianceTone(row.freight_variance_direction);
   const reviewedAt = row.reviewed_at || row.updated_at;
 
@@ -481,7 +492,9 @@ const RequestCard = ({
       <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-3">
         <div className="flex items-start gap-3">
           <div className={`mt-1 p-2 rounded-lg ${pending ? 'bg-cargo-accent/10' : row.status === 'approved' ? 'bg-cargo-success/10' : 'bg-cargo-danger/10'}`}>
-            <Route className={`w-4 h-4 ${pending ? 'text-cargo-accent' : row.status === 'approved' ? 'text-cargo-success' : 'text-cargo-danger'}`} />
+            <span className={`block min-w-[1rem] text-center text-xs font-bold leading-4 ${pending ? 'text-cargo-accent' : row.status === 'approved' ? 'text-cargo-success' : 'text-cargo-danger'}`}>
+              {tripNumber ?? '-'}
+            </span>
           </div>
           <div>
             <p className="text-cargo-text font-bold text-base">
@@ -496,7 +509,6 @@ const RequestCard = ({
                 <Car className="w-3 h-3" />
                 Car: {row.car_number || 'No cargo assigned'}
               </span>
-              <span>Trip #{row.trip_id}</span>
             </div>
           </div>
         </div>
@@ -529,27 +541,35 @@ const RequestCard = ({
         ) : null}
       </div>
 
-      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
+      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-7 gap-3">
         {[
           { label: 'Requested', value: formatDate(row.created_at), icon: Calendar },
           { label: 'Reviewed', value: pending ? 'Waiting' : formatDate(reviewedAt), icon: Clock3 },
-          { label: 'Freight', value: formatCurrency(row.freight_charge), subvalue: `↕ ${formatVariancePercent(row.freight_variance_percentage)}`, icon: Wallet, tone: varianceTone },
+          { label: 'Freight', value: formatCurrency(row.freight_charge), subvalue: `↕ ${formatVariancePercent(row.freight_variance_percentage)}`, icon: Wallet, tone: varianceTone, imageSrc: row.bilty_slip_image || null, imageAlt: 'Bilty slip' },
           { label: 'Expenses', value: formatCurrency(row.total_expenses), icon: TrendingDown },
           { label: 'Net income', value: formatCurrency(row.net_profit ?? row.net_income), icon: TrendingUp, highlight: true },
           { label: 'Distance', value: `${distance.toLocaleString()} km`, subvalue: `Avg: ${formatAverage(row.trip_average_km_per_liter)}`, icon: Activity },
+          { label: 'Wasted', value: `${wastedKm.toLocaleString()} km`, icon: Route, tone: wastedKm > 0 ? 'text-cargo-danger' : 'text-cargo-text' },
         ].map((item) => (
           <div
             key={item.label}
             className={`rounded-lg border p-3 ${item.highlight ? 'border-cargo-success/30 bg-cargo-success/5' : 'border-cargo-border bg-cargo-dark/20'}`}
           >
-            <p className="text-xs text-cargo-muted font-medium flex items-center gap-1">
-              <item.icon className="w-3 h-3" />
-              {item.label}
-            </p>
-            <p className={`text-sm font-semibold mt-1.5 ${item.highlight ? 'text-cargo-success' : item.tone || 'text-cargo-text'}`}>
-              {item.value}
-            </p>
-            {item.subvalue ? <p className={`text-xs mt-1 ${item.tone || 'text-cargo-muted'}`}>{item.subvalue}</p> : null}
+            <div className="flex items-start justify-between gap-2">
+              <div className="min-w-0">
+                <p className="text-xs text-cargo-muted font-medium flex items-center gap-1">
+                  <item.icon className="w-3 h-3" />
+                  {item.label}
+                </p>
+                <p className={`text-sm font-semibold mt-1.5 ${item.highlight ? 'text-cargo-success' : item.tone || 'text-cargo-text'}`}>
+                  {item.value}
+                </p>
+                {item.subvalue ? <p className={`text-xs mt-1 ${item.tone || 'text-cargo-muted'}`}>{item.subvalue}</p> : null}
+              </div>
+              {item.imageSrc ? (
+                <ClickableImage src={item.imageSrc} alt={item.imageAlt || item.label} className="h-12 w-12 shrink-0" />
+              ) : null}
+            </div>
           </div>
         ))}
       </div>
@@ -697,7 +717,7 @@ const RequestSection = ({
 
     {requests.length ? (
       <div className="space-y-4">
-        {requests.map((row) => (
+        {requests.map((row, index) => (
           <div key={row.request_id} className="space-y-4">
             <FindingTripExpenseBreakdown
               row={row}
@@ -711,6 +731,7 @@ const RequestSection = ({
             />
             <RequestCard
               row={row}
+              tripNumber={index + 1}
               busyId={busyId}
               onEditCommission={onEditCommission}
               onStatusChange={onStatusChange}

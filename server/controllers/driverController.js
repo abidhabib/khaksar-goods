@@ -5,6 +5,7 @@ const {
     ensureDriverDailyExpenseEntriesTable,
     ensureDriverDailyExpenseEntryColumns,
     ensureDriverPaymentSubmissionsTable,
+    ensureDriverCompanyBalanceAdjustmentsTable,
     ensureDriverLocationLogsTable,
     ensureDriverLeaveRequestsTable,
     ensureFreightRateCardsTable
@@ -19,6 +20,48 @@ const {
     attachBetweenTripDailyExpenses
 } = require('../utils/helpers');
 const { calculateFreightEstimate } = require('../services/freightRateService');
+const DRIVER_TOTAL_INCOME_SQL = (driverAlias) => `
+    (
+        COALESCE((
+            SELECT SUM(CASE WHEN t.status = 'completed' THEN t.freight_charge ELSE 0 END)
+            FROM trips t
+            WHERE t.driver_id = ${driverAlias}
+        ), 0)
+        -
+        COALESCE((
+            SELECT SUM(e.amount)
+            FROM expenses e
+            JOIN trips t2 ON t2.id = e.trip_id
+            WHERE t2.driver_id = ${driverAlias}
+              AND t2.status = 'completed'
+        ), 0)
+        -
+        COALESCE((
+            SELECT SUM(de.amount)
+            FROM driver_daily_expense_entries de
+            WHERE de.driver_id = ${driverAlias}
+        ), 0)
+        -
+        COALESCE((
+            SELECT SUM(CASE WHEN r.status = 'approved' THEN r.amount ELSE 0 END)
+            FROM driver_cashout_requests r
+            WHERE r.driver_id = ${driverAlias}
+        ), 0)
+        -
+        COALESCE((
+            SELECT SUM(CASE WHEN dps.status = 'approved' THEN dps.amount ELSE 0 END)
+            FROM driver_payment_submissions dps
+            WHERE dps.driver_id = ${driverAlias}
+        ), 0)
+        +
+        COALESCE((
+            SELECT SUM(CASE WHEN dcba.adjustment_type = 'deposit' THEN dcba.amount ELSE 0 END)
+            FROM driver_company_balance_adjustments dcba
+            WHERE dcba.driver_id = ${driverAlias}
+        ), 0)
+        + 15000
+    )
+`;
 const getAuthenticatedDriverId = (req) => {
     const driverId = req?.user?.driver_id;
     return driverId !== undefined && driverId !== null ? Number(driverId) : null;
@@ -1030,6 +1073,13 @@ const endTrip = async (req, res) => {
 
 const addTripExpense = async (req, res) => {
     try {
+        const schemaConnection = await pool.getConnection();
+        try {
+            await ensureDriverCompanyBalanceAdjustmentsTable(schemaConnection);
+        } finally {
+            schemaConnection.release();
+        }
+
         const driver_id = await resolveDriverId(req);
         if (!driver_id) {
             return res.status(403).json({ message: 'Driver account required' });
@@ -1601,35 +1651,7 @@ const getCompanyPayments = async (req, res) => {
         const [[income]] = await pool.execute(
             `SELECT
                 c.car_number,
-                (
-                    COALESCE((
-                        SELECT SUM(CASE WHEN t.status = 'completed' THEN t.freight_charge ELSE 0 END)
-                        FROM trips t
-                        WHERE t.driver_id = d.id
-                    ), 0)
-                    -
-                    COALESCE((
-                        SELECT SUM(e.amount)
-                        FROM expenses e
-                        JOIN trips t2 ON t2.id = e.trip_id
-                        WHERE t2.driver_id = d.id
-                          AND t2.status = 'completed'
-                    ), 0)
-                    -
-                    COALESCE((
-                        SELECT SUM(de.amount)
-                        FROM driver_daily_expense_entries de
-                        WHERE de.driver_id = d.id
-                    ), 0)
-                    -
-                    COALESCE((
-                        SELECT SUM(CASE WHEN r.status = 'approved' THEN r.amount ELSE 0 END)
-                        FROM driver_cashout_requests r
-                        WHERE r.driver_id = d.id
-                    ), 0)
-                    +
-                    15000
-                ) AS total_income
+                ${DRIVER_TOTAL_INCOME_SQL('d.id')} AS total_income
              FROM drivers d
              LEFT JOIN cars c ON d.assigned_car_id = c.id
              WHERE d.id = ?
@@ -1839,10 +1861,15 @@ const createDriverCashoutRequest = async (req, res) => {
             return res.status(400).json({ message: 'Requested amount exceeds available balance' });
         }
 
+        await connection.execute(
+            `UPDATE drivers SET ${balanceColumn} = ${balanceColumn} - ? WHERE id = ?`,
+            [amountValue, driver_id]
+        );
+
         const [result] = await connection.execute(
             `INSERT INTO driver_cashout_requests
-                (driver_id, balance_type, amount, receive_method, account_number, account_name, bank_name, status)
-             VALUES (?, ?, ?, ?, ?, ?, ?, 'pending')`,
+                (driver_id, balance_type, amount, receive_method, account_number, account_name, bank_name, status, reviewed_at)
+             VALUES (?, ?, ?, ?, ?, ?, ?, 'approved', CURRENT_TIMESTAMP)`,
             [
                 driver_id,
                 balanceType,
@@ -1854,8 +1881,25 @@ const createDriverCashoutRequest = async (req, res) => {
             ]
         );
 
+        await createDriverAccountTransaction(connection, {
+            driverId: driver_id,
+            balanceType,
+            transactionType: 'cashout_debit',
+            direction: 'debit',
+            amount: amountValue,
+            sourceType: 'driver_cashout_request',
+            sourceId: result.insertId,
+            notes: `Driver cashout approved via ${receiveMethod}`
+        });
+
         await connection.commit();
-        res.status(201).json({ success: true, message: 'Driver cashout request submitted', request_id: result.insertId });
+        res.status(201).json({
+            success: true,
+            message: 'Driver cashout request approved',
+            request_id: result.insertId,
+            remaining_balance: Math.max(0, balance - amountValue),
+            balance_type: balanceType
+        });
     } catch (error) {
         await connection.rollback();
         res.status(500).json({ message: 'Server error', error: error.message });

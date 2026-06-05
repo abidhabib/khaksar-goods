@@ -52,7 +52,9 @@ const attachBetweenTripDailyExpenses = (trips, timelineTrips = [], dailyExpenseE
             driver_id: driverId,
             status: timelineTrip.status,
             started_at_ms: toTimestampMs(timelineTrip.started_at),
-            ended_at_ms: toTimestampMs(timelineTrip.ended_at)
+            ended_at_ms: toTimestampMs(timelineTrip.ended_at),
+            start_meter_reading: Number(timelineTrip.start_meter_reading),
+            end_meter_reading: Number(timelineTrip.end_meter_reading)
         });
     }
 
@@ -75,11 +77,17 @@ const attachBetweenTripDailyExpenses = (trips, timelineTrips = [], dailyExpenseE
 
             let nextTripId = null;
             let nextStartedAtMs = null;
+            let wastedKm = 0;
             for (let nextIndex = index + 1; nextIndex < driverTrips.length; nextIndex += 1) {
                 const nextTrip = driverTrips[nextIndex];
                 if (nextTrip.started_at_ms !== null && nextTrip.started_at_ms > trip.ended_at_ms) {
                     nextTripId = nextTrip.id;
                     nextStartedAtMs = nextTrip.started_at_ms;
+                    const previousEndMeter = Number(trip.end_meter_reading);
+                    const nextStartMeter = Number(nextTrip.start_meter_reading);
+                    wastedKm = Number.isFinite(previousEndMeter) && Number.isFinite(nextStartMeter)
+                        ? Math.max(0, nextStartMeter - previousEndMeter)
+                        : 0;
                     break;
                 }
             }
@@ -88,7 +96,8 @@ const attachBetweenTripDailyExpenses = (trips, timelineTrips = [], dailyExpenseE
                 completed_trip_id: trip.id,
                 next_trip_id: nextTripId,
                 start_ms: trip.ended_at_ms,
-                end_ms: nextStartedAtMs
+                end_ms: nextStartedAtMs,
+                wasted_km: wastedKm
             };
             windows.push(window);
 
@@ -100,6 +109,7 @@ const attachBetweenTripDailyExpenses = (trips, timelineTrips = [], dailyExpenseE
     const linkedByTripId = new Map();
     const waitingByTripId = new Map();
     const waitingTargetTripIdByTripId = new Map();
+    const waitingWastedKmByTripId = new Map();
     for (const entry of dailyExpenseEntries) {
         const driverId = Number(entry?.driver_id);
         const amount = Number(entry?.amount) || 0;
@@ -151,6 +161,10 @@ const attachBetweenTripDailyExpenses = (trips, timelineTrips = [], dailyExpenseE
                     Number.isFinite(targetWindow.next_trip_id) ? targetWindow.next_trip_id : null
                 );
             }
+
+            if (!waitingWastedKmByTripId.has(targetWindow.completed_trip_id)) {
+                waitingWastedKmByTripId.set(targetWindow.completed_trip_id, Number(targetWindow.wasted_km) || 0);
+            }
         }
 
         if (Number.isFinite(targetWindow.next_trip_id)) {
@@ -197,6 +211,9 @@ const attachBetweenTripDailyExpenses = (trips, timelineTrips = [], dailyExpenseE
             pending_next_trip_target_trip_id: waitingTargetTripIdByTripId.has(tripId)
                 ? waitingTargetTripIdByTripId.get(tripId)
                 : null,
+            pending_next_trip_wasted_km: waitingWastedKmByTripId.has(tripId)
+                ? waitingWastedKmByTripId.get(tripId)
+                : 0,
             expenses: tripExpenses
         };
     });

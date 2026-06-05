@@ -158,6 +158,28 @@ const ensureDriverPaymentSubmissionsTable = async (connection) => {
     `);
 };
 
+const ensureDriverCompanyBalanceAdjustmentsTable = async (connection) => {
+    await connection.query(`
+        CREATE TABLE IF NOT EXISTS driver_company_balance_adjustments (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            driver_id INT NOT NULL,
+            amount DECIMAL(10,2) NOT NULL DEFAULT 0.00,
+            adjustment_type ENUM('deposit') NOT NULL DEFAULT 'deposit',
+            remarks TEXT NULL,
+            created_by INT NOT NULL,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            INDEX idx_driver_company_balance_adjustments_driver_created (driver_id, created_at),
+            INDEX idx_driver_company_balance_adjustments_creator (created_by, created_at),
+            CONSTRAINT fk_driver_company_balance_adjustments_driver
+                FOREIGN KEY (driver_id) REFERENCES drivers(id)
+                ON DELETE CASCADE,
+            CONSTRAINT fk_driver_company_balance_adjustments_creator
+                FOREIGN KEY (created_by) REFERENCES users(id)
+                ON DELETE CASCADE
+        )
+    `);
+};
+
 const ensureDriverLocationLogsTable = async (connection) => {
     await connection.query(`
         CREATE TABLE IF NOT EXISTS driver_location_logs (
@@ -465,6 +487,7 @@ const ensureSchema = async () => {
         await ensureDriverDailyExpenseEntriesTable(connection);
         await ensureDriverDailyExpenseEntryColumns(connection, databaseName);
         await ensureDriverPaymentSubmissionsTable(connection);
+        await ensureDriverCompanyBalanceAdjustmentsTable(connection);
         await ensureDriverLocationLogsTable(connection);
         await ensureDriverLeaveRequestsTable(connection);
         await ensureDriverAccountTransactionsTable(connection);
@@ -497,6 +520,7 @@ module.exports = {
     ensureDriverDailyExpenseEntriesTable,
     ensureDriverDailyExpenseEntryColumns,
     ensureDriverPaymentSubmissionsTable,
+    ensureDriverCompanyBalanceAdjustmentsTable,
     ensureDriverLocationLogsTable,
     ensureDriverLeaveRequestsTable,
     ensureFreightRateCardsTable

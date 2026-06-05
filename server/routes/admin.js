@@ -20,6 +20,8 @@ const {
     getDriverCommissionRequests,
     updateDriverCommissionRequest,
     updateDriverCommissionRequestStatus,
+    getDriverCompanyBalanceAdjustments,
+    addDriverCompanyBalanceAdjustment,
     getDriverCashoutRequests,
     updateDriverCashoutRequest,
     updateDriverCashoutRequestStatus,
@@ -82,6 +84,8 @@ router.delete('/drivers-expenses/:id', authMiddleware, adminOnly, deleteDriverDa
 router.get('/driver-commission-requests', authMiddleware, adminOnly, getDriverCommissionRequests);
 router.put('/driver-commission-requests/:id', authMiddleware, adminOnly, updateDriverCommissionRequest);
 router.put('/driver-commission-requests/:id/status', authMiddleware, adminOnly, updateDriverCommissionRequestStatus);
+router.get('/driver-company-balance-adjustments', authMiddleware, adminOnly, getDriverCompanyBalanceAdjustments);
+router.post('/drivers/:id/company-deposits', authMiddleware, adminOnly, addDriverCompanyBalanceAdjustment);
 router.get('/driver-cashout-requests', authMiddleware, adminOnly, getDriverCashoutRequests);
 router.put('/driver-cashout-requests/:id', authMiddleware, adminOnly, updateDriverCashoutRequest);
 router.put('/driver-cashout-requests/:id/status', authMiddleware, adminOnly, updateDriverCashoutRequestStatus);

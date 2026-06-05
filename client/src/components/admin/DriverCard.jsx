@@ -1,8 +1,8 @@
 import { useState } from 'react';
-import { User, Phone, Car, Activity, MoreVertical, MapPin, HandHelping, Wallet, Coins, CalendarDays, IdCard } from 'lucide-react';
+import { User, Phone, Car, Activity, MoreVertical, MapPin, HandHelping, Wallet, Coins, CalendarDays, IdCard, Landmark } from 'lucide-react';
 import { formatLocationAgo, formatLocationSummary } from '../../utils/location';
 
-const DriverCard = ({ driver, onEdit, onAssign, onViewReport }) => {
+const DriverCard = ({ driver, onEdit, onAssign, onViewReport, onViewCashout, onDeposit, onViewDeposits }) => {
   const [menuOpen, setMenuOpen] = useState(false);
   const statusColors = {
     active: 'bg-cargo-success/20 text-cargo-success',
@@ -50,6 +50,26 @@ const DriverCard = ({ driver, onEdit, onAssign, onViewReport }) => {
                 type="button"
                 onClick={() => {
                   setMenuOpen(false);
+                  onDeposit(driver);
+                }}
+                className="block w-full px-4 py-2 text-left text-sm text-cargo-text hover:bg-cargo-border/40"
+              >
+                Deposit Balance
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setMenuOpen(false);
+                  onViewDeposits(driver);
+                }}
+                className="block w-full px-4 py-2 text-left text-sm text-cargo-text hover:bg-cargo-border/40"
+              >
+                See Deposits
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setMenuOpen(false);
                   onEdit(driver);
                 }}
                 className="block w-full px-4 py-2 text-left text-sm text-cargo-text hover:bg-cargo-border/40"
@@ -75,6 +95,16 @@ const DriverCard = ({ driver, onEdit, onAssign, onViewReport }) => {
                 className="block w-full px-4 py-2 text-left text-sm text-cargo-text hover:bg-cargo-border/40"
               >
                 View Report
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setMenuOpen(false);
+                  onViewCashout(driver);
+                }}
+                className="block w-full px-4 py-2 text-left text-sm text-cargo-text hover:bg-cargo-border/40"
+              >
+                See Cashout
               </button>
             </div>
           )}
@@ -174,20 +204,39 @@ const DriverCard = ({ driver, onEdit, onAssign, onViewReport }) => {
         </div>
       </div>
 
-      <div className="flex gap-2 pt-3 border-t border-cargo-border">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-3 border-t border-cargo-border">
         <button 
           onClick={() => onViewReport(driver.id)}
-          className="flex-1 btn-secondary text-sm py-2"
+          className="btn-secondary text-sm py-2"
         >
           View Report
         </button>
         <button 
+          onClick={() => onViewCashout(driver)}
+          className="btn-secondary text-sm py-2"
+        >
+          See Cashout
+        </button>
+        <button
+          onClick={() => onDeposit(driver)}
+          className="btn-secondary text-sm py-2 flex items-center justify-center gap-2"
+        >
+          <Landmark className="w-4 h-4" />
+          Deposit
+        </button>
+        <button 
           onClick={() => onAssign(driver)}
-          className="flex-1 btn-primary text-sm py-2"
+          className="btn-primary text-sm py-2"
         >
           {driver.car_id ? 'Reassign Car' : 'Assign Car'}
         </button>
       </div>
+      <button
+        onClick={() => onViewDeposits(driver)}
+        className="w-full mt-2 text-sm text-primary-300 hover:text-primary-200"
+      >
+        See Deposit History
+      </button>
     </div>
   );
 };

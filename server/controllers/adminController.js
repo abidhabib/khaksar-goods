@@ -4,6 +4,7 @@ const {
     ensureDriverDailyExpenseEntriesTable,
     ensureDriverDailyExpenseEntryColumns,
     ensureDriverPaymentSubmissionsTable,
+    ensureDriverCompanyBalanceAdjustmentsTable,
     ensureDriverLeaveRequestsTable,
     ensureFreightRateCardsTable
 } = require('../config/schema');
@@ -54,6 +55,48 @@ const DAILY_EXPENSE_CATEGORIES = new Set([
     'other'
 ]);
 const MOBOIL_CHANGE_INTERVAL = 5000;
+const DRIVER_COMPANY_AMOUNT_SQL = (driverAlias) => `
+    (
+        COALESCE((
+            SELECT SUM(CASE WHEN t3.status = 'completed' THEN t3.freight_charge ELSE 0 END)
+            FROM trips t3
+            WHERE t3.driver_id = ${driverAlias}
+        ), 0)
+        -
+        COALESCE((
+            SELECT SUM(e.amount)
+            FROM expenses e
+            JOIN trips t4 ON t4.id = e.trip_id
+            WHERE t4.driver_id = ${driverAlias}
+              AND t4.status = 'completed'
+        ), 0)
+        -
+        COALESCE((
+            SELECT SUM(de.amount)
+            FROM driver_daily_expense_entries de
+            WHERE de.driver_id = ${driverAlias}
+        ), 0)
+        -
+        COALESCE((
+            SELECT SUM(CASE WHEN r.status = 'approved' THEN r.amount ELSE 0 END)
+            FROM driver_cashout_requests r
+            WHERE r.driver_id = ${driverAlias}
+        ), 0)
+        -
+        COALESCE((
+            SELECT SUM(CASE WHEN dps.status = 'approved' THEN dps.amount ELSE 0 END)
+            FROM driver_payment_submissions dps
+            WHERE dps.driver_id = ${driverAlias}
+        ), 0)
+        +
+        COALESCE((
+            SELECT SUM(CASE WHEN dcba.adjustment_type = 'deposit' THEN dcba.amount ELSE 0 END)
+            FROM driver_company_balance_adjustments dcba
+            WHERE dcba.driver_id = ${driverAlias}
+        ), 0)
+        + 15000
+    )
+`;
 
 const toNullableString = (value) => {
     if (value === undefined || value === null) {
@@ -649,6 +692,13 @@ const assignCarWithIntegrity = async (connection, driverId, carId) => {
 // Get all cars with assigned driver info
 const getAllCars = async (req, res) => {
     try {
+        const schemaConnection = await pool.getConnection();
+        try {
+            await ensureDriverCompanyBalanceAdjustmentsTable(schemaConnection);
+        } finally {
+            schemaConnection.release();
+        }
+
         const [cars] = await pool.execute(`
             SELECT c.*, 
                    d.id as driver_id, 
@@ -672,6 +722,7 @@ const getAllCars = async (req, res) => {
                        JOIN expenses e4 ON e4.trip_id = t5.id AND e4.category = 'diesel'
                        WHERE t5.car_id = c.id AND t5.status = 'completed'
                    ) as total_diesel_liters,
+                   ${DRIVER_COMPANY_AMOUNT_SQL('d.id')} as company_amount,
                    ca.start_meter_reading as assigned_at_meter,
                    ca.assigned_at as assignment_assigned_at,
                    (
@@ -1073,6 +1124,7 @@ const getAllDrivers = async (req, res) => {
     try {
         const connection = await pool.getConnection();
         try {
+            await ensureDriverCompanyBalanceAdjustmentsTable(connection);
             await syncAllDriverSalary(connection);
             await syncAllHelperSalary(connection);
         } finally {
@@ -1085,36 +1137,7 @@ const getAllDrivers = async (req, res) => {
                    u.username, u.phone, u.status, u.created_at,
                    c.id as car_id, c.car_number, c.current_meter_reading as car_current_meter,
                    h.helper_name, h.phone_number as helper_phone_number, h.salary_amount as helper_salary_amount,
-                   (
-                       COALESCE((
-                           SELECT SUM(CASE WHEN t3.status = 'completed' THEN t3.freight_charge ELSE 0 END)
-                           FROM trips t3
-                           WHERE t3.driver_id = d.id
-                       ), 0)
-                       -
-                       COALESCE((
-                           SELECT SUM(e.amount)
-                           FROM expenses e
-                           JOIN trips t4 ON t4.id = e.trip_id
-                           WHERE t4.driver_id = d.id
-                             AND t4.status = 'completed'
-                       ), 0)
-                       -
-                       COALESCE((
-                           SELECT SUM(de.amount)
-                           FROM driver_daily_expense_entries de
-                           WHERE de.driver_id = d.id
-                       ), 0)
-                       -
-                       COALESCE((
-                           SELECT SUM(CASE WHEN r.status = 'approved' THEN r.amount ELSE 0 END)
-                           FROM driver_cashout_requests r
-                           WHERE r.driver_id = d.id
-                       ), 0)
-                       
-                        +15000
-                     
-                   ) AS company_amount,
+                   ${DRIVER_COMPANY_AMOUNT_SQL('d.id')} AS company_amount,
                    dll.area as last_location_area,
                    dll.city as last_location_city,
                    dll.province as last_location_province,
@@ -1163,7 +1186,6 @@ const getAllDrivers = async (req, res) => {
         res.status(500).json({ message: 'Server error' });
     }
 };
-
 // Add new driver (creates user + driver profile)
 const addDriver = async (req, res) => {
     const connection = await pool.getConnection();
@@ -1827,6 +1849,111 @@ const getDriverCashoutRequests = async (req, res) => {
         );
 
         res.json({ success: true, requests });
+    } catch (error) {
+        res.status(500).json({ message: 'Server error', error: error.message });
+    }
+};
+
+const getDriverCompanyBalanceAdjustments = async (req, res) => {
+    try {
+        const schemaConnection = await pool.getConnection();
+        try {
+            await ensureDriverCompanyBalanceAdjustmentsTable(schemaConnection);
+        } finally {
+            schemaConnection.release();
+        }
+
+        const driverId = Number(req.query?.driver_id);
+        if (!driverId) {
+            return res.status(400).json({ message: 'Driver id is required' });
+        }
+
+        const [adjustments] = await pool.execute(
+            `SELECT dcba.*,
+                    d.full_name AS driver_full_name,
+                    driver_user.username AS driver_username,
+                    creator.username AS created_by_username
+             FROM driver_company_balance_adjustments dcba
+             JOIN drivers d ON dcba.driver_id = d.id
+             JOIN users driver_user ON d.user_id = driver_user.id
+             JOIN users creator ON dcba.created_by = creator.id
+             WHERE dcba.driver_id = ?
+             ORDER BY dcba.created_at DESC, dcba.id DESC`,
+            [driverId]
+        );
+
+        const [[summary]] = await pool.execute(
+            `SELECT
+                COALESCE(SUM(CASE WHEN adjustment_type = 'deposit' THEN amount ELSE 0 END), 0) AS total_deposits
+             FROM driver_company_balance_adjustments
+             WHERE driver_id = ?`,
+            [driverId]
+        );
+
+        res.json({
+            success: true,
+            adjustments,
+            summary: {
+                total_deposits: Number(summary?.total_deposits) || 0
+            }
+        });
+    } catch (error) {
+        res.status(500).json({ message: 'Server error', error: error.message });
+    }
+};
+
+const addDriverCompanyBalanceAdjustment = async (req, res) => {
+    try {
+        const schemaConnection = await pool.getConnection();
+        try {
+            await ensureDriverCompanyBalanceAdjustmentsTable(schemaConnection);
+        } finally {
+            schemaConnection.release();
+        }
+
+        const driverId = Number(req.params.id);
+        const amount = toNonNegativeAmount(req.body?.amount);
+        const remarks = toNullableString(req.body?.remarks);
+
+        if (!driverId) {
+            return res.status(400).json({ message: 'Valid driver id is required' });
+        }
+
+        if (!(amount > 0)) {
+            return res.status(400).json({ message: 'Deposit amount must be greater than zero' });
+        }
+
+        const [driverRows] = await pool.execute(
+            'SELECT id FROM drivers WHERE id = ? LIMIT 1',
+            [driverId]
+        );
+
+        if (!driverRows.length) {
+            return res.status(404).json({ message: 'Driver not found' });
+        }
+
+        const [result] = await pool.execute(
+            `INSERT INTO driver_company_balance_adjustments
+             (driver_id, amount, adjustment_type, remarks, created_by)
+             VALUES (?, ?, 'deposit', ?, ?)`,
+            [driverId, amount, remarks, req.user.id]
+        );
+
+        const [[adjustment]] = await pool.execute(
+            `SELECT dcba.*,
+                    creator.username AS created_by_username
+             FROM driver_company_balance_adjustments dcba
+             JOIN users creator ON dcba.created_by = creator.id
+             WHERE dcba.id = ?
+             LIMIT 1`,
+            [result.insertId]
+        );
+
+        res.status(201).json({
+            success: true,
+            message: 'Driver company balance deposit saved successfully',
+            adjustment
+        });
     } catch (error) {
         res.status(500).json({ message: 'Server error', error: error.message });
     }
@@ -3227,7 +3354,7 @@ const attachExpensesToTrips = async (trips) => {
     const driverPlaceholders = driverIds.map(() => '?').join(', ');
     const [timelineTrips, dailyExpenseRows] = await Promise.all([
         pool.execute(
-            `SELECT id, driver_id, status, started_at, ended_at
+            `SELECT id, driver_id, status, started_at, ended_at, start_meter_reading, end_meter_reading
              FROM trips
              WHERE driver_id IN (${driverPlaceholders})
              ORDER BY driver_id ASC, started_at ASC, id ASC`,
@@ -3247,13 +3374,27 @@ const attachExpensesToTrips = async (trips) => {
 
 const getDashboardStats = async (req, res) => {
     try {
+        const schemaConnection = await pool.getConnection();
+        try {
+            await ensureDriverCompanyBalanceAdjustmentsTable(schemaConnection);
+        } finally {
+            schemaConnection.release();
+        }
+
         const [[overall]] = await pool.execute(`
             SELECT
                 (SELECT COUNT(*) FROM cars WHERE status = 'active') as active_cars,
                 (SELECT COUNT(*) FROM drivers d JOIN users u ON d.user_id = u.id WHERE u.status = 'active') as active_drivers,
                 (SELECT COUNT(*) FROM helpers WHERE status = 'active') as active_helpers,
                 (SELECT COUNT(*) FROM trips WHERE status = 'ongoing') as ongoing_trips,
-                (SELECT COUNT(*) FROM trips WHERE status = 'completed' AND DATE_FORMAT(started_at, '%Y-%m') = DATE_FORMAT(CURDATE(), '%Y-%m')) as completed_trips_this_month    `);
+                (SELECT COUNT(*) FROM trips WHERE status = 'completed' AND DATE_FORMAT(started_at, '%Y-%m') = DATE_FORMAT(CURDATE(), '%Y-%m')) as completed_trips_this_month,
+                (
+                    SELECT COALESCE(SUM(
+                        ${DRIVER_COMPANY_AMOUNT_SQL('d.id')}
+                    ), 0)
+                    FROM drivers d
+                ) as total_company_amount
+        `);
 
         const monthlyCompletedTripsQuery = `
             SELECT
@@ -3764,6 +3905,8 @@ module.exports = {
     getDriverCommissionRequests,
     updateDriverCommissionRequest,
     updateDriverCommissionRequestStatus,
+    getDriverCompanyBalanceAdjustments,
+    addDriverCompanyBalanceAdjustment,
     getDriverCashoutRequests,
     updateDriverCashoutRequest,
     updateDriverCashoutRequestStatus,

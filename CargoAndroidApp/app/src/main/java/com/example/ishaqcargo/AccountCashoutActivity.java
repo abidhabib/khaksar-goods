@@ -224,6 +224,7 @@ public class AccountCashoutActivity extends AppCompatActivity {
                 runOnUiThread(() -> {
                     setLoading(false);
                     Toast.makeText(AccountCashoutActivity.this, R.string.cashout_submit_success, Toast.LENGTH_SHORT).show();
+                    setResult(RESULT_OK);
                     finish();
                 });
             }

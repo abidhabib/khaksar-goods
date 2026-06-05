@@ -301,6 +301,11 @@ Medical %6$s • Food %7$s • Guard %8$s</string>
     <string name="payment_change_screenshot">Tap to change payment screenshot</string>
     <string name="payment_add_screenshot_gallery">Tap to select screenshot from gallery</string>
     <string name="payment_change_screenshot_gallery">Tap to change screenshot from gallery</string>
+    <string name="payment_add_screenshot_picker">Tap to add screenshot from camera or gallery</string>
+    <string name="payment_change_screenshot_picker">Tap to change screenshot from camera or gallery</string>
+    <string name="payment_pick_screenshot_title">Select screenshot source</string>
+    <string name="payment_pick_from_camera">Camera</string>
+    <string name="payment_pick_from_gallery">Gallery</string>
     <string name="submit_payment">Submit Payment</string>
     <string name="payment_submit_history">History</string>
     <string name="payment_submit_new">New Submission</string>
