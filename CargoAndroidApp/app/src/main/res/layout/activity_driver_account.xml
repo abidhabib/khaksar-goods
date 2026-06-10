@@ -237,6 +237,27 @@
                                 app:backgroundTint="@color/white"
                                 app:cornerRadius="14dp"
                                 app:elevation="0dp" />
+
+                            <com.google.android.material.button.MaterialButton
+                                android:id="@+id/generateCommissionButton"
+                                android:layout_width="match_parent"
+                                android:layout_height="40dp"
+                                android:layout_marginTop="10dp"
+                                android:text="@string/generate_commission_default"
+                                android:textAllCaps="false"
+                                android:textColor="@color/white"
+                                app:backgroundTint="@color/revenue_widget_text"
+                                app:cornerRadius="14dp"
+                                app:elevation="0dp" />
+
+                            <TextView
+                                android:id="@+id/generateCommissionHintText"
+                                android:layout_width="match_parent"
+                                android:layout_height="wrap_content"
+                                android:layout_marginTop="8dp"
+                                android:text="@string/generate_commission_empty"
+                                android:textColor="@color/revenue_widget_text"
+                                android:textSize="11sp" />
                         </LinearLayout>
                     </com.google.android.material.card.MaterialCardView>
                 </LinearLayout>

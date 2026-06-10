@@ -425,6 +425,91 @@ const attachDriverTimelineExpensesToTrips = async (trips) => {
     return attachBetweenTripDailyExpenses(trips, timelineRows[0], dailyExpenseRows[0]);
 };
 
+const applyCommissionTripFormula = (trip) => {
+    const freightCharge = Number(trip?.freight_charge) || 0;
+    const tripExpensesTotal = Number(
+        trip?.trip_expenses_total ?? trip?.current_expenses ?? trip?.total_expenses
+    ) || 0;
+    const betweenTripExpensesTotal = Number(trip?.between_trip_expenses_total) || 0;
+    const biltyCommissionAmount = Number(trip?.bilty_commission_amount) || 0;
+    const hasStoredBiltyCommissionExpense = Array.isArray(trip?.expenses)
+        && trip.expenses.some((expense) => expense?.category === 'bilty_commission');
+    const effectiveBiltyCommissionAmount = hasStoredBiltyCommissionExpense ? 0 : biltyCommissionAmount;
+    const totalExpenses = tripExpensesTotal + betweenTripExpensesTotal + effectiveBiltyCommissionAmount;
+    const netProfit = roundCurrency(freightCharge - totalExpenses);
+
+    return {
+        ...trip,
+        trip_expenses_total: tripExpensesTotal,
+        between_trip_expenses_total: betweenTripExpensesTotal,
+        total_expenses: totalExpenses,
+        net_profit: netProfit,
+        net_income: netProfit
+    };
+};
+
+const fetchDriverCommissionEligibleTrips = async (connection, driverId) => {
+    const [tripRows] = await connection.execute(
+        `SELECT
+            t.id,
+            t.driver_id,
+            t.status,
+            t.started_at,
+            t.ended_at,
+            t.start_meter_reading,
+            t.end_meter_reading,
+            t.freight_charge,
+            t.bilty_commission_amount,
+            COALESCE(exp.total_expenses, 0) AS total_expenses,
+            cr.id AS commission_request_id,
+            cr.status AS commission_request_status
+         FROM trips t
+         LEFT JOIN (
+             SELECT trip_id, SUM(amount) AS total_expenses
+             FROM expenses
+             GROUP BY trip_id
+         ) exp ON exp.trip_id = t.id
+         LEFT JOIN driver_commission_requests cr ON cr.trip_id = t.id
+         WHERE t.driver_id = ?
+           AND t.status = 'completed'
+           AND (cr.id IS NULL OR cr.status <> 'approved')
+         ORDER BY t.started_at ASC, t.id ASC`,
+        [driverId]
+    );
+
+    if (!tripRows.length) {
+        return [];
+    }
+
+    const tripIds = tripRows.map((trip) => Number(trip.id)).filter(Number.isFinite);
+    const placeholders = tripIds.map(() => '?').join(', ');
+    const [expenseRows] = await connection.execute(
+        `SELECT id, trip_id, category, amount, liters, location, coordinates, receipt_image, notes, created_at
+         FROM expenses
+         WHERE trip_id IN (${placeholders})
+         ORDER BY created_at ASC, id ASC`,
+        tripIds
+    );
+
+    const expensesByTripId = expenseRows.reduce((map, expense) => {
+        const tripId = Number(expense.trip_id);
+        if (!map.has(tripId)) {
+            map.set(tripId, []);
+        }
+        map.get(tripId).push(expense);
+        return map;
+    }, new Map());
+
+    const tripsWithExpenses = tripRows.map((trip) => ({
+        ...trip,
+        expenses: expensesByTripId.get(Number(trip.id)) || [],
+        trip_expenses_total: Number(trip.total_expenses) || 0
+    }));
+
+    const tripsWithTimelineExpenses = await attachDriverTimelineExpensesToTrips(tripsWithExpenses);
+    return tripsWithTimelineExpenses.map(applyCommissionTripFormula);
+};
+
 // Get driver's dashboard data
 const getDashboard = async (req, res) => {
     try {
@@ -1002,18 +1087,6 @@ const endTrip = async (req, res) => {
         );
         const totalExpenses = Number(tripExpenseTotals?.total_expenses) || 0;
         const netProfit = roundCurrency((Number(trip[0].freight_charge) || 0) - totalExpenses);
-
-        const [driverRows] = await connection.execute(
-            `SELECT commission_percentage
-             FROM drivers
-             WHERE id = ?
-             LIMIT 1`,
-            [driver_id]
-        );
-        const commissionPercentage = Number(driverRows[0]?.commission_percentage) || 0;
-        const commissionAmount = netProfit > 0 && commissionPercentage > 0
-            ? roundCurrency((netProfit * commissionPercentage) / 100)
-            : 0;
         
         await connection.execute(
             `UPDATE cars 
@@ -1024,23 +1097,6 @@ const endTrip = async (req, res) => {
              WHERE id = ?`,
             [meterReadingValue, trip[0].freight_charge, totalExpenses, distance_km, trip[0].car_id]
         );
-
-        if (commissionAmount > 0) {
-            await connection.execute(
-                `INSERT INTO driver_commission_requests
-                    (driver_id, trip_id, commission_percentage, net_profit, commission_amount, status)
-                 VALUES (?, ?, ?, ?, ?, 'pending')
-                 ON DUPLICATE KEY UPDATE
-                    commission_percentage = VALUES(commission_percentage),
-                    net_profit = VALUES(net_profit),
-                    commission_amount = VALUES(commission_amount),
-                    status = 'pending',
-                    reviewed_by = NULL,
-                    reviewed_at = NULL,
-                    remarks = NULL`,
-                [driver_id, trip_id, commissionPercentage, netProfit, commissionAmount]
-            );
-        }
 
         await connection.commit();
 
@@ -1053,13 +1109,7 @@ const endTrip = async (req, res) => {
                 freight_charge: trip[0].freight_charge,
                 total_expenses: totalExpenses,
                 net_profit: netProfit,
-                commission_request: commissionAmount > 0
-                    ? {
-                        status: 'pending',
-                        commission_percentage: commissionPercentage,
-                        commission_amount: commissionAmount
-                    }
-                    : null
+                commission_request: null
             }
         });
     } catch (error) {
@@ -1763,6 +1813,7 @@ const submitCompanyPayment = async (req, res) => {
 const getDriverAccount = async (req, res) => {
     const connection = await pool.getConnection();
     try {
+        await ensureDriverCompanyBalanceAdjustmentsTable(connection);
         const driver_id = await resolveDriverId(req);
         if (!driver_id) {
             return res.status(403).json({ message: 'Driver account required' });
@@ -1808,8 +1859,152 @@ const getDriverAccount = async (req, res) => {
             [driver_id]
         );
 
-        res.json({ success: true, account, transactions, cashouts, commissions });
+        const eligibleTrips = await fetchDriverCommissionEligibleTrips(connection, driver_id);
+        const generateableTrips = eligibleTrips
+            .map((trip) => {
+                const netProfit = Number(trip.net_profit) || 0;
+                const commissionAmount = netProfit > 0
+                    ? roundCurrency((netProfit * commissionPercentage) / 100)
+                    : 0;
+                return {
+                    ...trip,
+                    commission_amount: commissionAmount
+                };
+            })
+            .filter((trip) => (Number(trip.commission_amount) || 0) > 0);
+        const generateableCommissionAmount = generateableTrips.reduce(
+            (sum, trip) => sum + (Number(trip.commission_amount) || 0),
+            0
+        );
+
+        res.json({
+            success: true,
+            account: {
+                ...account,
+                generateable_commission_amount: roundCurrency(generateableCommissionAmount),
+                generateable_commission_trip_count: generateableTrips.length
+            },
+            transactions,
+            cashouts,
+            commissions
+        });
     } catch (error) {
+        res.status(500).json({ message: 'Server error', error: error.message });
+    } finally {
+        connection.release();
+    }
+};
+
+const generateDriverCommission = async (req, res) => {
+    const connection = await pool.getConnection();
+    try {
+        await connection.beginTransaction();
+        await ensureDriverCompanyBalanceAdjustmentsTable(connection);
+
+        const driver_id = await resolveDriverId(req);
+        if (!driver_id) {
+            return res.status(403).json({ message: 'Driver account required' });
+        }
+
+        await syncDriverSalaryForDriver(connection, driver_id);
+
+        const [[driver]] = await connection.execute(
+            `SELECT commission_percentage
+             FROM drivers
+             WHERE id = ?
+             LIMIT 1`,
+            [driver_id]
+        );
+
+        const commissionPercentage = Number(driver?.commission_percentage) || 0;
+        if (!(commissionPercentage > 0)) {
+            return res.status(400).json({ message: 'Commission percentage is not configured for your account' });
+        }
+
+        const eligibleTrips = await fetchDriverCommissionEligibleTrips(connection, driver_id);
+        if (!eligibleTrips.length) {
+            return res.status(400).json({ message: 'No commission is available to generate right now' });
+        }
+
+        let totalGeneratedAmount = 0;
+        const generatedTrips = [];
+
+        for (const trip of eligibleTrips) {
+            const netProfit = Number(trip.net_profit) || 0;
+            const commissionAmount = netProfit > 0
+                ? roundCurrency((netProfit * commissionPercentage) / 100)
+                : 0;
+
+            if (!(commissionAmount > 0)) {
+                continue;
+            }
+
+            let requestId = Number(trip.commission_request_id) || null;
+            if (requestId) {
+                await connection.execute(
+                    `UPDATE driver_commission_requests
+                     SET commission_percentage = ?,
+                         net_profit = ?,
+                         commission_amount = ?,
+                         status = 'approved',
+                         reviewed_by = NULL,
+                         reviewed_at = CURRENT_TIMESTAMP,
+                         remarks = ?
+                     WHERE id = ?`,
+                    [commissionPercentage, netProfit, commissionAmount, 'Generated by driver', requestId]
+                );
+            } else {
+                const [requestResult] = await connection.execute(
+                    `INSERT INTO driver_commission_requests
+                        (driver_id, trip_id, commission_percentage, net_profit, commission_amount, status, reviewed_at, remarks)
+                     VALUES (?, ?, ?, ?, ?, 'approved', CURRENT_TIMESTAMP, ?)`,
+                    [driver_id, trip.id, commissionPercentage, netProfit, commissionAmount, 'Generated by driver']
+                );
+                requestId = requestResult.insertId;
+            }
+
+            await connection.execute(
+                'UPDATE drivers SET commission_balance = commission_balance + ? WHERE id = ?',
+                [commissionAmount, driver_id]
+            );
+
+            await createDriverAccountTransaction(connection, {
+                driverId: driver_id,
+                balanceType: 'commission',
+                transactionType: 'commission_credit',
+                direction: 'credit',
+                amount: commissionAmount,
+                sourceType: 'commission_request',
+                sourceId: requestId || trip.id,
+                notes: `Commission generated for trip #${trip.id}`
+            });
+
+            totalGeneratedAmount += commissionAmount;
+            generatedTrips.push({
+                trip_id: trip.id,
+                net_profit: netProfit,
+                commission_amount: commissionAmount
+            });
+        }
+
+        if (!generatedTrips.length) {
+            await connection.rollback();
+            return res.status(400).json({ message: 'No positive commission is available to generate right now' });
+        }
+
+        await connection.commit();
+
+        res.json({
+            success: true,
+            message: 'Commission generated successfully',
+            summary: {
+                trip_count: generatedTrips.length,
+                total_generated_amount: roundCurrency(totalGeneratedAmount)
+            },
+            trips: generatedTrips
+        });
+    } catch (error) {
+        await connection.rollback();
         res.status(500).json({ message: 'Server error', error: error.message });
     } finally {
         connection.release();
@@ -2379,6 +2574,7 @@ module.exports = {
     submitCompanyPayment,
     getCompanyPayments,
     getDriverAccount,
+    generateDriverCommission,
     createDriverCashoutRequest,
     getHelperAccount,
     createHelperCashoutRequest,

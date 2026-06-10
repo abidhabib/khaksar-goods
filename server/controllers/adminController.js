@@ -236,6 +236,16 @@ const recalculateDriverCommissionRequestsForDriver = async (driverId) => {
         return;
     }
 
+    const [existingRequestRows] = await pool.execute(
+        `SELECT id, trip_id, status
+         FROM driver_commission_requests
+         WHERE driver_id = ?`,
+        [normalizedDriverId]
+    );
+    const existingRequestByTripId = new Map(
+        existingRequestRows.map((row) => [Number(row.trip_id), row])
+    );
+
     const tripsWithExpenses = await attachExpensesToTrips(tripRows);
 
     for (const trip of tripsWithExpenses) {
@@ -254,24 +264,15 @@ const recalculateDriverCommissionRequestsForDriver = async (driverId) => {
             ? roundCurrency((netProfit * commissionPercentage) / 100)
             : 0;
 
-        if (commissionAmount > 0) {
-            await pool.execute(
-                `INSERT INTO driver_commission_requests
-                    (driver_id, trip_id, commission_percentage, net_profit, commission_amount, status)
-                 VALUES (?, ?, ?, ?, ?, 'pending')
-                 ON DUPLICATE KEY UPDATE
-                    commission_percentage = VALUES(commission_percentage),
-                    net_profit = VALUES(net_profit),
-                    commission_amount = VALUES(commission_amount)`,
-                [normalizedDriverId, tripId, commissionPercentage, netProfit, commissionAmount]
-            );
+        const existingRequest = existingRequestByTripId.get(tripId);
+        if (!existingRequest || existingRequest.status === 'approved') {
             continue;
         }
 
         await pool.execute(
             `UPDATE driver_commission_requests
              SET commission_percentage = ?, net_profit = ?, commission_amount = ?
-             WHERE trip_id = ?`,
+             WHERE trip_id = ? AND status <> 'approved'`,
             [commissionPercentage, netProfit, commissionAmount, tripId]
         );
     }

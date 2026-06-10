@@ -644,8 +644,7 @@ const TripCard = ({
 
        <div className="rounded-md border border-slate-700 bg-slate-800/30 p-2.5 flex items-start justify-between gap-2">
           <div className="min-w-0">
-            <p className="text-[11px] text-slate-300 uppercase tracking-wider font-bold">Load Details</p>
-            <p className="text-sm text-slate-200 font-semibold mt-1">{loadSummary || 'N/A'}</p>
+            <p className="text-xl text-slate-300 uppercase tracking-wider font-bold">Load <span className='text-xl'>{loadSummary || 'N/A'}</span> Ton</p>
             <p className="text-sm text-slate-400 mt-0.5">{trip.load_live_location || 'No load location'}</p>
             <MapLink coordinates={trip.load_coordinates} />
           </div>

@@ -343,6 +343,16 @@ public class ApiClient {
         CLIENT.newCall(request).enqueue(callback);
     }
 
+    public static void generateDriverCommission(String baseUrl, String token, Callback callback) {
+        Request request = new Request.Builder()
+                .url(baseUrl + "/driver/account/generate-commission")
+                .post(RequestBody.create(new byte[0]))
+                .header("Authorization", "Bearer " + token)
+                .build();
+
+        CLIENT.newCall(request).enqueue(callback);
+    }
+
     public static void getHelperAccount(String baseUrl, String token, Callback callback) {
         Request request = new Request.Builder()
                 .url(baseUrl + "/driver/helper-account")

@@ -34,6 +34,9 @@ public class DriverAccountActivity extends AppCompatActivity {
     private String baseUrl;
     private double availableBalance;
     private double commissionBalance;
+    private double generateableCommissionAmount;
+    private int generateableCommissionTripCount;
+    private boolean generatingCommission;
     private final ActivityResultLauncher<Intent> cashoutLauncher = registerForActivityResult(
             new ActivityResultContracts.StartActivityForResult(),
             result -> {
@@ -93,6 +96,7 @@ public class DriverAccountActivity extends AppCompatActivity {
                 openCashout(AccountCashoutActivity.MODE_DRIVER, AccountCashoutActivity.BALANCE_AVAILABLE, availableBalance));
         binding.commissionCashoutButton.setOnClickListener(v ->
                 openCashout(AccountCashoutActivity.MODE_DRIVER, AccountCashoutActivity.BALANCE_COMMISSION, commissionBalance));
+        binding.generateCommissionButton.setOnClickListener(v -> generateCommission());
         binding.cashoutHistoryCard.setOnClickListener(v ->
                 startActivity(AccountHistoryActivity.newIntent(this, AccountHistoryActivity.MODE_DRIVER, AccountHistoryActivity.HISTORY_CASHOUT)));
         binding.commissionHistoryCard.setOnClickListener(v ->
@@ -155,6 +159,8 @@ public class DriverAccountActivity extends AppCompatActivity {
     private void bindAccount(JSONObject account, JSONArray cashouts, JSONArray commissions) {
         availableBalance = account != null ? account.optDouble("available_balance", 0) : 0;
         commissionBalance = account != null ? account.optDouble("commission_balance", 0) : 0;
+        generateableCommissionAmount = account != null ? account.optDouble("generateable_commission_amount", 0) : 0;
+        generateableCommissionTripCount = account != null ? account.optInt("generateable_commission_trip_count", 0) : 0;
 
         String fullName = account != null ? account.optString("full_name", getString(R.string.driver_account_default_name)) : getString(R.string.driver_account_default_name);
         String carNumber = account != null ? account.optString("car_number", getString(R.string.driver_account_no_car)) : getString(R.string.driver_account_no_car);
@@ -172,6 +178,75 @@ public class DriverAccountActivity extends AppCompatActivity {
         binding.commissionAmountText.setText(formatCurrency(commissionBalance));
         binding.cashoutHistoryPreview.setText(buildCashoutPreview(cashouts));
         binding.commissionHistoryPreview.setText(buildCommissionPreview(commissions));
+        bindGenerateCommissionState();
+    }
+
+    private void bindGenerateCommissionState() {
+        boolean hasGenerateableCommission = generateableCommissionAmount > 0 && generateableCommissionTripCount > 0;
+        binding.generateCommissionButton.setEnabled(hasGenerateableCommission && !generatingCommission);
+        CharSequence buttonText;
+        if (generatingCommission) {
+            buttonText = getString(R.string.generating_commission);
+        } else if (hasGenerateableCommission) {
+            buttonText = getString(R.string.generate_commission_button_format, formatCurrency(generateableCommissionAmount));
+        } else {
+            buttonText = getString(R.string.generate_commission_default);
+        }
+        binding.generateCommissionButton.setText(buttonText);
+        binding.generateCommissionHintText.setText(
+                hasGenerateableCommission
+                        ? getString(
+                                R.string.generate_commission_hint_format,
+                                formatCurrency(generateableCommissionAmount),
+                                String.valueOf(generateableCommissionTripCount)
+                        )
+                        : getString(R.string.generate_commission_empty)
+        );
+    }
+
+    private void generateCommission() {
+        if (generatingCommission || !(generateableCommissionAmount > 0) || generateableCommissionTripCount <= 0) {
+            return;
+        }
+
+        String token = sessionManager.getToken();
+        if (token == null) {
+            return;
+        }
+
+        generatingCommission = true;
+        bindGenerateCommissionState();
+
+        ApiClient.generateDriverCommission(baseUrl, token, new Callback() {
+            @Override
+            public void onFailure(Call call, IOException e) {
+                runOnUiThread(() -> {
+                    generatingCommission = false;
+                    bindGenerateCommissionState();
+                    Toast.makeText(DriverAccountActivity.this, R.string.commission_generate_failed, Toast.LENGTH_SHORT).show();
+                });
+            }
+
+            @Override
+            public void onResponse(Call call, Response response) throws IOException {
+                String body = response.body() != null ? response.body().string() : "";
+                if (!response.isSuccessful()) {
+                    String message = ApiClient.parseErrorMessage(body, getString(R.string.commission_generate_failed));
+                    runOnUiThread(() -> {
+                        generatingCommission = false;
+                        bindGenerateCommissionState();
+                        Toast.makeText(DriverAccountActivity.this, message, Toast.LENGTH_SHORT).show();
+                    });
+                    return;
+                }
+
+                runOnUiThread(() -> {
+                    generatingCommission = false;
+                    Toast.makeText(DriverAccountActivity.this, R.string.commission_generated_successfully, Toast.LENGTH_SHORT).show();
+                    fetchAccount();
+                });
+            }
+        });
     }
 
     private String buildCashoutPreview(JSONArray cashouts) {
@@ -238,5 +313,8 @@ public class DriverAccountActivity extends AppCompatActivity {
     private void setLoading(boolean loading) {
         binding.loadingOverlay.setVisibility(loading ? View.VISIBLE : View.GONE);
         binding.swipeRefreshLayout.setRefreshing(loading);
+        if (!loading) {
+            bindGenerateCommissionState();
+        }
     }
 }
