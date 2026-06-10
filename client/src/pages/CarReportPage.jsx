@@ -359,8 +359,7 @@ const PendingNextTripExpenseBreakdown = ({
   );
   const totalExpenses = Number(trip.pending_next_trip_expenses_total ?? 0);
   const groupedExpenses = groupExpensesByCategory(expenses, dailyExpenseCategories, 'expense_image');
-
-  const wastedKm = Number(trip.pending_next_trip_wasted_km ?? 0);
+  const wastedKm = Number(trip.pending_next_trip_start_wasted_km ?? 0);
 
   if (!groupedExpenses.length) return null;
 
@@ -372,9 +371,8 @@ const PendingNextTripExpenseBreakdown = ({
             <Receipt className="w-4 h-4 text-sky-400" />
             Waiting For Next Trip
           </p>
-         
           {wastedKm > 0 ? (
-            <span className="text-[11px] px-1.5 py-0.5 rounded-full bg-rose-600/10  border border-rose-600/20">
+            <span className="text-[11px] px-1.5 py-0.5 rounded-full bg-rose-600/10 border border-rose-600/20">
               Wasted {wastedKm.toLocaleString()} km
             </span>
           ) : null}

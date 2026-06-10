@@ -358,11 +358,12 @@ const FindingTripExpenseBreakdown = ({
   allowAdd = false,
 }) => {
   const groupedExpenses = groupExpensesByCategory(expenses, dailyExpenseCategories, 'expense_image');
-  const nextTripTag = title === 'Waiting For Next Trip Expenses' && row?.pending_next_trip_target_trip_id
+  const isWaitingForNextTrip = title.startsWith('Waiting For Next Trip');
+  const nextTripTag = isWaitingForNextTrip && row?.pending_next_trip_target_trip_id
     ? `Trip #${row.pending_next_trip_target_trip_id}`
     : null;
-  const wastedKm = title === 'Waiting For Next Trip Expenses'
-    ? Number(row?.pending_next_trip_wasted_km ?? 0)
+  const wastedKm = isWaitingForNextTrip
+    ? Number(row?.pending_next_trip_start_wasted_km ?? 0)
     : 0;
 
   if (!groupedExpenses.length && !allowAdd) {

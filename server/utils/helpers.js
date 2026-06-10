@@ -109,7 +109,16 @@ const attachBetweenTripDailyExpenses = (trips, timelineTrips = [], dailyExpenseE
     const linkedByTripId = new Map();
     const waitingByTripId = new Map();
     const waitingTargetTripIdByTripId = new Map();
-    const waitingWastedKmByTripId = new Map();
+    const waitingNextTripWastedKmByTripId = new Map();
+    const startingWastedKmByTripId = new Map();
+    for (const windows of tripsByDriver.values()) {
+        for (const window of windows) {
+            if (Number.isFinite(window.next_trip_id) && tripIds.has(window.next_trip_id)) {
+                startingWastedKmByTripId.set(window.next_trip_id, Number(window.wasted_km) || 0);
+            }
+        }
+    }
+
     for (const entry of dailyExpenseEntries) {
         const driverId = Number(entry?.driver_id);
         const amount = Number(entry?.amount) || 0;
@@ -143,8 +152,8 @@ const attachBetweenTripDailyExpenses = (trips, timelineTrips = [], dailyExpenseE
                 );
             }
 
-            if (!waitingWastedKmByTripId.has(targetWindow.completed_trip_id)) {
-                waitingWastedKmByTripId.set(targetWindow.completed_trip_id, Number(targetWindow.wasted_km) || 0);
+            if (!waitingNextTripWastedKmByTripId.has(targetWindow.completed_trip_id)) {
+                waitingNextTripWastedKmByTripId.set(targetWindow.completed_trip_id, Number(targetWindow.wasted_km) || 0);
             }
         }
 
@@ -209,8 +218,11 @@ const attachBetweenTripDailyExpenses = (trips, timelineTrips = [], dailyExpenseE
             pending_next_trip_target_trip_id: waitingTargetTripIdByTripId.has(tripId)
                 ? waitingTargetTripIdByTripId.get(tripId)
                 : null,
-            pending_next_trip_wasted_km: waitingWastedKmByTripId.has(tripId)
-                ? waitingWastedKmByTripId.get(tripId)
+            pending_next_trip_start_wasted_km: waitingNextTripWastedKmByTripId.has(tripId)
+                ? waitingNextTripWastedKmByTripId.get(tripId)
+                : 0,
+            pending_next_trip_wasted_km: startingWastedKmByTripId.has(tripId)
+                ? startingWastedKmByTripId.get(tripId)
                 : 0,
             expenses: tripExpenses
         };
