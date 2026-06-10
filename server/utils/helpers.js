@@ -117,35 +117,16 @@ const attachBetweenTripDailyExpenses = (trips, timelineTrips = [], dailyExpenseE
             continue;
         }
 
-        const appliedTripId = Number(entry?.applied_trip_id);
-        if (Number.isFinite(appliedTripId) && tripIds.has(appliedTripId)) {
-            if (!linkedByTripId.has(appliedTripId)) {
-                linkedByTripId.set(appliedTripId, []);
-            }
-
-            linkedByTripId.get(appliedTripId).push({
-                ...entry,
-                amount
-            });
-            continue;
-        }
-
         const entryTimestamp = toTimestampMs(entry.created_at) ?? toTimestampMs(entry.expense_date, true);
-        if (entryTimestamp === null) {
-            continue;
-        }
-
         const windows = tripsByDriver.get(driverId) || [];
-        const targetWindow = windows.find((window) =>
-            entryTimestamp >= window.start_ms &&
-            (window.end_ms === null || entryTimestamp < window.end_ms)
-        );
+        const targetWindow = entryTimestamp === null
+            ? null
+            : windows.find((window) =>
+                entryTimestamp >= window.start_ms &&
+                (window.end_ms === null || entryTimestamp < window.end_ms)
+            );
 
-        if (!targetWindow) {
-            continue;
-        }
-
-        if (tripIds.has(targetWindow.completed_trip_id)) {
+        if (targetWindow && tripIds.has(targetWindow.completed_trip_id)) {
             if (!waitingByTripId.has(targetWindow.completed_trip_id)) {
                 waitingByTripId.set(targetWindow.completed_trip_id, []);
             }
@@ -165,6 +146,23 @@ const attachBetweenTripDailyExpenses = (trips, timelineTrips = [], dailyExpenseE
             if (!waitingWastedKmByTripId.has(targetWindow.completed_trip_id)) {
                 waitingWastedKmByTripId.set(targetWindow.completed_trip_id, Number(targetWindow.wasted_km) || 0);
             }
+        }
+
+        const appliedTripId = Number(entry?.applied_trip_id);
+        if (Number.isFinite(appliedTripId) && tripIds.has(appliedTripId)) {
+            if (!linkedByTripId.has(appliedTripId)) {
+                linkedByTripId.set(appliedTripId, []);
+            }
+
+            linkedByTripId.get(appliedTripId).push({
+                ...entry,
+                amount
+            });
+            continue;
+        }
+
+        if (!targetWindow) {
+            continue;
         }
 
         if (Number.isFinite(targetWindow.next_trip_id)) {

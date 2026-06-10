@@ -363,7 +363,6 @@ const PendingNextTripExpenseBreakdown = ({
   const wastedKm = Number(trip.pending_next_trip_wasted_km ?? 0);
 
   if (!groupedExpenses.length) return null;
-console.log(wastedKm);
 
   return (
     <div className="rounded-lg border border-slate-700 bg-rose-500/10 px-2 py-2 space-y-3">
@@ -1170,7 +1169,7 @@ const CarReportPage = () => {
                   />
                   <TripCard
                     trip={trip}
-                    tripNumber={index + 1}
+                      tripNumber={trips.length - index}
                     status="completed"
                     onEditTrip={openTripModal}
                     onEditExpense={openExpenseEditModal}
