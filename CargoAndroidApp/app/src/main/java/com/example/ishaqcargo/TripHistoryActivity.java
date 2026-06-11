@@ -6,6 +6,7 @@ import android.text.TextUtils;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.widget.ImageView;
+import android.widget.LinearLayout;
 import android.widget.TextView;
 import android.widget.Toast;
 
@@ -167,8 +168,10 @@ public class TripHistoryActivity extends AppCompatActivity {
         TextView tripFinanceText = tripCard.findViewById(R.id.tripFinanceText);
         TextView tripExpenseBreakdownText = tripCard.findViewById(R.id.tripExpenseBreakdownText);
         TextView tripNotesText = tripCard.findViewById(R.id.tripNotesText);
-
-       
+        LinearLayout lookingExpenseSection = tripCard.findViewById(R.id.lookingExpenseSection);
+        LinearLayout lookingExpenseList = tripCard.findViewById(R.id.lookingExpenseList);
+        TextView lookingExpenseTotalText = tripCard.findViewById(R.id.lookingExpenseTotalText);
+        TextView lookingExpenseCountText = tripCard.findViewById(R.id.lookingExpenseCountText);
 
 
         // Data extraction
@@ -181,6 +184,7 @@ public class TripHistoryActivity extends AppCompatActivity {
         double distance = trip.optDouble("distance_km", endMeter - startMeter);
         double freight = trip.optDouble("freight_charge", 0);
         double totalExpense = trip.optDouble("total_expenses", 0);
+        double lookingExpenseTotal = trip.optDouble("between_trip_expenses_total", 0);
         double dieselExpense = trip.optDouble("diesel_expense", 0);
         double totalDieselLiters = trip.optDouble("total_diesel_liters", 0);
         double tripAverage = trip.isNull("trip_average_km_per_liter")
@@ -227,6 +231,14 @@ public class TripHistoryActivity extends AppCompatActivity {
                 formatCurrency(biltyCommissionExpense),
                 formatCurrency(tyrePunctureExpense)
         ));
+        bindLookingExpenses(
+                lookingExpenseSection,
+                lookingExpenseList,
+                lookingExpenseTotalText,
+                lookingExpenseCountText,
+                trip.optJSONArray("daily_expenses"),
+                lookingExpenseTotal
+        );
 
         // Notes builder
         StringBuilder notesBuilder = new StringBuilder();
@@ -253,6 +265,97 @@ public class TripHistoryActivity extends AppCompatActivity {
                 ? getString(R.string.trip_notes_empty) : notesBuilder.toString());
 
 
+    }
+
+    private void bindLookingExpenses(
+            LinearLayout section,
+            LinearLayout list,
+            TextView totalText,
+            TextView countText,
+            JSONArray expenses,
+            double fallbackTotal
+    ) {
+        list.removeAllViews();
+        if (expenses == null || expenses.length() == 0) {
+            section.setVisibility(View.GONE);
+            return;
+        }
+
+        double total = 0;
+        int visibleCount = 0;
+        for (int i = 0; i < expenses.length(); i++) {
+            JSONObject expense = expenses.optJSONObject(i);
+            if (expense == null) continue;
+            visibleCount++;
+            total += expense.optDouble("amount", 0);
+            list.addView(createLookingExpenseRow(expense));
+        }
+
+        if (visibleCount == 0) {
+            section.setVisibility(View.GONE);
+            return;
+        }
+
+        section.setVisibility(View.VISIBLE);
+        totalText.setText(formatCurrency(total > 0 ? total : fallbackTotal));
+        countText.setText(getResources().getQuantityString(
+                R.plurals.looking_expense_count,
+                visibleCount,
+                visibleCount
+        ));
+    }
+
+    private View createLookingExpenseRow(JSONObject expense) {
+        LinearLayout row = new LinearLayout(this);
+        row.setOrientation(LinearLayout.HORIZONTAL);
+        row.setGravity(android.view.Gravity.CENTER_VERTICAL);
+        row.setBackgroundResource(R.drawable.bg_looking_expense_row);
+        int padding = dp(10);
+        row.setPadding(padding, padding, padding, padding);
+        LinearLayout.LayoutParams rowParams = new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT
+        );
+        rowParams.setMargins(0, 0, 0, dp(8));
+        row.setLayoutParams(rowParams);
+
+        LinearLayout textColumn = new LinearLayout(this);
+        textColumn.setOrientation(LinearLayout.VERTICAL);
+        LinearLayout.LayoutParams textParams = new LinearLayout.LayoutParams(
+                0,
+                LinearLayout.LayoutParams.WRAP_CONTENT,
+                1f
+        );
+        textColumn.setLayoutParams(textParams);
+
+        TextView title = new TextView(this);
+        title.setText(formatCategory(expense.optString("category", "other")));
+        title.setTextColor(getColorCompat(R.color.section_title));
+        title.setTextSize(13);
+        title.setTypeface(title.getTypeface(), android.graphics.Typeface.BOLD);
+
+        TextView meta = new TextView(this);
+        String date = formatTimestamp(expense.optString("created_at", ""));
+        String note = expense.optString("note", "");
+        meta.setText(TextUtils.isEmpty(note) ? date : date + " • " + note);
+        meta.setTextColor(getColorCompat(R.color.section_hint));
+        meta.setTextSize(11);
+        meta.setMaxLines(2);
+        meta.setEllipsize(TextUtils.TruncateAt.END);
+
+        textColumn.addView(title);
+        textColumn.addView(meta);
+
+        TextView amount = new TextView(this);
+        amount.setText(formatCurrency(expense.optDouble("amount", 0)));
+        amount.setTextColor(android.graphics.Color.rgb(159, 18, 57));
+        amount.setTextSize(13);
+        amount.setTypeface(amount.getTypeface(), android.graphics.Typeface.BOLD);
+        amount.setPadding(dp(10), 0, 0, 0);
+
+        row.addView(textColumn);
+        row.addView(amount);
+        return row;
     }
 
     private void bindImage(ImageView imageView, TextView hintView, String imageUrl, String title) {
@@ -317,5 +420,30 @@ public class TripHistoryActivity extends AppCompatActivity {
     private String formatAverage(double value) {
         if (!(value > 0)) return "N/A";
         return String.format(Locale.US, "%.2f km/L", value);
+    }
+
+    private String formatCategory(String category) {
+        if (TextUtils.isEmpty(category)) return "Other";
+        String normalized = category.replace('_', ' ').trim();
+        if (normalized.isEmpty()) return "Other";
+        String[] parts = normalized.split("\\s+");
+        StringBuilder builder = new StringBuilder();
+        for (String part : parts) {
+            if (part.isEmpty()) continue;
+            if (builder.length() > 0) builder.append(' ');
+            builder.append(Character.toUpperCase(part.charAt(0)));
+            if (part.length() > 1) {
+                builder.append(part.substring(1).toLowerCase(Locale.US));
+            }
+        }
+        return builder.length() == 0 ? "Other" : builder.toString();
+    }
+
+    private int dp(int value) {
+        return Math.round(value * getResources().getDisplayMetrics().density);
+    }
+
+    private int getColorCompat(int colorRes) {
+        return getColor(colorRes);
     }
 }

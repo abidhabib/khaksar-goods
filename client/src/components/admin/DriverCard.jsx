@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { User, Phone, Car, Activity, MoreVertical, MapPin, HandHelping, Wallet, Coins, CalendarDays, IdCard, Landmark } from 'lucide-react';
 import { formatLocationAgo, formatLocationSummary } from '../../utils/location';
 
-const DriverCard = ({ driver, onEdit, onAssign, onViewReport, onViewCashout, onDeposit, onViewDeposits }) => {
+const DriverCard = ({ driver, onEdit, onAssign, onViewReport, onViewCashout, onDeposit, onViewDeposits, onViewCommissionLogs }) => {
   const [menuOpen, setMenuOpen] = useState(false);
   const statusColors = {
     active: 'bg-cargo-success/20 text-cargo-success',
@@ -65,6 +65,16 @@ const DriverCard = ({ driver, onEdit, onAssign, onViewReport, onViewCashout, onD
                 className="block w-full px-4 py-2 text-left text-sm text-cargo-text hover:bg-cargo-border/40"
               >
                 See Deposits
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setMenuOpen(false);
+                  onViewCommissionLogs(driver);
+                }}
+                className="block w-full px-4 py-2 text-left text-sm text-cargo-text hover:bg-cargo-border/40"
+              >
+                See Commission 
               </button>
               <button
                 type="button"
@@ -215,14 +225,14 @@ const DriverCard = ({ driver, onEdit, onAssign, onViewReport, onViewCashout, onD
           onClick={() => onViewCashout(driver)}
           className="btn-secondary text-sm py-2"
         >
-          See Cashout
+          Cashout History
         </button>
         <button
           onClick={() => onDeposit(driver)}
           className="btn-secondary text-sm py-2 flex items-center justify-center gap-2"
         >
           <Landmark className="w-4 h-4" />
-          Deposit
+          Deposit in Co. Acc
         </button>
         <button 
           onClick={() => onAssign(driver)}
@@ -231,12 +241,22 @@ const DriverCard = ({ driver, onEdit, onAssign, onViewReport, onViewCashout, onD
           {driver.car_id ? 'Reassign Car' : 'Assign Car'}
         </button>
       </div>
-      <button
-        onClick={() => onViewDeposits(driver)}
-        className="w-full mt-2 text-sm text-primary-300 hover:text-primary-200"
-      >
-        See Deposit History
-      </button>
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 mt-2">
+        <button
+          type="button"
+          onClick={() => onViewDeposits(driver)}
+          className="btn-secondary text-sm py-2"
+        >
+          See Deposit History
+        </button>
+        <button
+          type="button"
+          onClick={() => onViewCommissionLogs(driver)}
+          className="btn-secondary text-sm py-2"
+        >
+          Commission History
+        </button>
+      </div>
     </div>
   );
 };

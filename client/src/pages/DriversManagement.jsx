@@ -218,6 +218,12 @@ const DriversManagement = () => {
       driverUsername: driver.username || '',
     }
   });
+  const openCommissionHistoryPage = (driver) => navigate(`/drivers/${driver.id}/commission-history`, {
+    state: {
+      driverName: driver.full_name || driver.username || '',
+      driverUsername: driver.username || '',
+    }
+  });
 
   const filteredDrivers = useMemo(() => drivers.filter((driver) => {
     const term = searchTerm.toLowerCase();
@@ -422,6 +428,7 @@ const DriversManagement = () => {
               onViewCashout={openCashoutPage}
               onDeposit={openDepositModal}
               onViewDeposits={openDepositHistoryPage}
+              onViewCommissionLogs={openCommissionHistoryPage}
             />
           ))}
         </div>
@@ -484,7 +491,7 @@ const DriversManagement = () => {
       >
         <form onSubmit={handleDeposit} className="space-y-4">
           <div>
-            <label className="block text-sm font-medium text-cargo-text mb-2">Deposit Amount</label>
+            <label className="block text-sm font-medium text-cargo-text mb-2">Deposit in Co. Account</label>
             <input
               type="number"
               min="0"

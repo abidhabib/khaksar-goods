@@ -5,12 +5,11 @@ import AdminDashboard from './pages/AdminDashboard'
 import CarsManagement from './pages/CarsManagement'
 import DriversManagement from './pages/DriversManagement'
 import HelpersManagement from './pages/HelpersManagement'
-import AccountRequestsPage from './pages/AccountRequestsPage'
 import CarReportPage from './pages/CarReportPage'
 import DriverReportPage from './pages/DriverReportPage'
 import DriverCashoutHistoryPage from './pages/DriverCashoutHistoryPage'
 import DriverCompanyDepositHistoryPage from './pages/DriverCompanyDepositHistoryPage'
-import DriverExpensesReportPage from './pages/DriverExpensesReportPage'
+import DriverCommissionHistoryPage from './pages/DriverCommissionHistoryPage'
 import PaymentSubmissionsPage from './pages/PaymentSubmissionsPage'
 import TripMonitor from './pages/TripMonitor'
 import TripReportPage from './pages/TripReportPage'
@@ -33,11 +32,10 @@ function App() {
           <Route path="/cars/:id/report" element={<CarReportPage />} />
           <Route path="/drivers" element={<DriversManagement />} />
           <Route path="/helpers" element={<HelpersManagement />} />
-          <Route path="/account-requests" element={<AccountRequestsPage />} />
           <Route path="/drivers/:id/report" element={<DriverReportPage />} />
           <Route path="/drivers/:id/cashout-history" element={<DriverCashoutHistoryPage />} />
           <Route path="/drivers/:id/deposit-history" element={<DriverCompanyDepositHistoryPage />} />
-          <Route path="/drivers-expenses" element={<DriverExpensesReportPage />} />
+          <Route path="/drivers/:id/commission-history" element={<DriverCommissionHistoryPage />} />
           <Route path="/payment-submissions" element={<PaymentSubmissionsPage />} />
           <Route path="/trips" element={<TripMonitor />} />
           <Route path="/trips/:id/report" element={<TripReportPage />} />

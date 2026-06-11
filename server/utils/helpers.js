@@ -35,6 +35,7 @@ const attachBetweenTripDailyExpenses = (trips, timelineTrips = [], dailyExpenseE
 
     const tripIds = new Set(trips.map((trip) => Number(trip.id)).filter(Number.isFinite));
     const tripsByDriver = new Map();
+    const firstTripByDriverId = new Map();
 
     for (const timelineTrip of timelineTrips) {
         const tripId = Number(timelineTrip?.id);
@@ -67,6 +68,11 @@ const attachBetweenTripDailyExpenses = (trips, timelineTrips = [], dailyExpenseE
             }
             return left.id - right.id;
         });
+
+        const firstTrip = driverTrips.find((trip) => trip.started_at_ms !== null);
+        if (firstTrip) {
+            firstTripByDriverId.set(driverId, firstTrip);
+        }
 
         const windows = [];
         for (let index = 0; index < driverTrips.length; index += 1) {
@@ -111,6 +117,7 @@ const attachBetweenTripDailyExpenses = (trips, timelineTrips = [], dailyExpenseE
     const waitingTargetTripIdByTripId = new Map();
     const waitingNextTripWastedKmByTripId = new Map();
     const startingWastedKmByTripId = new Map();
+
     for (const windows of tripsByDriver.values()) {
         for (const window of windows) {
             if (Number.isFinite(window.next_trip_id) && tripIds.has(window.next_trip_id)) {
@@ -164,6 +171,25 @@ const attachBetweenTripDailyExpenses = (trips, timelineTrips = [], dailyExpenseE
             }
 
             linkedByTripId.get(appliedTripId).push({
+                ...entry,
+                amount
+            });
+            continue;
+        }
+
+        const firstTrip = firstTripByDriverId.get(driverId);
+        if (
+            firstTrip &&
+            firstTrip.started_at_ms !== null &&
+            entryTimestamp !== null &&
+            entryTimestamp < firstTrip.started_at_ms &&
+            tripIds.has(firstTrip.id)
+        ) {
+            if (!linkedByTripId.has(firstTrip.id)) {
+                linkedByTripId.set(firstTrip.id, []);
+            }
+
+            linkedByTripId.get(firstTrip.id).push({
                 ...entry,
                 amount
             });

@@ -13,46 +13,54 @@ import {
   LineChart,
   Line,
 } from 'recharts';
-import { Calendar, Download, Filter, FileText } from 'lucide-react';
+import {
+  BarChart3,
+  TrendingUp,
+  TrendingDown,
+  Minus,
+  Download,
+  CalendarDays,
+  SlidersHorizontal,
+  FileText,
+  ArrowRight,
+  DollarSign,
+  Receipt,
+  Truck,
+  Wallet,
+  Package,
+} from 'lucide-react';
 import { useApi } from '../hooks/useApi';
 
 const formatCurrency = (value) => `Rs ${Number(value || 0).toLocaleString()}`;
 
-const getChangeTone = (value, inverse = false) => {
+const getChangeConfig = (value, inverse = false) => {
   if (value === 0) {
-    return 'text-cargo-muted';
+    return { icon: Minus, color: 'text-slate-500', bg: 'bg-slate-800', label: 'No change' };
   }
-
   const isPositive = inverse ? value <= 0 : value >= 0;
-  return isPositive ? 'text-cargo-success' : 'text-cargo-danger';
-};
-
-const getChangeLabel = (value) => {
-  if (value === 0) {
-    return 'No change vs previous period';
+  if (isPositive) {
+    return { icon: TrendingUp, color: 'text-emerald-400', bg: 'bg-emerald-500/10', label: `+${value}%` };
   }
-
-  const prefix = value > 0 ? '+' : '';
-  return `${prefix}${value}% vs previous period`;
+  return { icon: TrendingDown, color: 'text-rose-400', bg: 'bg-rose-500/10', label: `${value}%` };
 };
 
 const reportTypeConfig = {
   revenue: {
     title: 'Revenue Trend',
     dataKey: 'revenue',
-    color: '#3b82f6',
+    color: '#38bdf8',
     formatter: formatCurrency,
   },
   expenses: {
     title: 'Expense Trend',
     dataKey: 'expenses',
-    color: '#ef4444',
+    color: '#fb7185',
     formatter: formatCurrency,
   },
   trips: {
     title: 'Trip Volume',
     dataKey: 'trips',
-    color: '#6366f1',
+    color: '#a78bfa',
     formatter: (value) => `${value} trips`,
   },
 };
@@ -79,9 +87,7 @@ const Reports = () => {
   }, [get, period]);
 
   const handleExportPdf = () => {
-    if (!reportData) {
-      return;
-    }
+    if (!reportData) return;
 
     setExporting(true);
 
@@ -99,10 +105,10 @@ const Reports = () => {
         startY: 40,
         head: [['Metric', 'Value', 'Change']],
         body: [
-          ['Total Revenue', formatCurrency(reportData.summary.totalRevenue), getChangeLabel(reportData.comparison.revenueChange)],
-          ['Total Expenses', formatCurrency(reportData.summary.totalExpenses), getChangeLabel(reportData.comparison.expensesChange)],
-          ['Net Profit', formatCurrency(reportData.summary.netProfit), getChangeLabel(reportData.comparison.netProfitChange)],
-          ['Total Trips', String(reportData.summary.totalTrips), getChangeLabel(reportData.comparison.tripsChange)],
+          ['Total Revenue', formatCurrency(reportData.summary.totalRevenue), `${reportData.comparison.revenueChange}%`],
+          ['Total Expenses', formatCurrency(reportData.summary.totalExpenses), `${reportData.comparison.expensesChange}%`],
+          ['Net Profit', formatCurrency(reportData.summary.netProfit), `${reportData.comparison.netProfitChange}%`],
+          ['Total Trips', String(reportData.summary.totalTrips), `${reportData.comparison.tripsChange}%`],
         ],
       });
 
@@ -155,49 +161,91 @@ const Reports = () => {
   if (loading || !reportData) {
     return (
       <div className="flex items-center justify-center h-96">
-        <div className="w-8 h-8 border-4 border-primary-600 border-t-transparent rounded-full animate-spin" />
+        <div className="w-8 h-8 border-2 border-sky-500 border-t-transparent rounded-full animate-spin" />
       </div>
     );
   }
 
+  const summaryCards = [
+    {
+      label: 'Total Revenue',
+      value: formatCurrency(reportData.summary.totalRevenue),
+      change: getChangeConfig(reportData.comparison.revenueChange),
+      icon: DollarSign,
+    },
+    {
+      label: 'Total Expenses',
+      value: formatCurrency(reportData.summary.totalExpenses),
+      change: getChangeConfig(reportData.comparison.expensesChange, true),
+      icon: Receipt,
+    },
+    {
+      label: 'Net Profit',
+      value: formatCurrency(reportData.summary.netProfit),
+      change: getChangeConfig(reportData.comparison.netProfitChange),
+      icon: Wallet,
+    },
+    {
+      label: 'Total Trips',
+      value: reportData.summary.totalTrips,
+      change: getChangeConfig(reportData.comparison.tripsChange),
+      icon: Truck,
+    },
+  ];
+
   return (
-    <div className="space-y-6 pb-10 max-w-7xl">
-      <div className="flex items-center justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-bold text-cargo-text">Reports & Analytics</h1>
-          <p className="text-cargo-muted mt-1">Live financial reports powered by your trip database</p>
+    <div className="space-y-5 pb-6">
+      {/* Header */}
+      <div className="flex items-center justify-between gap-3 flex-wrap">
+        <div className="flex items-center gap-3">
+          <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-slate-800 border border-slate-700">
+            <BarChart3 className="w-5 h-5 text-sky-400" />
+          </div>
+          <div>
+            <h1 className="text-xl font-semibold text-slate-100">Reports & Analytics</h1>
+            <p className="text-sm text-slate-500">Financial overview from trip data</p>
+          </div>
         </div>
         <button
           type="button"
           onClick={handleExportPdf}
           disabled={exporting}
-          className="btn-secondary flex items-center gap-2 disabled:opacity-60 disabled:cursor-not-allowed"
+          className="flex items-center gap-2 rounded-lg border border-slate-700 bg-slate-800 px-3 py-2 text-sm font-medium text-slate-300 hover:bg-slate-700 disabled:opacity-50 transition-colors"
         >
           <Download className="w-4 h-4" />
-          {exporting ? 'Exporting...' : 'Download PDF'}
+          {exporting ? 'Exporting...' : 'Export PDF'}
         </button>
       </div>
 
-      <div className="card flex flex-wrap items-center gap-4">
-        <div className="flex items-center gap-2">
-          <Calendar className="w-5 h-5 text-cargo-muted" />
-          <select
-            value={period}
-            onChange={(e) => setPeriod(e.target.value)}
-            className="bg-cargo-dark border border-cargo-border rounded-lg px-3 py-2 text-cargo-text"
-          >
-            <option value="week">Last 7 Days</option>
-            <option value="month">Last 30 Days</option>
-            <option value="year">Last 12 Months</option>
-          </select>
+      {/* Controls */}
+      <div className="flex flex-wrap items-center gap-2">
+        <div className="flex items-center gap-1.5 rounded-lg bg-slate-900 border border-slate-800 p-1">
+          {[
+            { value: 'week', label: '7 Days' },
+            { value: 'month', label: '30 Days' },
+            { value: 'year', label: '12 Months' },
+          ].map((opt) => (
+            <button
+              key={opt.value}
+              type="button"
+              onClick={() => setPeriod(opt.value)}
+              className={`px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${
+                period === opt.value
+                  ? 'bg-slate-800 text-slate-100'
+                  : 'text-slate-500 hover:text-slate-300'
+              }`}
+            >
+              {opt.label}
+            </button>
+          ))}
         </div>
 
-        <div className="flex items-center gap-2">
-          <Filter className="w-5 h-5 text-cargo-muted" />
+        <div className="flex items-center gap-1.5 rounded-lg bg-slate-900 border border-slate-800 px-2 py-1">
+          <SlidersHorizontal className="w-3.5 h-3.5 text-slate-500 ml-1" />
           <select
             value={reportType}
             onChange={(e) => setReportType(e.target.value)}
-            className="bg-cargo-dark border border-cargo-border rounded-lg px-3 py-2 text-cargo-text"
+            className="bg-transparent text-sm text-slate-300 outline-none py-1 pr-1"
           >
             <option value="revenue">Revenue</option>
             <option value="expenses">Expenses</option>
@@ -206,83 +254,90 @@ const Reports = () => {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
-        <div className="card">
-          <p className="text-sm text-cargo-muted mb-1">Total Revenue</p>
-          <p className="text-2xl font-bold text-cargo-text">{formatCurrency(reportData.summary.totalRevenue)}</p>
-          <p className={`text-xs mt-1 ${getChangeTone(reportData.comparison.revenueChange)}`}>
-            {getChangeLabel(reportData.comparison.revenueChange)}
-          </p>
-        </div>
-        <div className="card">
-          <p className="text-sm text-cargo-muted mb-1">Total Expenses</p>
-          <p className="text-2xl font-bold text-cargo-text">{formatCurrency(reportData.summary.totalExpenses)}</p>
-          <p className={`text-xs mt-1 ${getChangeTone(reportData.comparison.expensesChange, true)}`}>
-            {getChangeLabel(reportData.comparison.expensesChange)}
-          </p>
-        </div>
-        <div className="card">
-          <p className="text-sm text-cargo-muted mb-1">Net Profit</p>
-          <p className="text-2xl font-bold text-cargo-text">{formatCurrency(reportData.summary.netProfit)}</p>
-          <p className={`text-xs mt-1 ${getChangeTone(reportData.comparison.netProfitChange)}`}>
-            {getChangeLabel(reportData.comparison.netProfitChange)}
-          </p>
-        </div>
-        <div className="card">
-          <p className="text-sm text-cargo-muted mb-1">Total Trips</p>
-          <p className="text-2xl font-bold text-cargo-text">{reportData.summary.totalTrips}</p>
-          <p className={`text-xs mt-1 ${getChangeTone(reportData.comparison.tripsChange)}`}>
-            {getChangeLabel(reportData.comparison.tripsChange)}
-          </p>
-        </div>
+      {/* Summary Cards */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+        {summaryCards.map((card) => {
+          const ChangeIcon = card.change.icon;
+          return (
+            <div key={card.label} className="rounded-lg border border-slate-800 bg-slate-900/80 p-3">
+              <div className="flex items-center justify-between mb-2">
+                <div className="flex items-center gap-1.5 text-slate-500">
+                  <card.icon className="w-3.5 h-3.5" />
+                  <span className="text-xs font-medium">{card.label}</span>
+                </div>
+              </div>
+              <p className="text-lg font-bold text-slate-100">{card.value}</p>
+              <div className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 mt-1.5 text-xs font-medium ${card.change.bg} ${card.change.color}`}>
+                <ChangeIcon className="w-3 h-3" />
+                {card.change.label}
+              </div>
+            </div>
+          );
+        })}
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <div className="card">
-          <h3 className="text-lg font-semibold text-cargo-text mb-6">{chartConfig.title}</h3>
-          <div className="h-64">
+      {/* Charts Row */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        {/* Trend Chart */}
+        <div className="rounded-lg border border-slate-800 bg-slate-900/80 p-4">
+          <div className="flex items-center gap-2 mb-4">
+            <TrendingUp className="w-4 h-4 text-sky-400" />
+            <h3 className="text-sm font-semibold text-slate-200">{chartConfig.title}</h3>
+          </div>
+          <div className="h-56">
             <ResponsiveContainer width="100%" height="100%">
               <LineChart data={reportData.trend}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#334155" />
-                <XAxis dataKey="label" stroke="#64748b" />
-                <YAxis stroke="#64748b" />
+                <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" />
+                <XAxis dataKey="label" stroke="#475569" fontSize={12} tickLine={false} axisLine={false} />
+                <YAxis stroke="#475569" fontSize={12} tickLine={false} axisLine={false} tickFormatter={(v) => v >= 1000 ? `${(v/1000).toFixed(0)}k` : v} />
                 <Tooltip
                   formatter={(value) => chartConfig.formatter(value)}
                   contentStyle={{
-                    backgroundColor: '#1e293b',
-                    border: '1px solid #334155',
+                    backgroundColor: '#0f172a',
+                    border: '1px solid #1e293b',
                     borderRadius: '8px',
+                    fontSize: '12px',
+                    color: '#e2e8f0',
                   }}
                 />
                 <Line
                   type="monotone"
                   dataKey={chartConfig.dataKey}
                   stroke={chartConfig.color}
-                  strokeWidth={3}
-                  dot={{ fill: chartConfig.color }}
+                  strokeWidth={2}
+                  dot={{ fill: chartConfig.color, r: 3 }}
+                  activeDot={{ r: 5 }}
                 />
               </LineChart>
             </ResponsiveContainer>
           </div>
         </div>
 
-        <div className="card">
-          <h3 className="text-lg font-semibold text-cargo-text mb-6">Expense Breakdown</h3>
+        {/* Expense Breakdown */}
+        <div className="rounded-lg border border-slate-800 bg-slate-900/80 p-4">
+          <div className="flex items-center gap-2 mb-4">
+            <Receipt className="w-4 h-4 text-rose-400" />
+            <h3 className="text-sm font-semibold text-slate-200">Expense Breakdown</h3>
+          </div>
           {reportData.expenseBreakdown.length === 0 ? (
-            <p className="text-cargo-muted">No expense data found for this period.</p>
+            <div className="flex flex-col items-center justify-center h-56 text-slate-600">
+              <Receipt className="w-8 h-8 mb-2" />
+              <p className="text-sm">No expense data</p>
+            </div>
           ) : (
-            <div className="space-y-4">
+            <div className="space-y-3">
               {reportData.expenseBreakdown.map((item) => (
                 <div key={item.category}>
-                  <div className="flex items-center justify-between mb-2">
-                    <span className="text-sm text-cargo-text capitalize">{item.category}</span>
-                    <span className="text-sm text-cargo-muted">
-                      {formatCurrency(item.amount)} ({item.percentage}%)
-                    </span>
+                  <div className="flex items-center justify-between mb-1.5">
+                    <span className="text-sm text-slate-300 capitalize">{item.category}</span>
+                    <div className="flex items-center gap-2">
+                      <span className="text-sm font-medium text-slate-200">{formatCurrency(item.amount)}</span>
+                      <span className="text-xs text-slate-500">{item.percentage}%</span>
+                    </div>
                   </div>
-                  <div className="w-full bg-cargo-dark rounded-full h-2">
+                  <div className="w-full bg-slate-800 rounded-full h-1.5">
                     <div
-                      className="bg-primary-600 h-2 rounded-full transition-all"
+                      className="bg-sky-500 h-1.5 rounded-full transition-all"
                       style={{ width: `${item.percentage}%` }}
                     />
                   </div>
@@ -293,52 +348,76 @@ const Reports = () => {
         </div>
       </div>
 
-      <div className="card">
-        <h3 className="text-lg font-semibold text-cargo-text mb-4">Revenue vs Expenses</h3>
-        <div className="h-72">
+      {/* Revenue vs Expenses */}
+      <div className="rounded-lg border border-slate-800 bg-slate-900/80 p-4">
+        <div className="flex items-center gap-2 mb-4">
+          <BarChart3 className="w-4 h-4 text-sky-400" />
+          <h3 className="text-sm font-semibold text-slate-200">Revenue vs Expenses</h3>
+        </div>
+        <div className="h-64">
           <ResponsiveContainer width="100%" height="100%">
-            <BarChart data={reportData.trend}>
-              <CartesianGrid strokeDasharray="3 3" stroke="#334155" />
-              <XAxis dataKey="label" stroke="#64748b" />
-              <YAxis stroke="#64748b" />
+            <BarChart data={reportData.trend} barGap={4}>
+              <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" />
+              <XAxis dataKey="label" stroke="#475569" fontSize={12} tickLine={false} axisLine={false} />
+              <YAxis stroke="#475569" fontSize={12} tickLine={false} axisLine={false} tickFormatter={(v) => v >= 1000 ? `${(v/1000).toFixed(0)}k` : v} />
               <Tooltip
                 formatter={(value) => formatCurrency(value)}
                 contentStyle={{
-                  backgroundColor: '#1e293b',
-                  border: '1px solid #334155',
+                  backgroundColor: '#0f172a',
+                  border: '1px solid #1e293b',
                   borderRadius: '8px',
+                  fontSize: '12px',
+                  color: '#e2e8f0',
                 }}
               />
-              <Bar dataKey="revenue" fill="#3b82f6" radius={[6, 6, 0, 0]} />
-              <Bar dataKey="expenses" fill="#ef4444" radius={[6, 6, 0, 0]} />
+              <Bar dataKey="revenue" fill="#38bdf8" radius={[4, 4, 0, 0]} maxBarSize={40} />
+              <Bar dataKey="expenses" fill="#fb7185" radius={[4, 4, 0, 0]} maxBarSize={40} />
             </BarChart>
           </ResponsiveContainer>
         </div>
       </div>
 
-      <div className="card">
-        <div className="flex items-center gap-3 mb-4">
-          <FileText className="w-5 h-5 text-primary-400" />
-          <h3 className="text-lg font-semibold text-cargo-text">Recent Completed Trips</h3>
+      {/* Recent Trips */}
+      <div className="rounded-lg border border-slate-800 bg-slate-900/80 p-4">
+        <div className="flex items-center gap-2 mb-4">
+          <Truck className="w-4 h-4 text-slate-400" />
+          <h3 className="text-sm font-semibold text-slate-200">Recent Completed Trips</h3>
         </div>
         {reportData.recentTrips.length === 0 ? (
-          <p className="text-cargo-muted">No completed trips found for this period.</p>
+          <div className="flex flex-col items-center justify-center py-8 text-slate-600">
+            <Package className="w-8 h-8 mb-2" />
+            <p className="text-sm">No completed trips</p>
+          </div>
         ) : (
-          <div className="space-y-3">
+          <div className="space-y-2">
             {reportData.recentTrips.map((trip) => (
-              <div key={trip.id} className="flex flex-col gap-3 p-4 bg-cargo-dark rounded-lg lg:flex-row lg:items-center lg:justify-between">
-                <div>
-                  <p className="text-sm font-medium text-cargo-text">
-                    {trip.source} to {trip.destination}
-                  </p>
-                  <p className="text-xs text-cargo-muted mt-1">
-                    {trip.driver_name} &bull; {trip.car_number} &bull; {format(new Date(trip.started_at), 'PPP')}
+              <div
+                key={trip.id}
+                className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 rounded-md bg-slate-950/40 border border-slate-800/50 p-3 hover:border-slate-700 transition-colors"
+              >
+                <div className="min-w-0">
+                  <div className="flex items-center gap-1.5 text-sm text-slate-200">
+                    <span className="truncate">{trip.source}</span>
+                    <ArrowRight className="w-3 h-3 text-slate-600 shrink-0" />
+                    <span className="truncate">{trip.destination}</span>
+                  </div>
+                  <p className="text-xs text-slate-500 mt-0.5">
+                    {trip.driver_name} &bull; {trip.car_number} &bull; {format(new Date(trip.started_at), 'MMM d, yyyy')}
                   </p>
                 </div>
-                <div className="flex flex-wrap items-center gap-4 text-sm">
-                  <span className="text-cargo-text">Revenue: {formatCurrency(trip.freight_charge)}</span>
-                  <span className="text-cargo-muted">Expenses: {formatCurrency(trip.total_expenses)}</span>
-                  <span className="text-primary-400">Net: {formatCurrency(trip.net_profit)}</span>
+                <div className="flex items-center gap-4 text-xs shrink-0">
+                  <div className="text-right">
+                    <p className="text-slate-500">Revenue</p>
+                    <p className="font-medium text-slate-200">{formatCurrency(trip.freight_charge)}</p>
+                  </div>
+                  <div className="text-right">
+                    <p className="text-slate-500">Expenses</p>
+                    <p className="font-medium text-slate-200">{formatCurrency(trip.total_expenses)}</p>
+                  </div>
+                  <div className="text-right">
+                    <p className="text-slate-500">Net</p>
+                    <p className="font-medium text-emerald-400">{formatCurrency(trip.net_profit)}</p>
+                  </div>
                 </div>
               </div>
             ))}

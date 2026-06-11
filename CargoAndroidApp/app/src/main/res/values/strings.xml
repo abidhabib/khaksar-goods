@@ -61,8 +61,14 @@
     <string name="trip_history_finance">Freight: %1$s • Expense: %2$s • Net: %3$s</string>
     <string name="trip_notes_empty">Notes: No notes added</string>
     <string name="trip_notes_value">Notes: %1$s</string>
+    <string name="trip_expense_breakdown_title">Trip Expenses</string>
+    <string name="looking_for_trip_expenses">Looking For Trip Expenses</string>
     <string name="trip_expense_breakdown">Diesel %1$s • Toll %2$s • Food %3$s • Police %4$s
 Chalaan %5$s • Mandi Kaat %6$s • Reward %7$s • Bilty %8$s • Tyre %9$s</string>
+    <plurals name="looking_expense_count">
+        <item quantity="one">%1$d expense attached to this trip</item>
+        <item quantity="other">%1$d expenses attached to this trip</item>
+    </plurals>
     <string name="trip_image_preview">Trip image preview</string>
     <string name="trip_start_image">Start meter image</string>
     <string name="trip_end_image">End meter image</string>
@@ -239,13 +245,6 @@ Medical %6$s • Food %7$s • Guard %8$s</string>
     <string name="commission_request_history">Commission Request History</string>
     <string name="cashout_payment_history">Cashout History</string>
     <string name="cash_out">Cash Out</string>
-    <string name="generate_commission_default">Generate Commission</string>
-    <string name="generate_commission_button_format">Generate Commission (%1$s)</string>
-    <string name="generate_commission_empty">No commission available to generate right now.</string>
-    <string name="generate_commission_hint_format">%1$s from %2$s completed trips is ready to generate.</string>
-    <string name="generating_commission">Generating commission...</string>
-    <string name="commission_generated_successfully">Commission generated successfully</string>
-    <string name="commission_generate_failed">Unable to generate commission</string>
     <string name="driver_account_default_name">Driver</string>
     <string name="helper_account_default_name">Helper</string>
     <string name="driver_account_no_car">Car not assigned</string>

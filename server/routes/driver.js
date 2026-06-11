@@ -17,7 +17,6 @@ const {
     submitCompanyPayment,
     getCompanyPayments,
     getDriverAccount,
-    generateDriverCommission,
     createDriverCashoutRequest,
     getHelperAccount,
     createHelperCashoutRequest,
@@ -86,7 +85,6 @@ router.post(
 );
 router.get('/company-payments', authMiddleware, driverOnly, getCompanyPayments);
 router.get('/account', authMiddleware, driverOnly, getDriverAccount);
-router.post('/account/generate-commission', authMiddleware, driverOnly, generateDriverCommission);
 router.post('/account/cashout-requests', authMiddleware, driverOnly, createDriverCashoutRequest);
 router.get('/driver-account', authMiddleware, driverOnly, getDriverAccount);
 router.post('/driver-account/cashout-requests', authMiddleware, driverOnly, createDriverCashoutRequest);

@@ -56,6 +56,8 @@
     <string name="trip_history_finance">کرایہ: %1$s • خرچ: %2$s • خالص: %3$s</string>
     <string name="trip_notes_empty">نوٹس: کوئی نوٹ شامل نہیں</string>
     <string name="trip_notes_value">نوٹس: %1$s</string>
+    <string name="trip_expense_breakdown_title">ٹرپ اخراجات</string>
+    <string name="looking_for_trip_expenses">ٹرپ تلاش کرنے کے اخراجات</string>
 
     <string name="daily_expenses"> اخراجات</string>
     <string name="daily_expenses_subtitle">    خرچے  محفوظ کریں۔</string>
@@ -63,6 +65,10 @@
 
     <string name="trip_expense_breakdown">ڈیزل %1$s • ٹول %2$s • کھانا %3$s • پولیس %4$s
 چالان %5$s • منڈی کاٹ %6$s • انعام %7$s • بلٹی %8$s • پنکچر %9$s</string>
+    <plurals name="looking_expense_count">
+        <item quantity="one">%1$d خرچ اس ٹرپ کے ساتھ منسلک ہے</item>
+        <item quantity="other">%1$d اخراجات اس ٹرپ کے ساتھ منسلک ہیں</item>
+    </plurals>
 
     <string name="trip_image_preview">ٹرپ تصویر پیش منظر</string>
     <string name="trip_start_image">شروع کے میٹر کی تصویر</string>

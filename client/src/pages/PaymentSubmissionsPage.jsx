@@ -1,5 +1,23 @@
 import { useEffect, useState } from 'react';
-import { CalendarDays, CheckCircle2, Eye, Pencil, Truck, Wallet, XCircle } from 'lucide-react';
+import {
+  Wallet,
+  Truck,
+  TrendingUp,
+  Clock,
+  CheckCircle2,
+  XCircle,
+  Pencil,
+  Eye,
+  User,
+  Car,
+  Banknote,
+  Receipt,
+  ArrowRight,
+  Filter,
+  X,
+  ChevronDown,
+  CalendarDays,
+} from 'lucide-react';
 import { useApi } from '../hooks/useApi';
 import Modal from '../components/common/Modal';
 
@@ -9,10 +27,20 @@ const formatDateTime = (value) => {
   if (!value) return '-';
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return value;
-  return date.toLocaleString();
+  return date.toLocaleDateString('en-US', {
+    month: 'short',
+    day: 'numeric',
+    year: 'numeric',
+  });
 };
 
 const TABS = ['pending', 'approved', 'rejected'];
+
+const STATUS_CONFIG = {
+  pending: { label: 'Pending', color: 'text-sky-400', bg: 'bg-sky-500/10', border: 'border-sky-500/20' },
+  approved: { label: 'Approved', color: 'text-emerald-400', bg: 'bg-emerald-500/10', border: 'border-emerald-500/20' },
+  rejected: { label: 'Rejected', color: 'text-rose-400', bg: 'bg-rose-500/10', border: 'border-rose-500/20' },
+};
 
 const PaymentSubmissionsPage = () => {
   const { get, put, loading } = useApi();
@@ -34,6 +62,7 @@ const PaymentSubmissionsPage = () => {
     handover_to: '',
   });
   const [savingEdit, setSavingEdit] = useState(false);
+  const [showFilters, setShowFilters] = useState(false);
 
   const fetchDrivers = async () => {
     const result = await get('/admin/drivers');
@@ -117,35 +146,53 @@ const PaymentSubmissionsPage = () => {
   const summary = reportData?.summary || {};
 
   return (
-    <div className="space-y-6">
-      <div className="rounded-xl border border-cargo-border bg-gradient-to-r from-cargo-card to-cargo-dark p-5">
-        <h1 className="text-2xl font-bold text-cargo-text flex items-center gap-2">
-          <Wallet className="w-6 h-6 text-primary-400" />
-          Payment Submissions
-        </h1>
-      </div>
-
-      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
-        <div className="card">
-          <p className="text-sm text-cargo-muted flex items-center gap-2"><Wallet className="w-4 h-4" />Total Amount Received</p>
-          <p className="text-2xl font-bold text-cargo-text mt-1">{formatCurrency(summary.total_amount_received)}</p>
+    <div className="space-y-5">
+      {/* Header */}
+      <div className="flex items-center gap-3">
+        <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-slate-800 border border-slate-700">
+          <Wallet className="w-5 h-5 text-sky-400" />
         </div>
-        <div className="card">
-          <p className="text-sm text-cargo-muted flex items-center gap-2"><Truck className="w-4 h-4" />Total Cargo Income</p>
-          <p className="text-2xl font-bold text-cargo-text mt-1">{formatCurrency(summary.total_cargo_income)}</p>
-        </div>
-        <div className="card">
-          <p className="text-sm text-cargo-muted flex items-center gap-2"><CalendarDays className="w-4 h-4" />Net Profit</p>
-          <p className="text-2xl font-bold text-cargo-text mt-1">{formatCurrency(summary.net_profit)}</p>
-        </div>
-        <div className="card">
-          <p className="text-sm text-cargo-muted flex items-center gap-2"><CalendarDays className="w-4 h-4" />Pending Amount</p>
-          <p className="text-2xl font-bold text-cargo-text mt-1">{formatCurrency(summary.total_pending_amount)}</p>
+        <div>
+          <h1 className="text-xl font-semibold text-slate-100">Payment Submissions</h1>
+          <p className="text-sm text-slate-500">Manage driver payment deposits</p>
         </div>
       </div>
 
-      <div className="card space-y-4">
-        <div className="flex flex-wrap gap-2">
+      {/* Summary Cards */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+        <div className="rounded-lg border border-slate-800 bg-slate-900/80 p-3">
+          <div className="flex items-center gap-2 text-slate-500 mb-1">
+            <Banknote className="w-3.5 h-3.5" />
+            <span className="text-xs font-medium">Received</span>
+          </div>
+          <p className="text-lg font-bold text-slate-100">{formatCurrency(summary.total_amount_received)}</p>
+        </div>
+        <div className="rounded-lg border border-slate-800 bg-slate-900/80 p-3">
+          <div className="flex items-center gap-2 text-slate-500 mb-1">
+            <Truck className="w-3.5 h-3.5" />
+            <span className="text-xs font-medium">Cargo Income</span>
+          </div>
+          <p className="text-lg font-bold text-slate-100">{formatCurrency(summary.total_cargo_income)}</p>
+        </div>
+        <div className="rounded-lg border border-slate-800 bg-slate-900/80 p-3">
+          <div className="flex items-center gap-2 text-slate-500 mb-1">
+            <TrendingUp className="w-3.5 h-3.5" />
+            <span className="text-xs font-medium">Net Profit</span>
+          </div>
+          <p className="text-lg font-bold text-emerald-400">{formatCurrency(summary.net_profit)}</p>
+        </div>
+        <div className="rounded-lg border border-slate-800 bg-slate-900/80 p-3">
+          <div className="flex items-center gap-2 text-slate-500 mb-1">
+            <Clock className="w-3.5 h-3.5" />
+            <span className="text-xs font-medium">Pending</span>
+          </div>
+          <p className="text-lg font-bold text-sky-400">{formatCurrency(summary.total_pending_amount)}</p>
+        </div>
+      </div>
+
+      {/* Tabs & Filter Toggle */}
+      <div className="flex items-center justify-between gap-3">
+        <div className="flex items-center gap-1 rounded-lg bg-slate-900 border border-slate-800 p-1">
           {TABS.map((tab) => (
             <button
               key={tab}
@@ -155,201 +202,272 @@ const PaymentSubmissionsPage = () => {
                 setFilters(nextFilters);
                 fetchPayments(nextFilters);
               }}
-              className={filters.status === tab ? 'btn-primary' : 'btn-secondary'}
+              className={`px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${
+                filters.status === tab
+                  ? 'bg-slate-800 text-slate-100'
+                  : 'text-slate-500 hover:text-slate-300'
+              }`}
             >
               {tab.charAt(0).toUpperCase() + tab.slice(1)}
             </button>
           ))}
         </div>
-
-        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-5 gap-3">
-          <select
-            value={filters.driver_id}
-            onChange={(e) => setFilters((prev) => ({ ...prev, driver_id: e.target.value }))}
-            className="input-field w-full"
-          >
-            <option value="">All Drivers</option>
-            {drivers.map((driver) => (
-              <option key={driver.id} value={driver.id}>{driver.username}</option>
-            ))}
-          </select>
-          <input
-            type="month"
-            value={filters.month}
-            onChange={(e) => setFilters((prev) => ({ ...prev, month: e.target.value }))}
-            className="input-field w-full"
-          />
-          <input
-            type="date"
-            value={filters.from_date}
-            onChange={(e) => setFilters((prev) => ({ ...prev, from_date: e.target.value }))}
-            className="input-field w-full"
-          />
-          <input
-            type="date"
-            value={filters.to_date}
-            onChange={(e) => setFilters((prev) => ({ ...prev, to_date: e.target.value }))}
-            className="input-field w-full"
-          />
-          <button type="button" onClick={() => fetchPayments(filters)} className="btn-primary">
-            Apply Filter
-          </button>
-        </div>
+        <button
+          type="button"
+          onClick={() => setShowFilters(!showFilters)}
+          className="flex items-center gap-1.5 rounded-lg border border-slate-800 bg-slate-900 px-3 py-1.5 text-sm text-slate-400 hover:text-slate-200 transition-colors"
+        >
+          <Filter className="w-3.5 h-3.5" />
+          Filters
+          <ChevronDown className={`w-3.5 h-3.5 transition-transform ${showFilters ? 'rotate-180' : ''}`} />
+        </button>
       </div>
 
-      <div className="card space-y-4 overflow-x-auto">
-        <div>
-          <h2 className="text-lg font-semibold text-cargo-text">Submission Table</h2>
-          <p className="text-cargo-muted text-sm mt-1">Approve or reject payment requests and review proof for account deposits.</p>
+      {/* Filters Panel */}
+      {showFilters && (
+        <div className="rounded-lg border border-slate-800 bg-slate-900/60 p-3 space-y-3">
+          <div className="flex items-center justify-between">
+            <span className="text-sm font-medium text-slate-400">Filter Options</span>
+            <button onClick={() => setShowFilters(false)} className="text-slate-500 hover:text-slate-300">
+              <X className="w-4 h-4" />
+            </button>
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-2">
+            <select
+              value={filters.driver_id}
+              onChange={(e) => setFilters((prev) => ({ ...prev, driver_id: e.target.value }))}
+              className="rounded-md border border-slate-700 bg-slate-800 px-3 py-2 text-sm text-slate-200 outline-none focus:border-sky-500/50"
+            >
+              <option value="">All Drivers</option>
+              {drivers.map((driver) => (
+                <option key={driver.id} value={driver.id}>{driver.username}</option>
+              ))}
+            </select>
+            <input
+              type="month"
+              value={filters.month}
+              onChange={(e) => setFilters((prev) => ({ ...prev, month: e.target.value }))}
+              className="rounded-md border border-slate-700 bg-slate-800 px-3 py-2 text-sm text-slate-200 outline-none focus:border-sky-500/50"
+            />
+            <input
+              type="date"
+              value={filters.from_date}
+              onChange={(e) => setFilters((prev) => ({ ...prev, from_date: e.target.value }))}
+              className="rounded-md border border-slate-700 bg-slate-800 px-3 py-2 text-sm text-slate-200 outline-none focus:border-sky-500/50"
+              placeholder="From"
+            />
+            <input
+              type="date"
+              value={filters.to_date}
+              onChange={(e) => setFilters((prev) => ({ ...prev, to_date: e.target.value }))}
+              className="rounded-md border border-slate-700 bg-slate-800 px-3 py-2 text-sm text-slate-200 outline-none focus:border-sky-500/50"
+              placeholder="To"
+            />
+            <button
+              type="button"
+              onClick={() => fetchPayments(filters)}
+              className="rounded-md bg-sky-600 px-4 py-2 text-sm font-medium text-white hover:bg-sky-500 transition-colors"
+            >
+              Apply
+            </button>
+          </div>
         </div>
+      )}
 
-        <table className="w-full min-w-[1200px]">
-          <thead>
-            <tr className="border-b border-cargo-border text-left">
-              <th className="py-3 pr-4 text-xs uppercase tracking-wide text-cargo-muted">Driver Name</th>
-              <th className="py-3 pr-4 text-xs uppercase tracking-wide text-cargo-muted">Car Number</th>
-              <th className="py-3 pr-4 text-xs uppercase tracking-wide text-cargo-muted">Amount</th>
-              <th className="py-3 pr-4 text-xs uppercase tracking-wide text-cargo-muted">Payment Method</th>
-              <th className="py-3 pr-4 text-xs uppercase tracking-wide text-cargo-muted">Details</th>
-              <th className="py-3 pr-4 text-xs uppercase tracking-wide text-cargo-muted">Screenshot</th>
-              <th className="py-3 pr-4 text-xs uppercase tracking-wide text-cargo-muted">Status</th>
-              <th className="py-3 pr-4 text-xs uppercase tracking-wide text-cargo-muted">Submitted</th>
-              <th className="py-3 pr-4 text-xs uppercase tracking-wide text-cargo-muted">Updated</th>
-              <th className="py-3 pr-4 text-xs uppercase tracking-wide text-cargo-muted">Actions</th>
-            </tr>
-          </thead>
-          <tbody>
-            {payments.length ? payments.map((payment) => (
-              <tr key={payment.id} className="border-b border-cargo-border/60">
-                <td className="py-3 pr-4 text-sm text-cargo-text">{payment.driver_name}</td>
-                <td className="py-3 pr-4 text-sm text-cargo-text">{payment.car_number || 'N/A'}</td>
-                <td className="py-3 pr-4 text-sm font-semibold text-primary-400">{formatCurrency(payment.amount)}</td>
-                <td className="py-3 pr-4 text-sm text-cargo-text capitalize">{payment.payment_method}</td>
-                <td className="py-3 pr-4 text-sm text-cargo-muted">
-                  {payment.payment_method === 'cash'
-                    ? `Handover: ${payment.handover_to || 'N/A'}`
-                    : `Fee: ${formatCurrency(payment.sending_fee)}`}
-                </td>
-                <td className="py-3 pr-4 text-sm text-cargo-text">
-                  {payment.screenshot_image ? (
+      {/* Payment Cards */}
+<div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-3">        {payments.length ? (
+          payments.map((payment) => {
+            const cfg = STATUS_CONFIG[payment.status] || STATUS_CONFIG.pending;
+            return (
+              <div
+                key={payment.id}
+                className="rounded-lg border border-slate-800 bg-emerald-900/30 p-3 hover:border-slate-700 transition-colors"
+              >
+                {/* Card Header */}
+                <div className="flex items-start justify-between gap-3 mb-3">
+                  <div className="flex items-center gap-3 min-w-0">
+                    <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-slate-800 border border-slate-700">
+                      <User className="w-4 h-4 text-slate-400" />
+                    </div>
+                    <div className="min-w-0">
+                      <p className="text-sm font-semibold text-slate-100 truncate">{payment.driver_name}</p>
+                      <div className="flex items-center gap-1.5 text-xs text-slate-500 mt-0.5">
+                        <Car className="w-3 h-3" />
+                        <span>{payment.car_number || 'No car'}</span>
+                      </div>
+                    </div>
+                  </div>
+                  <span className={`shrink-0 inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-medium ${cfg.bg} ${cfg.color} border ${cfg.border}`}>
+                    {payment.status === 'approved' && <CheckCircle2 className="w-3 h-3" />}
+                    {payment.status === 'rejected' && <XCircle className="w-3 h-3" />}
+                    {payment.status === 'pending' && <Clock className="w-3 h-3" />}
+                    {cfg.label}
+                  </span>
+                </div>
+
+                {/* Amount & Method */}
+                <div className="flex items-center justify-between mb-3">
+                  <div>
+                    <p className="text-2xl font-bold text-slate-100">{formatCurrency(payment.amount)}</p>
+                    <p className="text-xs text-slate-500 capitalize mt-0.5">{payment.payment_method}</p>
+                  </div>
+                  {payment.screenshot_image && (
                     <a
                       href={payment.screenshot_image}
                       target="_blank"
                       rel="noreferrer"
-                      className="inline-flex items-center gap-2 text-primary-400 hover:text-primary-300"
+                      className="flex items-center gap-1.5 rounded-md bg-slate-800 border border-slate-700 px-2.5 py-1.5 text-xs text-slate-300 hover:text-sky-400 hover:border-sky-500/30 transition-colors"
                     >
-                      <Eye className="w-4 h-4" />
-                      Preview
+                      <Eye className="w-3.5 h-3.5" />
+                      Screenshot
                     </a>
-                  ) : (
-                    'No screenshot'
                   )}
-                </td>
-                <td className="py-3 pr-4 text-sm">
-                  <span className={`inline-flex rounded-full px-3 py-1 text-xs font-semibold ${
-                    payment.status === 'approved'
-                      ? 'bg-cargo-success/15 text-cargo-success'
-                      : payment.status === 'rejected'
-                        ? 'bg-cargo-danger/15 text-cargo-danger'
-                        : 'bg-cargo-accent/15 text-cargo-accent'
-                  }`}>
-                    {payment.status}
-                  </span>
-                </td>
-                <td className="py-3 pr-4 text-sm text-cargo-muted">{formatDateTime(payment.submitted_at)}</td>
-                <td className="py-3 pr-4 text-sm text-cargo-muted">{formatDateTime(payment.status_updated_at)}</td>
-                <td className="py-3 pr-4 text-sm">
-                  {payment.status === 'pending' ? (
-                    <div className="flex flex-wrap items-center gap-2">
-                      <button
-                        type="button"
-                        onClick={() => openEditModal(payment)}
-                        disabled={submittingId === payment.id}
-                        className="inline-flex items-center gap-1 rounded-lg bg-primary-500/15 px-3 py-2 text-primary-300 hover:bg-primary-500/25 disabled:opacity-50"
-                      >
-                        <Pencil className="w-4 h-4" />
-                        Edit
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => handleStatusChange(payment.id, 'approved')}
-                        disabled={submittingId === payment.id}
-                        className="inline-flex items-center gap-1 rounded-lg bg-cargo-success/15 px-3 py-2 text-cargo-success hover:bg-cargo-success/25 disabled:opacity-50"
-                      >
-                        <CheckCircle2 className="w-4 h-4" />
-                        Approve
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => handleStatusChange(payment.id, 'rejected')}
-                        disabled={submittingId === payment.id}
-                        className="inline-flex items-center gap-1 rounded-lg bg-cargo-danger/15 px-3 py-2 text-cargo-danger hover:bg-cargo-danger/25 disabled:opacity-50"
-                      >
-                        <XCircle className="w-4 h-4" />
-                        Reject
-                      </button>
+                </div>
+
+                {/* Details */}
+                <div className="rounded-md bg-slate-950/50 border border-slate-800/50 p-2.5 mb-3">
+                  {payment.payment_method === 'cash' ? (
+                    <div className="flex items-center gap-2 text-sm">
+                      <Receipt className="w-3.5 h-3.5 text-slate-500 shrink-0" />
+                      <span className="text-slate-500">Handover to:</span>
+                      <span className="text-slate-300 font-medium">{payment.handover_to || 'N/A'}</span>
                     </div>
                   ) : (
-                    <span className="text-cargo-muted">No action</span>
+                    <div className="flex items-center gap-2 text-sm">
+                      <Receipt className="w-3.5 h-3.5 text-slate-500 shrink-0" />
+                      <span className="text-slate-500">Sending fee:</span>
+                      <span className="text-slate-300 font-medium">{formatCurrency(payment.sending_fee)}</span>
+                    </div>
                   )}
-                </td>
-              </tr>
-            )) : (
-              <tr>
-                <td colSpan="10" className="py-6 text-center text-cargo-muted">
-                  {loading ? 'Loading submissions...' : 'No rows found for this tab/filter.'}
-                </td>
-              </tr>
-            )}
-          </tbody>
-        </table>
+                </div>
+
+                {/* Dates */}
+                <div className="flex items-center gap-3 text-xs text-slate-600 mb-3">
+                  <div className="flex items-center gap-1">
+                    <CalendarDays className="w-3 h-3" />
+                    <span>Submitted {formatDateTime(payment.submitted_at)}</span>
+                  </div>
+                  {payment.status_updated_at && payment.status !== 'pending' && (
+                    <div className="flex items-center gap-1">
+                      <ArrowRight className="w-3 h-3" />
+                      <span>Updated {formatDateTime(payment.status_updated_at)}</span>
+                    </div>
+                  )}
+                </div>
+
+                {/* Actions */}
+                {payment.status === 'pending' && (
+                  <div className="flex items-center gap-2 pt-3 border-t border-slate-800">
+                    <button
+                      type="button"
+                      onClick={() => openEditModal(payment)}
+                      disabled={submittingId === payment.id}
+                      className="flex items-center gap-1.5 rounded-md bg-slate-800 border border-slate-700 px-3 py-1.5 text-xs font-medium text-slate-300 hover:bg-slate-700 hover:text-slate-100 disabled:opacity-40 transition-colors"
+                    >
+                      <Pencil className="w-3.5 h-3.5" />
+                      Edit
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleStatusChange(payment.id, 'approved')}
+                      disabled={submittingId === payment.id}
+                      className="flex items-center gap-1.5 rounded-md bg-emerald-500/10 border border-emerald-500/20 px-3 py-1.5 text-xs font-medium text-emerald-400 hover:bg-emerald-500/20 disabled:opacity-40 transition-colors"
+                    >
+                      <CheckCircle2 className="w-3.5 h-3.5" />
+                      Approve
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleStatusChange(payment.id, 'rejected')}
+                      disabled={submittingId === payment.id}
+                      className="flex items-center gap-1.5 rounded-md bg-rose-500/10 border border-rose-500/20 px-3 py-1.5 text-xs font-medium text-rose-400 hover:bg-rose-500/20 disabled:opacity-40 transition-colors"
+                    >
+                      <XCircle className="w-3.5 h-3.5" />
+                      Reject
+                    </button>
+                  </div>
+                )}
+              </div>
+            );
+          })
+        ) : (
+          <div className="rounded-lg border border-slate-800 bg-slate-900/60 p-8 text-center">
+            <Receipt className="w-8 h-8 text-slate-700 mx-auto mb-2" />
+            <p className="text-sm text-slate-500">
+              {loading ? 'Loading submissions...' : 'No submissions found.'}
+            </p>
+          </div>
+        )}
       </div>
 
-      <Modal isOpen={Boolean(editingPayment)} onClose={closeEditModal} title="Edit Payment Submission">
+      {/* Edit Modal */}
+      <Modal isOpen={Boolean(editingPayment)} onClose={closeEditModal} title="Edit Payment">
         <form onSubmit={handleEditSave} className="space-y-4">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-            <input
-              type="number"
-              min="0"
-              step="0.01"
-              value={editForm.amount}
-              onChange={(e) => setEditForm((prev) => ({ ...prev, amount: e.target.value }))}
-              className="input-field w-full"
-              placeholder="Amount"
-            />
-            <select
-              value={editForm.payment_method}
-              onChange={(e) => setEditForm((prev) => ({ ...prev, payment_method: e.target.value }))}
-              className="input-field w-full"
-            >
-              <option value="cash">Cash</option>
-              <option value="account">Account</option>
-            </select>
-            {editForm.payment_method === 'cash' ? (
-              <input
-                type="text"
-                value={editForm.handover_to}
-                onChange={(e) => setEditForm((prev) => ({ ...prev, handover_to: e.target.value }))}
-                className="input-field w-full md:col-span-2"
-                placeholder="Handover To"
-              />
-            ) : (
+            <div className="space-y-1">
+              <label className="text-xs font-medium text-slate-500">Amount</label>
               <input
                 type="number"
                 min="0"
                 step="0.01"
-                value={editForm.sending_fee}
-                onChange={(e) => setEditForm((prev) => ({ ...prev, sending_fee: e.target.value }))}
-                className="input-field w-full md:col-span-2"
-                placeholder="Sending Fee"
+                value={editForm.amount}
+                onChange={(e) => setEditForm((prev) => ({ ...prev, amount: e.target.value }))}
+                className="w-full rounded-md border border-slate-700 bg-slate-800 px-3 py-2 text-sm text-slate-200 outline-none focus:border-sky-500/50"
+                placeholder="0.00"
               />
+            </div>
+            <div className="space-y-1">
+              <label className="text-xs font-medium text-slate-500">Method</label>
+              <select
+                value={editForm.payment_method}
+                onChange={(e) => setEditForm((prev) => ({ ...prev, payment_method: e.target.value }))}
+                className="w-full rounded-md border border-slate-700 bg-slate-800 px-3 py-2 text-sm text-slate-200 outline-none focus:border-sky-500/50"
+              >
+                <option value="cash">Cash</option>
+                <option value="account">Account</option>
+              </select>
+            </div>
+            {editForm.payment_method === 'cash' ? (
+              <div className="md:col-span-2 space-y-1">
+                <label className="text-xs font-medium text-slate-500">Handover To</label>
+                <input
+                  type="text"
+                  value={editForm.handover_to}
+                  onChange={(e) => setEditForm((prev) => ({ ...prev, handover_to: e.target.value }))}
+                  className="w-full rounded-md border border-slate-700 bg-slate-800 px-3 py-2 text-sm text-slate-200 outline-none focus:border-sky-500/50"
+                  placeholder="Person name"
+                />
+              </div>
+            ) : (
+              <div className="md:col-span-2 space-y-1">
+                <label className="text-xs font-medium text-slate-500">Sending Fee</label>
+                <input
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  value={editForm.sending_fee}
+                  onChange={(e) => setEditForm((prev) => ({ ...prev, sending_fee: e.target.value }))}
+                  className="w-full rounded-md border border-slate-700 bg-slate-800 px-3 py-2 text-sm text-slate-200 outline-none focus:border-sky-500/50"
+                  placeholder="0.00"
+                />
+              </div>
             )}
           </div>
 
-          <div className="flex gap-3">
-            <button type="button" onClick={closeEditModal} className="flex-1 btn-secondary">Cancel</button>
-            <button type="submit" disabled={savingEdit} className="flex-1 btn-primary">
-              {savingEdit ? 'Saving...' : 'Save Changes'}
+          <div className="flex gap-2 pt-2">
+            <button
+              type="button"
+              onClick={closeEditModal}
+              className="flex-1 rounded-md border border-slate-700 bg-slate-800 px-4 py-2 text-sm font-medium text-slate-300 hover:bg-slate-700 transition-colors"
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              disabled={savingEdit}
+              className="flex-1 rounded-md bg-sky-600 px-4 py-2 text-sm font-medium text-white hover:bg-sky-500 disabled:opacity-50 transition-colors"
+            >
+              {savingEdit ? 'Saving...' : 'Save'}
             </button>
           </div>
         </form>

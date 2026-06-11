@@ -72,6 +72,19 @@ const DRIVER_COMPANY_AMOUNT_SQL = (driverAlias) => `
         ), 0)
         -
         COALESCE((
+            SELECT SUM(t5.bilty_commission_amount)
+            FROM trips t5
+            WHERE t5.driver_id = ${driverAlias}
+              AND t5.status = 'completed'
+              AND NOT EXISTS (
+                  SELECT 1
+                  FROM expenses e2
+                  WHERE e2.trip_id = t5.id
+                    AND e2.category = 'bilty_commission'
+              )
+        ), 0)
+        -
+        COALESCE((
             SELECT SUM(de.amount)
             FROM driver_daily_expense_entries de
             WHERE de.driver_id = ${driverAlias}
@@ -1008,6 +1021,94 @@ const getCarHistory = async (req, res) => {
         const tripsWithVariance = tripsWithExpenses
             .map((trip) => withFreightVariance(trip, freightRates))
             .map(applyTripNetIncomeFormula);
+        const firstTripPending = {
+            daily_expenses: [],
+            total_expenses: 0
+        };
+        const currentDriverId = Number(car[0].current_driver_id);
+        const activeAssignment = Number.isFinite(currentDriverId)
+            ? assignments.find((assignment) =>
+                Number(assignment.driver_id) === currentDriverId && !assignment.unassigned_at
+            )
+            : null;
+
+        if (activeAssignment) {
+            const firstTripConditions = ['car_id = ?', 'driver_id = ?'];
+            const firstTripParams = [id, currentDriverId];
+            if (activeAssignment.assigned_at) {
+                firstTripConditions.push('started_at >= ?');
+                firstTripParams.push(activeAssignment.assigned_at);
+            }
+
+            const [[firstTripAfterAssignment]] = await pool.execute(
+                `SELECT id, started_at
+                 FROM trips
+                 WHERE ${firstTripConditions.join(' AND ')}
+                 ORDER BY started_at ASC, id ASC
+                 LIMIT 1`,
+                firstTripParams
+            );
+
+            if (!firstTripAfterAssignment?.id) {
+                const dailyExpenseConditions = [
+                    'de.driver_id = ?',
+                    'de.applied_trip_id IS NULL'
+                ];
+                const dailyExpenseParams = [currentDriverId];
+
+                if (activeAssignment.assigned_at) {
+                    dailyExpenseConditions.push(`(
+                        de.expense_date > DATE(?)
+                        OR (de.expense_date = DATE(?) AND de.created_at >= ?)
+                    )`);
+                    dailyExpenseParams.push(
+                        activeAssignment.assigned_at,
+                        activeAssignment.assigned_at,
+                        activeAssignment.assigned_at
+                    );
+                }
+
+                if (from_date) {
+                    dailyExpenseConditions.push('de.expense_date >= ?');
+                    dailyExpenseParams.push(from_date);
+                }
+
+                if (to_date) {
+                    dailyExpenseConditions.push('de.expense_date <= ?');
+                    dailyExpenseParams.push(to_date);
+                }
+
+                if (!from_date && !to_date) {
+                    if (period === 'today') {
+                        dailyExpenseConditions.push('de.expense_date = CURDATE()');
+                    } else if (period === 'week') {
+                        dailyExpenseConditions.push('de.expense_date >= DATE_SUB(CURDATE(), INTERVAL 7 DAY)');
+                    } else if (period === 'month') {
+                        dailyExpenseConditions.push('de.expense_date >= DATE_SUB(CURDATE(), INTERVAL 30 DAY)');
+                    } else if (period === 'year') {
+                        dailyExpenseConditions.push('de.expense_date >= DATE_SUB(CURDATE(), INTERVAL 1 YEAR)');
+                    }
+                }
+
+                const [firstTripDailyExpenses] = await pool.execute(
+                    `SELECT de.id, de.driver_id, de.applied_trip_id, de.category, de.amount,
+                            de.meter_reading, de.note, de.expense_image, de.expense_date, de.created_at
+                     FROM driver_daily_expense_entries de
+                     WHERE ${dailyExpenseConditions.join(' AND ')}
+                     ORDER BY de.expense_date ASC, de.created_at ASC, de.id ASC`,
+                    dailyExpenseParams
+                );
+
+                firstTripPending.daily_expenses = firstTripDailyExpenses.map((expense) => ({
+                    ...expense,
+                    amount: Number(expense.amount) || 0
+                }));
+                firstTripPending.total_expenses = firstTripPending.daily_expenses.reduce(
+                    (sum, expense) => sum + (Number(expense.amount) || 0),
+                    0
+                );
+            }
+        }
 
         const completedTrips = tripsWithVariance.filter((trip) => trip.status === 'completed');
         const driverStatsMap = new Map();
@@ -1045,6 +1146,7 @@ const getCarHistory = async (req, res) => {
             total_distance: 0,
             total_diesel_liters: 0
         });
+        summaryTotals.total_expenses += Number(firstTripPending.total_expenses) || 0;
 
         res.json({
             success: true,
@@ -1056,6 +1158,12 @@ const getCarHistory = async (req, res) => {
                 )
             },
             assignments,
+            first_trip_pending: {
+                driver_id: Number.isFinite(currentDriverId) ? currentDriverId : null,
+                driver_name: car[0].current_driver_name || null,
+                daily_expenses: firstTripPending.daily_expenses,
+                total_expenses: firstTripPending.total_expenses
+            },
             trips: tripsWithVariance,
             driverStats,
             summary: {
@@ -1706,115 +1814,8 @@ const getDriverCommissionRequests = async (req, res) => {
     }
 };
 
-const updateDriverCommissionRequestStatus = async (req, res) => {
-    const connection = await pool.getConnection();
-    try {
-        await connection.beginTransaction();
 
-        const requestId = Number(req.params.id);
-        const status = String(req.body?.status || '').trim().toLowerCase();
-        const remarks = toNullableString(req.body?.remarks);
 
-        if (!ACCOUNT_REVIEW_STATUSES.has(status)) {
-            return res.status(400).json({ message: 'Status must be approved or rejected' });
-        }
-
-        const [rows] = await connection.execute(
-            'SELECT * FROM driver_commission_requests WHERE id = ? LIMIT 1',
-            [requestId]
-        );
-
-        if (!rows.length) {
-            return res.status(404).json({ message: 'Commission request not found' });
-        }
-
-        const request = rows[0];
-        if (request.status !== 'pending') {
-            return res.status(400).json({ message: 'Only pending requests can be updated' });
-        }
-
-        if (status === 'approved') {
-            await connection.execute(
-                'UPDATE drivers SET commission_balance = commission_balance + ? WHERE id = ?',
-                [request.commission_amount, request.driver_id]
-            );
-            await createDriverAccountTransaction(connection, {
-                driverId: request.driver_id,
-                balanceType: 'commission',
-                transactionType: 'commission_credit',
-                direction: 'credit',
-                amount: request.commission_amount,
-                sourceType: 'commission_request',
-                sourceId: request.id,
-                notes: `Commission approved for trip #${request.trip_id}`
-            });
-        }
-
-        await connection.execute(
-            `UPDATE driver_commission_requests
-             SET status = ?, reviewed_by = ?, reviewed_at = CURRENT_TIMESTAMP, remarks = ?
-             WHERE id = ?`,
-            [status, req.user.id, remarks, requestId]
-        );
-
-        await connection.commit();
-        res.json({ success: true, message: `Commission request ${status}` });
-    } catch (error) {
-        await connection.rollback();
-        res.status(500).json({ message: 'Server error', error: error.message });
-    } finally {
-        connection.release();
-    }
-};
-
-const updateDriverCommissionRequest = async (req, res) => {
-    try {
-        const requestId = Number(req.params.id);
-        const commissionPercentage = toNonNegativeAmount(req.body?.commission_percentage);
-        const netProfit = toNonNegativeAmount(req.body?.net_profit);
-        const submittedAmount = req.body?.commission_amount;
-        const commissionAmount = submittedAmount === undefined || submittedAmount === null || submittedAmount === ''
-            ? roundCurrency((netProfit * commissionPercentage) / 100)
-            : toNonNegativeAmount(submittedAmount);
-        const remarks = toNullableString(req.body?.remarks);
-
-        const [rows] = await pool.execute(
-            'SELECT id, status FROM driver_commission_requests WHERE id = ? LIMIT 1',
-            [requestId]
-        );
-
-        if (!rows.length) {
-            return res.status(404).json({ message: 'Commission request not found' });
-        }
-
-        if (rows[0].status !== 'pending') {
-            return res.status(400).json({ message: 'Only pending requests can be edited' });
-        }
-
-        if (!(commissionPercentage > 0)) {
-            return res.status(400).json({ message: 'Commission percentage must be greater than zero' });
-        }
-
-        if (!(netProfit >= 0)) {
-            return res.status(400).json({ message: 'Net profit is required' });
-        }
-
-        if (!(commissionAmount >= 0)) {
-            return res.status(400).json({ message: 'Commission amount is required' });
-        }
-
-        await pool.execute(
-            `UPDATE driver_commission_requests
-             SET commission_percentage = ?, net_profit = ?, commission_amount = ?, remarks = ?
-             WHERE id = ?`,
-            [commissionPercentage, netProfit, commissionAmount, remarks, requestId]
-        );
-
-        res.json({ success: true, message: 'Commission request updated successfully' });
-    } catch (error) {
-        res.status(500).json({ message: 'Server error', error: error.message });
-    }
-};
 
 const getDriverCashoutRequests = async (req, res) => {
     try {
@@ -3904,8 +3905,7 @@ module.exports = {
     getDriverReport,
     getDriversExpenseReport,
     getDriverCommissionRequests,
-    updateDriverCommissionRequest,
-    updateDriverCommissionRequestStatus,
+
     getDriverCompanyBalanceAdjustments,
     addDriverCompanyBalanceAdjustment,
     getDriverCashoutRequests,

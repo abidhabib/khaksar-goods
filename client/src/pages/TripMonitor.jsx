@@ -1,14 +1,16 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useApi } from '../hooks/useApi';
 import { format } from 'date-fns';
-import { Route, Clock, MapPin, DollarSign, Activity } from 'lucide-react';
+import { Route, Clock, MapPin, Activity } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
+
+const formatCurrency = (value) => `Rs ${Number(value || 0).toLocaleString()}`;
 
 const TripMonitor = () => {
   const { get, loading } = useApi();
   const [trips, setTrips] = useState([]);
   const [filter, setFilter] = useState('all'); // all, ongoing, completed
-const navigate = useNavigate();
+  const navigate = useNavigate();
  
 
   const fetchTrips = async () => {
@@ -21,7 +23,12 @@ const navigate = useNavigate();
  useEffect(() => {
     fetchTrips();
   }, []);
-  const filteredTrips = trips.filter(trip => {
+  const orderedTrips = useMemo(
+    () => [...trips].sort((left, right) => (Number(right.id) || 0) - (Number(left.id) || 0)),
+    [trips]
+  );
+
+  const filteredTrips = orderedTrips.filter(trip => {
     if (filter === 'all') return true;
     return trip.status === filter;
   });
@@ -37,7 +44,6 @@ const navigate = useNavigate();
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold text-cargo-text">Trip Monitor</h1>
-          <p className="text-cargo-muted mt-1">Monitor all trips in real-time</p>
         </div>
         
         <div className="flex items-center gap-2">
@@ -122,7 +128,11 @@ const navigate = useNavigate();
                   </div>
                   
                   <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
-                    <div>
+                <div>
+                    <p className="text-xs text-cargo-muted mb-1">Trip ID</p>
+                    <p className="text-sm font-medium text-cargo-text">#{trip.id}</p>
+                  </div>
+                  <div>
                       <p className="text-xs text-cargo-muted mb-1">Driver</p>
                       <p className="text-sm font-medium text-cargo-text">{trip.driver_name}</p>
                     </div>
@@ -132,11 +142,30 @@ const navigate = useNavigate();
                     </div>
                     <div>
                       <p className="text-xs text-cargo-muted mb-1">Revenue</p>
-                      <p className="text-sm font-medium text-cargo-text">{trip.freight_charge?.toLocaleString()}</p>
+                      <p className="text-sm font-medium text-cargo-text">{formatCurrency(trip.freight_charge)}</p>
                     </div>
-  <div>
-                      <p className="text-xs text-amber-500  mb-1"                 onClick={() => navigate(`/trips/${trip.id}/report`)} className="cursor-pointer hover:text-primary-400 transition-colors underline text-sm font-medium text-amber-500    "
->View Trip</p>
+                    <div>
+                      <p className="text-xs text-cargo-muted mb-1">Expenses</p>
+                      <p className="text-sm font-medium text-cargo-text">
+                        {trip.total_expenses !== undefined ? formatCurrency(trip.total_expenses) : 'N/A'}
+                      </p>
+                    </div>
+                    <div>
+                      <p className="text-xs text-cargo-muted mb-1">Net</p>
+                      <p className="text-sm font-medium text-cargo-text">
+                        {trip.net_profit !== undefined
+                          ? formatCurrency(trip.net_profit)
+                          : 'N/A'}
+                      </p>
+                    </div>
+                    <div className="md:col-span-4">
+                      <button
+                        type="button"
+                        onClick={() => navigate(`/trips/${trip.id}/report`)}
+                        className="cursor-pointer hover:text-primary-400 transition-colors underline text-sm font-medium text-amber-500"
+                      >
+                        View Trip
+                      </button>
                     </div>
 
              

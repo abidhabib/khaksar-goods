@@ -37,6 +37,19 @@ const DRIVER_TOTAL_INCOME_SQL = (driverAlias) => `
         ), 0)
         -
         COALESCE((
+            SELECT SUM(t3.bilty_commission_amount)
+            FROM trips t3
+            WHERE t3.driver_id = ${driverAlias}
+              AND t3.status = 'completed'
+              AND NOT EXISTS (
+                  SELECT 1
+                  FROM expenses e2
+                  WHERE e2.trip_id = t3.id
+                    AND e2.category = 'bilty_commission'
+              )
+        ), 0)
+        -
+        COALESCE((
             SELECT SUM(de.amount)
             FROM driver_daily_expense_entries de
             WHERE de.driver_id = ${driverAlias}
@@ -446,68 +459,6 @@ const applyCommissionTripFormula = (trip) => {
         net_profit: netProfit,
         net_income: netProfit
     };
-};
-
-const fetchDriverCommissionEligibleTrips = async (connection, driverId) => {
-    const [tripRows] = await connection.execute(
-        `SELECT
-            t.id,
-            t.driver_id,
-            t.status,
-            t.started_at,
-            t.ended_at,
-            t.start_meter_reading,
-            t.end_meter_reading,
-            t.freight_charge,
-            t.bilty_commission_amount,
-            COALESCE(exp.total_expenses, 0) AS total_expenses,
-            cr.id AS commission_request_id,
-            cr.status AS commission_request_status
-         FROM trips t
-         LEFT JOIN (
-             SELECT trip_id, SUM(amount) AS total_expenses
-             FROM expenses
-             GROUP BY trip_id
-         ) exp ON exp.trip_id = t.id
-         LEFT JOIN driver_commission_requests cr ON cr.trip_id = t.id
-         WHERE t.driver_id = ?
-           AND t.status = 'completed'
-           AND (cr.id IS NULL OR cr.status <> 'approved')
-         ORDER BY t.started_at ASC, t.id ASC`,
-        [driverId]
-    );
-
-    if (!tripRows.length) {
-        return [];
-    }
-
-    const tripIds = tripRows.map((trip) => Number(trip.id)).filter(Number.isFinite);
-    const placeholders = tripIds.map(() => '?').join(', ');
-    const [expenseRows] = await connection.execute(
-        `SELECT id, trip_id, category, amount, liters, location, coordinates, receipt_image, notes, created_at
-         FROM expenses
-         WHERE trip_id IN (${placeholders})
-         ORDER BY created_at ASC, id ASC`,
-        tripIds
-    );
-
-    const expensesByTripId = expenseRows.reduce((map, expense) => {
-        const tripId = Number(expense.trip_id);
-        if (!map.has(tripId)) {
-            map.set(tripId, []);
-        }
-        map.get(tripId).push(expense);
-        return map;
-    }, new Map());
-
-    const tripsWithExpenses = tripRows.map((trip) => ({
-        ...trip,
-        expenses: expensesByTripId.get(Number(trip.id)) || [],
-        trip_expenses_total: Number(trip.total_expenses) || 0
-    }));
-
-    const tripsWithTimelineExpenses = await attachDriverTimelineExpensesToTrips(tripsWithExpenses);
-    return tripsWithTimelineExpenses.map(applyCommissionTripFormula);
 };
 
 // Get driver's dashboard data
@@ -1081,12 +1032,102 @@ const endTrip = async (req, res) => {
             }
         }
 
-        const [[tripExpenseTotals]] = await connection.execute(
-            'SELECT COALESCE(SUM(amount), 0) AS total_expenses FROM expenses WHERE trip_id = ?',
+        const [tripExpenseRows] = await connection.execute(
+            'SELECT category, amount FROM expenses WHERE trip_id = ? ORDER BY created_at ASC, id ASC',
             [trip_id]
         );
-        const totalExpenses = Number(tripExpenseTotals?.total_expenses) || 0;
+        const tripExpensesTotal = tripExpenseRows.reduce((sum, expense) => sum + (Number(expense.amount) || 0), 0);
+        const hasStoredBiltyCommissionExpense = tripExpenseRows.some((expense) => expense.category === 'bilty_commission');
+        const biltyCommissionAmount = Number(trip[0].bilty_commission_amount) || 0;
+
+        const [previousCompletedTripRows] = await connection.execute(
+            `SELECT id
+             FROM trips
+             WHERE driver_id = ?
+               AND status = 'completed'
+               AND ended_at < ?
+             ORDER BY ended_at DESC, id DESC
+             LIMIT 1`,
+            [driver_id, trip[0].started_at]
+        );
+        const isFirstTrip = previousCompletedTripRows.length === 0;
+
+        let initialWaitingExpensesTotal = 0;
+        if (isFirstTrip) {
+            const [[initialWaitingExpenseRow]] = await connection.execute(
+                `SELECT COALESCE(SUM(amount), 0) AS total_amount
+                 FROM driver_daily_expense_entries
+                 WHERE driver_id = ?
+                   AND created_at < ?
+                   AND (applied_trip_id IS NULL OR applied_trip_id = ?)`,
+                [driver_id, trip[0].started_at, trip_id]
+            );
+            initialWaitingExpensesTotal = Number(initialWaitingExpenseRow?.total_amount) || 0;
+        }
+
+        const effectiveBiltyCommissionAmount = hasStoredBiltyCommissionExpense ? 0 : biltyCommissionAmount;
+        const totalExpenses = roundCurrency(tripExpensesTotal + initialWaitingExpensesTotal + effectiveBiltyCommissionAmount);
         const netProfit = roundCurrency((Number(trip[0].freight_charge) || 0) - totalExpenses);
+
+        const [[driverRow]] = await connection.execute(
+            'SELECT commission_percentage FROM drivers WHERE id = ? LIMIT 1',
+            [driver_id]
+        );
+        const commissionPercentage = Number(driverRow?.commission_percentage) || 0;
+        const commissionAmount = netProfit > 0 && commissionPercentage > 0
+            ? roundCurrency((netProfit * commissionPercentage) / 100)
+            : 0;
+
+        if (commissionAmount > 0) {
+            const [existingRequestRows] = await connection.execute(
+                `SELECT id, status
+                 FROM driver_commission_requests
+                 WHERE driver_id = ? AND trip_id = ?
+                 LIMIT 1`,
+                [driver_id, trip_id]
+            );
+            const existingRequest = existingRequestRows[0] || null;
+
+            if (!existingRequest || existingRequest.status !== 'approved') {
+                if (existingRequest) {
+                    await connection.execute(
+                        `UPDATE driver_commission_requests
+                         SET commission_percentage = ?,
+                             net_profit = ?,
+                             commission_amount = ?,
+                             status = 'approved',
+                             reviewed_by = NULL,
+                             reviewed_at = CURRENT_TIMESTAMP,
+                             remarks = ?
+                         WHERE id = ?`,
+                        [commissionPercentage, netProfit, commissionAmount, 'Auto-generated on trip completion', existingRequest.id]
+                    );
+                } else {
+                    await connection.execute(
+                        `INSERT INTO driver_commission_requests
+                            (driver_id, trip_id, commission_percentage, net_profit, commission_amount, status, reviewed_at, remarks)
+                         VALUES (?, ?, ?, ?, ?, 'approved', CURRENT_TIMESTAMP, ?)`,
+                        [driver_id, trip_id, commissionPercentage, netProfit, commissionAmount, 'Auto-generated on trip completion']
+                    );
+                }
+
+                await connection.execute(
+                    'UPDATE drivers SET commission_balance = commission_balance + ? WHERE id = ?',
+                    [commissionAmount, driver_id]
+                );
+
+                await createDriverAccountTransaction(connection, {
+                    driverId: driver_id,
+                    balanceType: 'commission',
+                    transactionType: 'commission_credit',
+                    direction: 'credit',
+                    amount: commissionAmount,
+                    sourceType: 'commission_request',
+                    sourceId: trip_id,
+                    notes: `Commission credited automatically for trip #${trip_id}`
+                });
+            }
+        }
         
         await connection.execute(
             `UPDATE cars 
@@ -1109,7 +1150,13 @@ const endTrip = async (req, res) => {
                 freight_charge: trip[0].freight_charge,
                 total_expenses: totalExpenses,
                 net_profit: netProfit,
-                commission_request: null
+                commission_request: commissionAmount > 0
+                    ? {
+                        commission_percentage: commissionPercentage,
+                        commission_amount: commissionAmount,
+                        status: 'approved'
+                    }
+                    : null
             }
         });
     } catch (error) {
@@ -1855,156 +1902,18 @@ const getDriverAccount = async (req, res) => {
              FROM driver_commission_requests
              WHERE driver_id = ?
              ORDER BY created_at DESC, id DESC
-             LIMIT 100`,
+            LIMIT 100`,
             [driver_id]
-        );
-
-        const eligibleTrips = await fetchDriverCommissionEligibleTrips(connection, driver_id);
-        const generateableTrips = eligibleTrips
-            .map((trip) => {
-                const netProfit = Number(trip.net_profit) || 0;
-                const commissionAmount = netProfit > 0
-                    ? roundCurrency((netProfit * commissionPercentage) / 100)
-                    : 0;
-                return {
-                    ...trip,
-                    commission_amount: commissionAmount
-                };
-            })
-            .filter((trip) => (Number(trip.commission_amount) || 0) > 0);
-        const generateableCommissionAmount = generateableTrips.reduce(
-            (sum, trip) => sum + (Number(trip.commission_amount) || 0),
-            0
         );
 
         res.json({
             success: true,
-            account: {
-                ...account,
-                generateable_commission_amount: roundCurrency(generateableCommissionAmount),
-                generateable_commission_trip_count: generateableTrips.length
-            },
+            account,
             transactions,
             cashouts,
             commissions
         });
     } catch (error) {
-        res.status(500).json({ message: 'Server error', error: error.message });
-    } finally {
-        connection.release();
-    }
-};
-
-const generateDriverCommission = async (req, res) => {
-    const connection = await pool.getConnection();
-    try {
-        await connection.beginTransaction();
-        await ensureDriverCompanyBalanceAdjustmentsTable(connection);
-
-        const driver_id = await resolveDriverId(req);
-        if (!driver_id) {
-            return res.status(403).json({ message: 'Driver account required' });
-        }
-
-        await syncDriverSalaryForDriver(connection, driver_id);
-
-        const [[driver]] = await connection.execute(
-            `SELECT commission_percentage
-             FROM drivers
-             WHERE id = ?
-             LIMIT 1`,
-            [driver_id]
-        );
-
-        const commissionPercentage = Number(driver?.commission_percentage) || 0;
-        if (!(commissionPercentage > 0)) {
-            return res.status(400).json({ message: 'Commission percentage is not configured for your account' });
-        }
-
-        const eligibleTrips = await fetchDriverCommissionEligibleTrips(connection, driver_id);
-        if (!eligibleTrips.length) {
-            return res.status(400).json({ message: 'No commission is available to generate right now' });
-        }
-
-        let totalGeneratedAmount = 0;
-        const generatedTrips = [];
-
-        for (const trip of eligibleTrips) {
-            const netProfit = Number(trip.net_profit) || 0;
-            const commissionAmount = netProfit > 0
-                ? roundCurrency((netProfit * commissionPercentage) / 100)
-                : 0;
-
-            if (!(commissionAmount > 0)) {
-                continue;
-            }
-
-            let requestId = Number(trip.commission_request_id) || null;
-            if (requestId) {
-                await connection.execute(
-                    `UPDATE driver_commission_requests
-                     SET commission_percentage = ?,
-                         net_profit = ?,
-                         commission_amount = ?,
-                         status = 'approved',
-                         reviewed_by = NULL,
-                         reviewed_at = CURRENT_TIMESTAMP,
-                         remarks = ?
-                     WHERE id = ?`,
-                    [commissionPercentage, netProfit, commissionAmount, 'Generated by driver', requestId]
-                );
-            } else {
-                const [requestResult] = await connection.execute(
-                    `INSERT INTO driver_commission_requests
-                        (driver_id, trip_id, commission_percentage, net_profit, commission_amount, status, reviewed_at, remarks)
-                     VALUES (?, ?, ?, ?, ?, 'approved', CURRENT_TIMESTAMP, ?)`,
-                    [driver_id, trip.id, commissionPercentage, netProfit, commissionAmount, 'Generated by driver']
-                );
-                requestId = requestResult.insertId;
-            }
-
-            await connection.execute(
-                'UPDATE drivers SET commission_balance = commission_balance + ? WHERE id = ?',
-                [commissionAmount, driver_id]
-            );
-
-            await createDriverAccountTransaction(connection, {
-                driverId: driver_id,
-                balanceType: 'commission',
-                transactionType: 'commission_credit',
-                direction: 'credit',
-                amount: commissionAmount,
-                sourceType: 'commission_request',
-                sourceId: requestId || trip.id,
-                notes: `Commission generated for trip #${trip.id}`
-            });
-
-            totalGeneratedAmount += commissionAmount;
-            generatedTrips.push({
-                trip_id: trip.id,
-                net_profit: netProfit,
-                commission_amount: commissionAmount
-            });
-        }
-
-        if (!generatedTrips.length) {
-            await connection.rollback();
-            return res.status(400).json({ message: 'No positive commission is available to generate right now' });
-        }
-
-        await connection.commit();
-
-        res.json({
-            success: true,
-            message: 'Commission generated successfully',
-            summary: {
-                trip_count: generatedTrips.length,
-                total_generated_amount: roundCurrency(totalGeneratedAmount)
-            },
-            trips: generatedTrips
-        });
-    } catch (error) {
-        await connection.rollback();
         res.status(500).json({ message: 'Server error', error: error.message });
     } finally {
         connection.release();
@@ -2053,6 +1962,8 @@ const createDriverCashoutRequest = async (req, res) => {
         const balance = Number(balanceRows[0]?.balance) || 0;
 
         if (balance < amountValue) {
+            console.log(`bal ${balance} .. com ${amountValue}`);
+            
             return res.status(400).json({ message: 'Requested amount exceeds available balance' });
         }
 
@@ -2574,7 +2485,6 @@ module.exports = {
     submitCompanyPayment,
     getCompanyPayments,
     getDriverAccount,
-    generateDriverCommission,
     createDriverCashoutRequest,
     getHelperAccount,
     createHelperCashoutRequest,

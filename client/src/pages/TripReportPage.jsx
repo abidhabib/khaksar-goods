@@ -304,15 +304,15 @@ const FindingTripExpenseBreakdown = ({
   onEditDailyExpense,
   onAddDailyExpense,
   onDeleteDailyExpense,
-  title = 'Finding This Trip Expenses',
+  title = 'Trip Finding Expenses',
   allowAdd = false,
 }) => {
   const groupedExpenses = groupExpensesByCategory(expenses, dailyExpenseCategories, 'expense_image');
-  const isWaitingForNextTrip = title.startsWith('Waiting For Next Trip');
-  const nextTripTag = isWaitingForNextTrip && trip?.pending_next_trip_target_trip_id
+  const isPendingNextTrip = title.startsWith('Waiting For Next Trip');
+  const nextTripTag = isPendingNextTrip && trip?.pending_next_trip_target_trip_id
     ? `Trip #${trip.pending_next_trip_target_trip_id}`
     : null;
-  const wastedKm = isWaitingForNextTrip
+  const wastedKm = isPendingNextTrip
     ? Number(trip?.pending_next_trip_start_wasted_km ?? 0)
     : 0;
 
@@ -413,7 +413,7 @@ const StatBadge = ({ children, variant = 'default' }) => {
 };
 
 /* ─── Trip Card ─── */
-const TripCard = ({ trip, tripNumber = 1, onEditTrip, onEditExpense, onAddExpense, onDeleteExpense, onEditDailyExpense, onAddDailyExpense, onDeleteDailyExpense }) => {
+const TripCard = ({ trip, onEditTrip, onEditExpense, onAddExpense, onDeleteExpense, onEditDailyExpense, onAddDailyExpense, onDeleteDailyExpense }) => {
   const isOngoing = trip.status === 'ongoing';
   const totalExpenses = Number(trip.total_expenses ?? 0);
   const net = Number(trip.net_profit ?? (Number(trip.freight_charge || 0) - totalExpenses));
@@ -428,9 +428,21 @@ const TripCard = ({ trip, tripNumber = 1, onEditTrip, onEditExpense, onAddExpens
       {/* Header */}
       <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-2">
         <div className="flex items-start gap-2.5">
-          <div className={`mt-0.5 p-1.5 rounded-md ${isOngoing ? 'bg-sky-500/10' : trip.status === 'cancelled' ? 'bg-rose-500/10' : 'bg-emerald-500/10'}`}>
-            <span className={`block min-w-[1rem] text-center text-[11px] font-bold leading-4 ${isOngoing ? 'text-sky-400' : trip.status === 'cancelled' ? 'text-rose-400' : 'text-emerald-400'}`}>
-              {tripNumber}
+          <div
+            className={`mt-0.5 p-2 rounded-md ${
+              isOngoing
+                ? 'bg-sky-500/10'
+                : trip.status === 'cancelled'
+                ? 'bg-rose-500/30'
+                : 'bg-emerald-500/30'
+            }`}
+          >
+            <span
+              className={`block min-w-[1rem] text-center text-[14px] font-bold leading-4 ${
+                isOngoing || trip.status === 'cancelled' ? 'text-slate-300' : 'text-slate-300'
+              }`}
+            >
+              #{trip.id ?? '-'}
             </span>
           </div>
           <div>
@@ -512,7 +524,7 @@ const TripCard = ({ trip, tripNumber = 1, onEditTrip, onEditExpense, onAddExpens
         <div className="rounded-md border border-slate-700 bg-slate-800/30 p-2.5 flex items-start justify-between gap-2">
           <div className="min-w-0">
             <p className="text-[10px] text-slate-500 uppercase tracking-wider font-medium">Load Details</p>
-            <p className="text-sm text-slate-200 font-semibold mt-1">{loadSummary || 'N/A'}</p>
+            <p className="text-sm text-slate-200 font-semibold mt-1">{loadSummary || trip.load_weight || trip.load_name || 'N/A'}</p>
             <p className="text-[11px] text-slate-400 mt-0.5">{trip.load_live_location || 'No load location'}</p>
           </div>
           <RightSideStack
@@ -699,24 +711,23 @@ const TripReportPage = () => {
         </div>
 
         {/* Waiting Expenses */}
-        <FindingTripExpenseBreakdown
-          trip={trip}
-          expenses={trip.pending_next_trip_daily_expenses || []}
-          totalExpenses={Number(trip.pending_next_trip_expenses_total || 0)}
-          onEditDailyExpense={openDailyExpenseEditModal}
-          onAddDailyExpense={openDailyExpenseAddModal}
-          onDeleteDailyExpense={handleDailyExpenseDelete}
-          title="Waiting For Next Trip"
-          allowAdd
-        />
+      <FindingTripExpenseBreakdown
+        trip={trip}
+        expenses={trip.daily_expenses || []}
+        totalExpenses={Number(trip.between_trip_expenses_total || 0)}
+        onEditDailyExpense={openDailyExpenseEditModal}
+        onAddDailyExpense={openDailyExpenseAddModal}
+        onDeleteDailyExpense={handleDailyExpenseDelete}
+        title="Trip Finding Expenses"
+        allowAdd={Boolean(trip.daily_expenses?.length)}
+      />
 
-        {/* Main Trip Card */}
-        <TripCard
-          trip={trip}
-          tripNumber={1}
-          onEditTrip={openTripModal}
-          onEditExpense={openExpenseEditModal}
-          onAddExpense={openExpenseAddModal}
+      {/* Main Trip Card */}
+      <TripCard
+        trip={trip}
+        onEditTrip={openTripModal}
+        onEditExpense={openExpenseEditModal}
+        onAddExpense={openExpenseAddModal}
           onDeleteExpense={handleTripExpenseDelete}
           onEditDailyExpense={openDailyExpenseEditModal}
           onAddDailyExpense={openDailyExpenseAddModal}

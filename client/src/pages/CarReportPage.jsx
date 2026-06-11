@@ -349,17 +349,22 @@ const ExpenseBreakdown = ({ trip, onEditExpense, onAddExpense, onDeleteExpense }
 
 const PendingNextTripExpenseBreakdown = ({
   trip,
+  title = 'Looking For Trip Expenses',
+  expenses: expenseRows,
+  totalExpenses,
   onEditDailyExpense,
   onAddDailyExpense,
   onDeleteDailyExpense,
 }) => {
-  const expenses = sortExpensesByCategory(
-    trip.pending_next_trip_daily_expenses || [],
+  const sortedExpenses = sortExpensesByCategory(
+    expenseRows ?? (trip.pending_next_trip_daily_expenses || []),
     dailyExpenseCategories
   );
-  const totalExpenses = Number(trip.pending_next_trip_expenses_total ?? 0);
-  const groupedExpenses = groupExpensesByCategory(expenses, dailyExpenseCategories, 'expense_image');
-  const wastedKm = Number(trip.pending_next_trip_start_wasted_km ?? 0);
+  const total = Number(totalExpenses ?? trip.pending_next_trip_expenses_total ?? 0);
+  const groupedExpenses = groupExpensesByCategory(sortedExpenses, dailyExpenseCategories, 'expense_image');
+  const wastedKm = title.startsWith('Waiting For Next Trip')
+    ? Number(trip.pending_next_trip_start_wasted_km ?? 0)
+    : 0;
 
   if (!groupedExpenses.length) return null;
 
@@ -369,7 +374,7 @@ const PendingNextTripExpenseBreakdown = ({
         <div className="flex items-center gap-2 flex-wrap">
           <p className="text-sm text-slate-200 font-semibold flex items-center gap-2">
             <Receipt className="w-4 h-4 text-sky-400" />
-            Waiting For Next Trip
+            {title}
           </p>
           {wastedKm > 0 ? (
             <span className="text-[11px] px-1.5 py-0.5 rounded-full bg-rose-600/10 border border-rose-600/20">
@@ -390,7 +395,7 @@ const PendingNextTripExpenseBreakdown = ({
           </button>
            <div className="">
 
-                      <p className="text-xl  text-white px-2 py-1 text-rose-600 border border-rose-600 rounded  font-bold">{formatCurrency(totalExpenses)}</p>
+                      <p className="text-xl  text-white px-2 py-1 text-rose-600 border border-rose-600 rounded  font-bold">{formatCurrency(total)}</p>
 
           </div>
         </div>
@@ -466,7 +471,6 @@ const StatBadge = ({ children, variant = 'default' }) => {
 
 const TripCard = ({
   trip,
-  tripNumber,
   status = 'completed',
   onEditTrip,
   onEditExpense,
@@ -502,14 +506,10 @@ const TripCard = ({
           >
             <span
               className={`block min-w-[1rem] text-center text-[14px] font-bold leading-4 ${
-                isOngoing
-                  ? 'text-slate-300'
-                  : trip.status === 'cancelled'
-                  ? 'text-slate-300'
-                  : 'text-slate-300'
+                isOngoing || trip.status === 'cancelled' ? 'text-slate-300' : 'text-slate-300'
               }`}
             >
-              {tripNumber ?? '-'}
+              #{trip.id ?? '-'}
             </span>
           </div>
           <div>
@@ -679,6 +679,16 @@ const TripCard = ({
         onDeleteExpense={onDeleteExpense}
       />
 
+      <PendingNextTripExpenseBreakdown
+        trip={trip}
+        title="Trip Finding Expenses"
+        expenses={trip.daily_expenses || []}
+        totalExpenses={Number(trip.between_trip_expenses_total || 0)}
+        onEditDailyExpense={onEditDailyExpense}
+        onAddDailyExpense={onAddDailyExpense}
+        onDeleteDailyExpense={onDeleteDailyExpense}
+      />
+
       {trip.notes ? (
         <div className="rounded-md border border-slate-700 bg-slate-800/30 p-3">
           <p className="text-[11px] text-slate-300 uppercase tracking-wider font-bold flex items-center gap-1 mb-1.5">
@@ -773,8 +783,28 @@ const CarReportPage = () => {
   }, [id, fetchReport]);
 
   const trips = reportData?.trips || [];
-  const ongoingTrips = useMemo(() => trips.filter((trip) => trip.status === 'ongoing'), [trips]);
-  const completedTrips = useMemo(() => trips.filter((trip) => trip.status === 'completed'), [trips]);
+  const orderedTrips = useMemo(
+    () => [...trips].sort((left, right) => {
+      return (Number(right.id) || 0) - (Number(left.id) || 0);
+    }),
+    [trips]
+  );
+  const firstTripPending = reportData?.first_trip_pending || {};
+  const firstTripPendingContext = useMemo(
+    () => ({
+      id: 'first-trip-pending',
+      driver_id: firstTripPending.driver_id ?? reportData?.car?.current_driver_id ?? null,
+      driver_name: firstTripPending.driver_name || reportData?.car?.current_driver_name || null,
+      car_number: reportData?.car?.car_number || null,
+    }),
+    [
+      firstTripPending.driver_id,
+      firstTripPending.driver_name,
+      reportData?.car?.current_driver_id,
+      reportData?.car?.current_driver_name,
+      reportData?.car?.car_number,
+    ]
+  );
 
   const openTripModal = (trip) => {
     setEditingTrip(trip);
@@ -1064,23 +1094,14 @@ const CarReportPage = () => {
             <div className="rounded-lg border border-slate-700 bg-slate-800/40 px-4 py-2">
               <h2 className="text-base font-semibold text-slate-200 mb-3 flex items-center gap-2">
                 <Activity className="w-4 h-4 text-slate-400" />
-                Trip Status
+                Trip Count
               </h2>
-              <div className="space-y-2">
-                <div className="flex items-center justify-between rounded-md border border-sky-500/20 bg-sky-500/5 p-3">
-                  <div className="flex items-center gap-2 text-sky-400">
-                    <Clock3 className="w-4 h-4" />
-                    <span className="text-sm font-medium">Ongoing</span>
-                  </div>
-                  <span className="text-slate-200 font-bold text-base">{ongoingTrips.length}</span>
+              <div className="flex items-center justify-between rounded-md border border-slate-700 bg-slate-800/30 p-3">
+                <div className="flex items-center gap-2 text-slate-400">
+                  <CheckCircle2 className="w-4 h-4" />
+                  <span className="text-sm font-medium">Trips in this report</span>
                 </div>
-                <div className="flex items-center justify-between rounded-md border border-emerald-500/20 bg-emerald-500/5 p-3">
-                  <div className="flex items-center gap-2 text-emerald-400">
-                    <CheckCircle2 className="w-4 h-4" />
-                    <span className="text-sm font-medium">Completed</span>
-                  </div>
-                  <span className="text-slate-200 font-bold text-base">{completedTrips.length}</span>
-                </div>
+                <span className="text-slate-200 font-bold text-base">{orderedTrips.length}</span>
               </div>
             </div>
           </div>
@@ -1123,52 +1144,41 @@ const CarReportPage = () => {
             )}
           </div>
 
-          {/* Ongoing Trips */}
+          {!orderedTrips.length && (firstTripPending.daily_expenses || []).length ? (
+            <PendingNextTripExpenseBreakdown
+              trip={firstTripPendingContext}
+              title="Waiting For First Trip"
+              expenses={firstTripPending.daily_expenses || []}
+              totalExpenses={Number(firstTripPending.total_expenses || 0)}
+              onEditDailyExpense={openDailyExpenseEditModal}
+              onAddDailyExpense={openDailyExpenseAddModal}
+              onDeleteDailyExpense={handleDailyExpenseDelete}
+            />
+          ) : null}
+
+          {/* Trip Timeline */}
           <div className="space-y-3">
             <h2 className="text-base font-semibold text-slate-200 flex items-center gap-2">
               <Clock3 className="w-4 h-4 text-sky-400" />
-              Ongoing Trips
+              Trip Timeline
             </h2>
-            {ongoingTrips.length ? (
-              ongoingTrips.map((trip, index) => (
-                <TripCard
-                  key={trip.id}
-                  trip={trip}
-                  tripNumber={index + 1}
-                  status="ongoing"
-                  onEditTrip={openTripModal}
-                  onEditExpense={openExpenseEditModal}
-                  onAddExpense={openExpenseAddModal}
-                  onDeleteExpense={handleTripExpenseDelete}
-                  onEditDailyExpense={openDailyExpenseEditModal}
-                  onAddDailyExpense={openDailyExpenseAddModal}
-                  onDeleteDailyExpense={handleDailyExpenseDelete}
-                />
-              ))
-            ) : (
-              <p className="text-sm text-slate-500">No ongoing trips in this period.</p>
-            )}
-          </div>
-
-          {/* Completed Trips */}
-          <div className="space-y-3">
-            <h2 className="text-base font-semibold text-slate-200 flex items-center gap-2">
-              <CheckCircle2 className="w-4 h-4 text-emerald-400" />
-              Completed Trip Records
-            </h2>
-            {completedTrips.length ? (
-              completedTrips.map((trip, index) => (
+            {orderedTrips.length ? (
+              orderedTrips.map((trip, index) => (
                 <div key={trip.id} className="space-y-3">
-                  <PendingNextTripExpenseBreakdown
-                    trip={trip}
-                    onEditDailyExpense={openDailyExpenseEditModal}
-                    onAddDailyExpense={openDailyExpenseAddModal}
-                    onDeleteDailyExpense={handleDailyExpenseDelete}
-                  />
+                  {index === 0 && (trip.pending_next_trip_daily_expenses || []).length ? (
+                    <PendingNextTripExpenseBreakdown
+                      trip={trip}
+                      title=" Trip Finding Expense"
+                      expenses={trip.pending_next_trip_daily_expenses || []}
+                      totalExpenses={Number(trip.pending_next_trip_expenses_total || 0)}
+                      onEditDailyExpense={openDailyExpenseEditModal}
+                      onAddDailyExpense={openDailyExpenseAddModal}
+                      onDeleteDailyExpense={handleDailyExpenseDelete}
+                    />
+                  ) : null}
                   <TripCard
                     trip={trip}
-                      tripNumber={trips.length - index}
-                    status="completed"
+                    status={trip.status}
                     onEditTrip={openTripModal}
                     onEditExpense={openExpenseEditModal}
                     onAddExpense={openExpenseAddModal}
@@ -1180,7 +1190,7 @@ const CarReportPage = () => {
                 </div>
               ))
             ) : (
-              <p className="text-sm text-slate-500">No completed trips in this period.</p>
+              <p className="text-sm text-slate-500">No trips in this period.</p>
             )}
           </div>
         </>
