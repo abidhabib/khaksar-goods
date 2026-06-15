@@ -3,6 +3,9 @@
     <files-path
         name="trip_media_files"
         path="trip-media/" />
+    <files-path
+        name="payment_media"
+        path="payment-media/" />
     <cache-path
         name="trip_media_cache"
         path="."
