@@ -1804,13 +1804,11 @@ const submitCompanyPayment = async (req, res) => {
             return res.status(400).json({ message: 'Handover to is required for cash payment' });
         }
 
-        
-
         if (paymentMethod === 'account' && !screenshotImage) {
             return res.status(400).json({ message: 'Payment screenshot is required for account payment' });
         }
 
-        const paymentStatus = paymentMethod === 'cash' ? 'approved' : 'pending';
+        const paymentStatus = 'pending';
 
         const [result] = await pool.execute(
             `INSERT INTO driver_payment_submissions
@@ -1846,9 +1844,7 @@ const submitCompanyPayment = async (req, res) => {
 
         res.status(201).json({
             success: true,
-            message: paymentMethod === 'cash'
-                ? 'Cash payment saved and approved successfully'
-                : 'Payment submission saved successfully',
+            message: 'Payment submission saved and awaiting admin approval',
             payment
         });
     } catch (error) {

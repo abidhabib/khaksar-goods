@@ -35,6 +35,7 @@ import org.json.JSONObject;
 
 import java.io.File;
 import java.io.IOException;
+import java.io.InputStream;
 import java.util.LinkedHashMap;
 import java.util.Locale;
 import java.util.Map;
@@ -217,7 +218,7 @@ public class PaymentSubmissionActivity extends AppCompatActivity {
             Map<String, String> fields = new LinkedHashMap<>();
             fields.put("payment_method", METHOD_ACCOUNT);
             fields.put("amount", amount);
-            fields.put("sending_fee", fee);
+            fields.put("sending_fee", TextUtils.isEmpty(fee) ? "0" : fee);
             submitPayment(fields, paymentScreenshotUri, dialog);
         });
 
@@ -231,6 +232,11 @@ public class PaymentSubmissionActivity extends AppCompatActivity {
     }
 
     private void submitPayment(Map<String, String> fields, Uri screenshotUri, Dialog dialogToClose) {
+        if (screenshotUri != null && !canReadUri(screenshotUri)) {
+            Toast.makeText(this, R.string.payment_screenshot_unavailable, Toast.LENGTH_LONG).show();
+            return;
+        }
+
         setLoading(true);
         setDialogSubmitting(dialogToClose, true);
         ContentResolver contentResolver = getContentResolver();
@@ -243,10 +249,15 @@ public class PaymentSubmissionActivity extends AppCompatActivity {
                 new Callback() {
                     @Override
                     public void onFailure(Call call, IOException e) {
+                        String message = e.getLocalizedMessage();
+                        if (TextUtils.isEmpty(message)) {
+                            message = getString(R.string.unable_to_save_expense);
+                        }
+                        final String toastMessage = message;
                         runOnUiThread(() -> {
                             setLoading(false);
                             setDialogSubmitting(dialogToClose, false);
-                            Toast.makeText(PaymentSubmissionActivity.this, R.string.unable_to_save_expense, Toast.LENGTH_LONG).show();
+                            Toast.makeText(PaymentSubmissionActivity.this, toastMessage, Toast.LENGTH_LONG).show();
                         });
                     }
 
@@ -346,6 +357,8 @@ public class PaymentSubmissionActivity extends AppCompatActivity {
         ImageView screenshotPreview = dialog.findViewById(R.id.screenshotPreview);
         LinearLayout cashSavingState = dialog.findViewById(R.id.cashSavingState);
         LinearLayout accountSavingState = dialog.findViewById(R.id.accountSavingState);
+        View cashFormContent = dialog.findViewById(R.id.cashFormContent);
+        View accountFormContent = dialog.findViewById(R.id.accountFormContent);
 
         if (cashSubmitButton != null) {
             cashSubmitButton.setEnabled(!loading);
@@ -363,6 +376,8 @@ public class PaymentSubmissionActivity extends AppCompatActivity {
         if (screenshotPreview != null) screenshotPreview.setEnabled(!loading);
         if (cashSavingState != null) cashSavingState.setVisibility(loading ? View.VISIBLE : View.GONE);
         if (accountSavingState != null) accountSavingState.setVisibility(loading ? View.VISIBLE : View.GONE);
+        if (cashFormContent != null) cashFormContent.setAlpha(loading ? 0.35f : 1f);
+        if (accountFormContent != null) accountFormContent.setAlpha(loading ? 0.35f : 1f);
     }
 
     private void restoreTransientState(Bundle savedInstanceState) {
@@ -444,6 +459,14 @@ public class PaymentSubmissionActivity extends AppCompatActivity {
         binding.cashMethodCard.setEnabled(!loading);
         binding.accountMethodCard.setEnabled(!loading);
         binding.historyCard.setEnabled(!loading);
+    }
+
+    private boolean canReadUri(Uri uri) {
+        try (InputStream inputStream = getContentResolver().openInputStream(uri)) {
+            return inputStream != null;
+        } catch (Exception exception) {
+            return false;
+        }
     }
 
     private String getInput(TextInputEditText input) {

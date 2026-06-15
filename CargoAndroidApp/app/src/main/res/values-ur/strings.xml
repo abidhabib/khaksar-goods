@@ -389,9 +389,10 @@
     <string name="payment_total_deposit">کل جمع رقم</string>
     <string name="payment_amount_placeholder">Rs 0</string>
     <string name="payment_deposit_cash">کیش کے ذریعے جمع کروائیں</string>
-    <string name="payment_deposit_cash_subtitle">رقم اور وصول کرنے والے شخص کی تفصیل محفوظ کریں</string>
+    <string name="payment_deposit_cash_subtitle">کیش جمع کروائی ایڈمن منظوری کے بعد منظور ہو گی</string>
     <string name="payment_deposit_account">اکاؤنٹ کے ذریعے جمع کروائیں</string>
     <string name="payment_deposit_account_subtitle"> بینک یا ایپ کا اسکرین شاٹ اپ لوڈ کریں</string>
+    <string name="payment_screenshot_unavailable">منتخب اسکرین شاٹ پڑھا نہیں جا سکا۔ دوبارہ منتخب کریں۔</string>
     <string name="payment_method_hint">جمع کروانے کا طریقہ منتخب کریں، فارم کھولیں اور پھر محفوظ کریں۔</string>
     <string name="payment_sending_fee">بھیجنے کی فیس</string>
     <string name="payment_handover_to">حوالہ کس کو کیا</string>
