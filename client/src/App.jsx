@@ -11,6 +11,7 @@ import DriverCashoutHistoryPage from './pages/DriverCashoutHistoryPage'
 import DriverCompanyDepositHistoryPage from './pages/DriverCompanyDepositHistoryPage'
 import DriverCommissionHistoryPage from './pages/DriverCommissionHistoryPage'
 import PaymentSubmissionsPage from './pages/PaymentSubmissionsPage'
+import CashoutApprovalsPage from './pages/CashoutApprovalsPage'
 import TripMonitor from './pages/TripMonitor'
 import TripReportPage from './pages/TripReportPage'
 import Reports from './pages/Reports'
@@ -37,6 +38,7 @@ function App() {
           <Route path="/drivers/:id/deposit-history" element={<DriverCompanyDepositHistoryPage />} />
           <Route path="/drivers/:id/commission-history" element={<DriverCommissionHistoryPage />} />
           <Route path="/payment-submissions" element={<PaymentSubmissionsPage />} />
+          <Route path="/cashout-approvals" element={<CashoutApprovalsPage />} />
           <Route path="/trips" element={<TripMonitor />} />
           <Route path="/trips/:id/report" element={<TripReportPage />} />
           <Route path="/reports" element={<Reports />} />

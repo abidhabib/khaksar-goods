@@ -34,6 +34,8 @@ public class DriverAccountActivity extends AppCompatActivity {
     private String baseUrl;
     private double availableBalance;
     private double commissionBalance;
+    private boolean hasPendingAvailableAccountCashout;
+    private boolean hasPendingCommissionAccountCashout;
     private final ActivityResultLauncher<Intent> cashoutLauncher = registerForActivityResult(
             new ActivityResultContracts.StartActivityForResult(),
             result -> {
@@ -90,9 +92,19 @@ public class DriverAccountActivity extends AppCompatActivity {
     private void setupActions() {
         binding.backButton.setOnClickListener(v -> finish());
         binding.availableCashoutButton.setOnClickListener(v ->
-                openCashout(AccountCashoutActivity.MODE_DRIVER, AccountCashoutActivity.BALANCE_AVAILABLE, availableBalance));
+                openCashout(
+                        AccountCashoutActivity.MODE_DRIVER,
+                        AccountCashoutActivity.BALANCE_AVAILABLE,
+                        availableBalance,
+                        hasPendingAvailableAccountCashout
+                ));
         binding.commissionCashoutButton.setOnClickListener(v ->
-                openCashout(AccountCashoutActivity.MODE_DRIVER, AccountCashoutActivity.BALANCE_COMMISSION, commissionBalance));
+                openCashout(
+                        AccountCashoutActivity.MODE_DRIVER,
+                        AccountCashoutActivity.BALANCE_COMMISSION,
+                        commissionBalance,
+                        hasPendingCommissionAccountCashout
+                ));
         binding.cashoutHistoryCard.setOnClickListener(v ->
                 startActivity(AccountHistoryActivity.newIntent(this, AccountHistoryActivity.MODE_DRIVER, AccountHistoryActivity.HISTORY_CASHOUT)));
         binding.commissionHistoryCard.setOnClickListener(v ->
@@ -100,8 +112,8 @@ public class DriverAccountActivity extends AppCompatActivity {
         binding.swipeRefreshLayout.setOnRefreshListener(this::fetchAccount);
     }
 
-    private void openCashout(String mode, String balanceType, double balance) {
-        cashoutLauncher.launch(AccountCashoutActivity.newIntent(this, mode, balanceType, balance));
+    private void openCashout(String mode, String balanceType, double balance, boolean hasPendingAccountCashout) {
+        cashoutLauncher.launch(AccountCashoutActivity.newIntent(this, mode, balanceType, balance, hasPendingAccountCashout));
     }
 
     private void fetchAccount() {
@@ -172,6 +184,34 @@ public class DriverAccountActivity extends AppCompatActivity {
         binding.commissionAmountText.setText(formatCurrency(commissionBalance));
         binding.cashoutHistoryPreview.setText(buildCashoutPreview(cashouts));
         binding.commissionHistoryPreview.setText(buildCommissionPreview(commissions));
+        bindPendingAccountCashouts(cashouts);
+    }
+
+    private void bindPendingAccountCashouts(JSONArray cashouts) {
+        hasPendingAvailableAccountCashout = hasPendingAccountCashout(cashouts, AccountCashoutActivity.BALANCE_AVAILABLE);
+        hasPendingCommissionAccountCashout = hasPendingAccountCashout(cashouts, AccountCashoutActivity.BALANCE_COMMISSION);
+    }
+
+    private boolean hasPendingAccountCashout(JSONArray cashouts, String balanceType) {
+        if (cashouts == null) {
+            return false;
+        }
+
+        for (int index = 0; index < cashouts.length(); index++) {
+            JSONObject cashout = cashouts.optJSONObject(index);
+            if (cashout == null) {
+                continue;
+            }
+
+            boolean sameBalance = balanceType.equalsIgnoreCase(cashout.optString("balance_type"));
+            boolean isAccount = "account".equalsIgnoreCase(cashout.optString("receive_method"));
+            boolean isPending = "pending".equalsIgnoreCase(cashout.optString("status"));
+            if (sameBalance && isAccount && isPending) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     private String buildCashoutPreview(JSONArray cashouts) {

@@ -344,12 +344,14 @@
     <string name="receive_in_account">اکاؤنٹ</string>
     <string name="receive_in_cash_subtitle">صرف رقم</string>
     <string name="receive_in_account_subtitle">اکاؤنٹ دیں</string>
+    <string name="receive_in_account_pending_subtitle">اکاؤنٹ کی درخواست پہلے سے پینڈنگ ہے</string>
     <string name="cashout_amount_label">رقم</string>
     <string name="amount_required">رقم دیں</string>
     <string name="account_number">اکاؤنٹ نمبر</string>
     <string name="account_name">اکاؤنٹ نام</string>
     <string name="bank_name">بینک</string>
     <string name="account_cashout_details_required">تفصیل دیں</string>
+    <string name="account_cashout_pending_exists">آپ کی اکاؤنٹ کیش آؤٹ درخواست پہلے سے پینڈنگ ہے</string>
     <string name="send_cashout_request">درخواست بھیجیں</string>
     <string name="cashout_submit_failed">درخواست فیل</string>
     <string name="cashout_submit_success">درخواست ہوگئی</string>

@@ -274,12 +274,14 @@ Medical %6$s • Food %7$s • Guard %8$s</string>
     <string name="receive_in_account">Receive in Account</string>
     <string name="receive_in_cash_subtitle">Only amount.</string>
     <string name="receive_in_account_subtitle">Add account.</string>
+    <string name="receive_in_account_pending_subtitle">Pending account request already exists</string>
     <string name="cashout_amount_label">Amount</string>
     <string name="amount_required">Amount is required</string>
     <string name="account_number">Account Number</string>
     <string name="account_name">Account Name</string>
     <string name="bank_name">Bank Name</string>
     <string name="account_cashout_details_required">Fill account details</string>
+    <string name="account_cashout_pending_exists">You already have a pending account cashout request</string>
     <string name="send_cashout_request">Send Request</string>
     <string name="cashout_submit_failed">Unable to submit cashout request</string>
     <string name="cashout_submit_success">Cashout request submitted</string>

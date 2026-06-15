@@ -72,7 +72,6 @@ const DRIVER_TOTAL_INCOME_SQL = (driverAlias) => `
             FROM driver_company_balance_adjustments dcba
             WHERE dcba.driver_id = ${driverAlias}
         ), 0)
-        + 15000
     )
 `;
 const getAuthenticatedDriverId = (req) => {
@@ -476,6 +475,7 @@ const getDashboard = async (req, res) => {
 
         const driver_id = await resolveDriverId(req);
         if (!driver_id) {
+            await connection.rollback();
             return res.status(403).json({ message: 'Driver account required' });
         }
 
@@ -697,6 +697,7 @@ const startTrip = async (req, res) => {
 
         const driver_id = await resolveDriverId(req);
         if (!driver_id) {
+            await connection.rollback();
             return res.status(403).json({ message: 'Driver account required' });
         }
 
@@ -868,6 +869,7 @@ const saveTripLoadDetails = async (req, res) => {
 
         const driver_id = await resolveDriverId(req);
         if (!driver_id) {
+            await connection.rollback();
             return res.status(403).json({ message: 'Driver account required' });
         }
 
@@ -1923,6 +1925,7 @@ const createDriverCashoutRequest = async (req, res) => {
 
         const driver_id = await resolveDriverId(req);
         if (!driver_id) {
+            await connection.rollback();
             return res.status(403).json({ message: 'Driver account required' });
         }
 
@@ -1936,6 +1939,7 @@ const createDriverCashoutRequest = async (req, res) => {
         const bankName = toNullableString(req.body?.bank_name);
 
         if (!balanceType || !DRIVER_BALANCE_TYPES.has(balanceType)) {
+            await connection.rollback();
             return res.status(400).json({ message: 'Valid driver balance type is required' });
         }
 
@@ -1947,6 +1951,7 @@ const createDriverCashoutRequest = async (req, res) => {
             bankName
         });
         if (validationError) {
+            await connection.rollback();
             return res.status(400).json({ message: validationError });
         }
 
@@ -1958,20 +1963,40 @@ const createDriverCashoutRequest = async (req, res) => {
         const balance = Number(balanceRows[0]?.balance) || 0;
 
         if (balance < amountValue) {
-            console.log(`bal ${balance} .. com ${amountValue}`);
-            
+            await connection.rollback();
             return res.status(400).json({ message: 'Requested amount exceeds available balance' });
         }
 
-        await connection.execute(
-            `UPDATE drivers SET ${balanceColumn} = ${balanceColumn} - ? WHERE id = ?`,
-            [amountValue, driver_id]
-        );
+        if (receiveMethod === 'account') {
+            const [pendingRows] = await connection.execute(
+                `SELECT id
+                 FROM driver_cashout_requests
+                 WHERE driver_id = ?
+                   AND balance_type = ?
+                   AND receive_method = 'account'
+                   AND status = 'pending'
+                 LIMIT 1`,
+                [driver_id, balanceType]
+            );
+
+            if (pendingRows.length) {
+                await connection.rollback();
+                return res.status(400).json({ message: 'You already have a pending account cashout request' });
+            }
+        } else {
+            await connection.execute(
+                `UPDATE drivers SET ${balanceColumn} = ${balanceColumn} - ? WHERE id = ?`,
+                [amountValue, driver_id]
+            );
+        }
+
+        const requestStatus = receiveMethod === 'account' ? 'pending' : 'approved';
+        const reviewedAtSql = receiveMethod === 'account' ? 'NULL' : 'CURRENT_TIMESTAMP';
 
         const [result] = await connection.execute(
             `INSERT INTO driver_cashout_requests
                 (driver_id, balance_type, amount, receive_method, account_number, account_name, bank_name, status, reviewed_at)
-             VALUES (?, ?, ?, ?, ?, ?, ?, 'approved', CURRENT_TIMESTAMP)`,
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ${reviewedAtSql})`,
             [
                 driver_id,
                 balanceType,
@@ -1979,27 +2004,32 @@ const createDriverCashoutRequest = async (req, res) => {
                 receiveMethod,
                 receiveMethod === 'account' ? accountNumber : null,
                 receiveMethod === 'account' ? accountName : null,
-                receiveMethod === 'account' ? bankName : null
+                receiveMethod === 'account' ? bankName : null,
+                requestStatus
             ]
         );
 
-        await createDriverAccountTransaction(connection, {
-            driverId: driver_id,
-            balanceType,
-            transactionType: 'cashout_debit',
-            direction: 'debit',
-            amount: amountValue,
-            sourceType: 'driver_cashout_request',
-            sourceId: result.insertId,
-            notes: `Driver cashout approved via ${receiveMethod}`
-        });
+        if (receiveMethod === 'cash') {
+            await createDriverAccountTransaction(connection, {
+                driverId: driver_id,
+                balanceType,
+                transactionType: 'cashout_debit',
+                direction: 'debit',
+                amount: amountValue,
+                sourceType: 'driver_cashout_request',
+                sourceId: result.insertId,
+                notes: `Driver cashout approved via ${receiveMethod}`
+            });
+        }
 
         await connection.commit();
         res.status(201).json({
             success: true,
-            message: 'Driver cashout request approved',
+            message: receiveMethod === 'account'
+                ? 'Driver account cashout request submitted for admin approval'
+                : 'Driver cashout request approved',
             request_id: result.insertId,
-            remaining_balance: Math.max(0, balance - amountValue),
+            remaining_balance: receiveMethod === 'account' ? balance : Math.max(0, balance - amountValue),
             balance_type: balanceType
         });
     } catch (error) {
@@ -2015,6 +2045,7 @@ const getHelperAccount = async (req, res) => {
     try {
         const driver_id = await resolveDriverId(req);
         if (!driver_id) {
+            await connection.rollback();
             return res.status(403).json({ message: 'Driver account required' });
         }
 
@@ -2029,6 +2060,7 @@ const getHelperAccount = async (req, res) => {
         );
 
         if (!driverRow?.helper_id) {
+            await connection.rollback();
             return res.status(404).json({ message: 'No helper assigned to this driver' });
         }
 
@@ -2081,6 +2113,7 @@ const createHelperCashoutRequest = async (req, res) => {
 
         const driver_id = await resolveDriverId(req);
         if (!driver_id) {
+            await connection.rollback();
             return res.status(403).json({ message: 'Driver account required' });
         }
 
@@ -2095,6 +2128,7 @@ const createHelperCashoutRequest = async (req, res) => {
         );
 
         if (!driverRow?.helper_id) {
+            await connection.rollback();
             return res.status(404).json({ message: 'No helper assigned to this driver' });
         }
 
@@ -2114,6 +2148,7 @@ const createHelperCashoutRequest = async (req, res) => {
             bankName
         });
         if (validationError) {
+            await connection.rollback();
             return res.status(400).json({ message: validationError });
         }
 
@@ -2124,13 +2159,39 @@ const createHelperCashoutRequest = async (req, res) => {
         const helperBalance = Number(helperBalanceRows[0]?.available_balance) || 0;
 
         if (helperBalance < amountValue) {
+            await connection.rollback();
             return res.status(400).json({ message: 'Requested amount exceeds helper available balance' });
         }
 
+        if (receiveMethod === 'account') {
+            const [pendingRows] = await connection.execute(
+                `SELECT id
+                 FROM helper_cashout_requests
+                 WHERE helper_id = ?
+                   AND receive_method = 'account'
+                   AND status = 'pending'
+                 LIMIT 1`,
+                [driverRow.helper_id]
+            );
+
+            if (pendingRows.length) {
+                await connection.rollback();
+                return res.status(400).json({ message: 'You already have a pending helper account cashout request' });
+            }
+        } else {
+            await connection.execute(
+                'UPDATE helpers SET available_balance = available_balance - ? WHERE id = ?',
+                [amountValue, driverRow.helper_id]
+            );
+        }
+
+        const requestStatus = receiveMethod === 'account' ? 'pending' : 'approved';
+        const reviewedAtSql = receiveMethod === 'account' ? 'NULL' : 'CURRENT_TIMESTAMP';
+
         const [result] = await connection.execute(
             `INSERT INTO helper_cashout_requests
-                (helper_id, driver_id, car_id, amount, receive_method, account_number, account_name, bank_name, status)
-             VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'pending')`,
+                (helper_id, driver_id, car_id, amount, receive_method, account_number, account_name, bank_name, status, reviewed_at)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ${reviewedAtSql})`,
             [
                 driverRow.helper_id,
                 driver_id,
@@ -2139,12 +2200,32 @@ const createHelperCashoutRequest = async (req, res) => {
                 receiveMethod,
                 receiveMethod === 'account' ? accountNumber : null,
                 receiveMethod === 'account' ? accountName : null,
-                receiveMethod === 'account' ? bankName : null
+                receiveMethod === 'account' ? bankName : null,
+                requestStatus
             ]
         );
 
+        if (receiveMethod === 'cash') {
+            await createHelperAccountTransaction(connection, {
+                helperId: driverRow.helper_id,
+                driverId: driver_id,
+                transactionType: 'cashout_debit',
+                direction: 'debit',
+                amount: amountValue,
+                sourceType: 'helper_cashout_request',
+                sourceId: result.insertId,
+                notes: `Helper cashout approved via ${receiveMethod}`
+            });
+        }
+
         await connection.commit();
-        res.status(201).json({ success: true, message: 'Helper cashout request submitted', request_id: result.insertId });
+        res.status(201).json({
+            success: true,
+            message: receiveMethod === 'account'
+                ? 'Helper account cashout request submitted for admin approval'
+                : 'Helper cashout request approved',
+            request_id: result.insertId
+        });
     } catch (error) {
         await connection.rollback();
         res.status(500).json({ message: 'Server error', error: error.message });

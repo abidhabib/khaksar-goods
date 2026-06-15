@@ -47,6 +47,8 @@ const formatVariancePercent = (value) => {
   return `${numericValue > 0 ? '+' : ''}${numericValue.toFixed(2)}%`;
 };
 
+
+
 const getVarianceTone = (direction) => {
   if (direction === 'up') return 'text-emerald-400';
   if (direction === 'down') return 'text-rose-400';
@@ -422,6 +424,7 @@ const TripCard = ({ trip, onEditTrip, onEditExpense, onAddExpense, onDeleteExpen
   const loadSummary = [trip.load_name, trip.load_weight].filter(Boolean).join(' · ');
   const statusVariant = trip.status === 'completed' ? 'completed' : trip.status === 'cancelled' ? 'cancelled' : 'ongoing';
   const varianceTone = getVarianceTone(trip.freight_variance_direction);
+  const driverTripLabel = (trip.driver_trip_number);
 
   return (
     <article className="rounded-lg border border-slate-700 bg-slate-800/40 p-3 space-y-3 hover:border-slate-600 transition-all duration-200">
@@ -442,8 +445,13 @@ const TripCard = ({ trip, onEditTrip, onEditExpense, onAddExpense, onDeleteExpen
                 isOngoing || trip.status === 'cancelled' ? 'text-slate-300' : 'text-slate-300'
               }`}
             >
-              #{trip.id ?? '-'}
+              {driverTripLabel ?? '-'}
             </span>
+            {driverTripLabel ? (
+              <span className="mt-1 block whitespace-nowrap text-center text-[11px] font-semibold leading-3 text-slate-400">
+                #{trip.id}
+              </span>
+            ) : null}
           </div>
           <div>
             <p className="text-slate-200 font-bold text-base">

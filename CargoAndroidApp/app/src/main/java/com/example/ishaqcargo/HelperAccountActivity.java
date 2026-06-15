@@ -32,6 +32,7 @@ public class HelperAccountActivity extends AppCompatActivity {
     private String baseUrl;
     private double helperAvailableBalance;
     private boolean hasAssignedHelper;
+    private boolean hasPendingAccountCashout;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -87,7 +88,8 @@ public class HelperAccountActivity extends AppCompatActivity {
                     this,
                     AccountCashoutActivity.MODE_HELPER,
                     AccountCashoutActivity.BALANCE_AVAILABLE,
-                    helperAvailableBalance
+                    helperAvailableBalance,
+                    hasPendingAccountCashout
             ));
         });
         binding.helperHistoryCard.setOnClickListener(v -> {
@@ -158,6 +160,7 @@ public class HelperAccountActivity extends AppCompatActivity {
         binding.helperLinkedText.setText(getString(R.string.helper_account_linked_meta, driverName, carNumber));
         binding.helperAvailableAmountText.setText(formatCurrency(helperAvailableBalance));
         binding.helperHistoryPreview.setText(buildCashoutPreview(cashouts));
+        hasPendingAccountCashout = hasPendingAccountCashout(cashouts);
         binding.helperCashoutButton.setEnabled(hasAssignedHelper);
         binding.helperHistoryCard.setEnabled(hasAssignedHelper);
         binding.helperHistoryCard.setAlpha(hasAssignedHelper ? 1f : 0.55f);
@@ -174,6 +177,28 @@ public class HelperAccountActivity extends AppCompatActivity {
         binding.helperCashoutButton.setEnabled(false);
         binding.helperHistoryCard.setEnabled(false);
         binding.helperHistoryCard.setAlpha(0.55f);
+        hasPendingAccountCashout = false;
+    }
+
+    private boolean hasPendingAccountCashout(JSONArray cashouts) {
+        if (cashouts == null) {
+            return false;
+        }
+
+        for (int index = 0; index < cashouts.length(); index++) {
+            JSONObject cashout = cashouts.optJSONObject(index);
+            if (cashout == null) {
+                continue;
+            }
+
+            boolean isAccount = "account".equalsIgnoreCase(cashout.optString("receive_method"));
+            boolean isPending = "pending".equalsIgnoreCase(cashout.optString("status"));
+            if (isAccount && isPending) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     private String buildCashoutPreview(JSONArray cashouts) {

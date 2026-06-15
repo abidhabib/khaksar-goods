@@ -7,7 +7,7 @@ import {
   Route, 
   FileText,
   Wallet,
-  Clock3,
+  BadgeCheck,
   Calculator
 } from 'lucide-react';
 
@@ -19,6 +19,7 @@ const Sidebar = ({ collapsed = false, mobileOpen = false, onClose }) => {
     { path: '/helpers', icon: HandHelping, label: 'Helpers' },
     { path: '/trips', icon: Route, label: 'Trips' },
     { path: '/payment-submissions', icon: Wallet, label: 'Payment' },
+    { path: '/cashout-approvals', icon: BadgeCheck, label: 'Cashout Approval' },
     { path: '/reports', icon: FileText, label: 'Reports' },
     { path: '/rent-estimation', icon: Calculator, label: 'Rent Estimation' },
   ];

@@ -107,7 +107,7 @@ const DRIVER_COMPANY_AMOUNT_SQL = (driverAlias) => `
             FROM driver_company_balance_adjustments dcba
             WHERE dcba.driver_id = ${driverAlias}
         ), 0)
-        + 15000
+        
     )
 `;
 
@@ -1008,6 +1008,12 @@ const getCarHistory = async (req, res) => {
         // All trips
         const [trips] = await pool.execute(`
             SELECT t.*, u.username as driver_name,
+                   (
+                       SELECT COUNT(*)
+                       FROM trips driver_trip
+                       WHERE driver_trip.driver_id = t.driver_id
+                         AND driver_trip.id <= t.id
+                   ) as driver_trip_number,
                    COALESCE((SELECT SUM(amount) FROM expenses WHERE trip_id = t.id), 0) as total_expenses,
                    (t.freight_charge - COALESCE((SELECT SUM(amount) FROM expenses WHERE trip_id = t.id), 0)) as net_income
             FROM trips t
@@ -1191,6 +1197,12 @@ const getTripReport = async (req, res) => {
                 u.phone as driver_phone,
                 d.license_number,
                 c.car_number,
+                (
+                    SELECT COUNT(*)
+                    FROM trips driver_trip
+                    WHERE driver_trip.driver_id = t.driver_id
+                      AND driver_trip.id <= t.id
+                ) as driver_trip_number,
                 COALESCE(exp.total_expenses, 0) as total_expenses,
                 (COALESCE(t.freight_charge, 0) - COALESCE(exp.total_expenses, 0)) as net_profit,
                 (COALESCE(t.end_meter_reading, 0) - COALESCE(t.start_meter_reading, 0)) as distance_km

@@ -38,6 +38,7 @@ public class AccountCashoutActivity extends AppCompatActivity {
     private static final String EXTRA_MODE = "mode";
     private static final String EXTRA_BALANCE_TYPE = "balance_type";
     private static final String EXTRA_CURRENT_BALANCE = "current_balance";
+    private static final String EXTRA_HAS_PENDING_ACCOUNT_CASHOUT = "has_pending_account_cashout";
 
     private ActivityAccountCashoutBinding binding;
     private SessionManager sessionManager;
@@ -46,12 +47,19 @@ public class AccountCashoutActivity extends AppCompatActivity {
     private String balanceType;
     private double currentBalance;
     private String receiveMethod = "cash";
+    private boolean hasPendingAccountCashout;
 
     public static Intent newIntent(Context context, String mode, String balanceType, double currentBalance) {
         Intent intent = new Intent(context, AccountCashoutActivity.class);
         intent.putExtra(EXTRA_MODE, mode);
         intent.putExtra(EXTRA_BALANCE_TYPE, balanceType);
         intent.putExtra(EXTRA_CURRENT_BALANCE, currentBalance);
+        return intent;
+    }
+
+    public static Intent newIntent(Context context, String mode, String balanceType, double currentBalance, boolean hasPendingAccountCashout) {
+        Intent intent = newIntent(context, mode, balanceType, currentBalance);
+        intent.putExtra(EXTRA_HAS_PENDING_ACCOUNT_CASHOUT, hasPendingAccountCashout);
         return intent;
     }
 
@@ -68,6 +76,7 @@ public class AccountCashoutActivity extends AppCompatActivity {
         mode = getIntent().getStringExtra(EXTRA_MODE);
         balanceType = getIntent().getStringExtra(EXTRA_BALANCE_TYPE);
         currentBalance = getIntent().getDoubleExtra(EXTRA_CURRENT_BALANCE, 0);
+        hasPendingAccountCashout = getIntent().getBooleanExtra(EXTRA_HAS_PENDING_ACCOUNT_CASHOUT, false);
 
         if (!MODE_HELPER.equals(mode)) {
             mode = MODE_DRIVER;
@@ -126,7 +135,13 @@ public class AccountCashoutActivity extends AppCompatActivity {
 
     private void setupActions() {
         binding.cashMethodCard.setOnClickListener(v -> setReceiveMethod("cash"));
-        binding.accountMethodCard.setOnClickListener(v -> setReceiveMethod("account"));
+        binding.accountMethodCard.setOnClickListener(v -> {
+            if (hasPendingAccountCashout) {
+                Toast.makeText(this, R.string.account_cashout_pending_exists, Toast.LENGTH_SHORT).show();
+                return;
+            }
+            setReceiveMethod("account");
+        });
         binding.submitButton.setOnClickListener(v -> submitCashoutRequest());
     }
 
@@ -149,6 +164,11 @@ public class AccountCashoutActivity extends AppCompatActivity {
                 binding.accountMethodSubtitle,
                 "account".equals(receiveMethod)
         );
+        binding.accountMethodCard.setEnabled(!hasPendingAccountCashout);
+        binding.accountMethodCard.setAlpha(hasPendingAccountCashout ? 0.55f : 1f);
+        binding.accountMethodSubtitle.setText(hasPendingAccountCashout
+                ? R.string.receive_in_account_pending_subtitle
+                : R.string.receive_in_account_subtitle);
     }
 
     private void updateMethodCard(MaterialCardView card, android.widget.TextView title, android.widget.TextView subtitle, boolean selected) {

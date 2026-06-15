@@ -489,6 +489,7 @@ const TripCard = ({
   const statusVariant =
     trip.status === 'completed' ? 'completed' : trip.status === 'cancelled' ? 'cancelled' : 'ongoing';
   const varianceTone = getVarianceTone(trip.freight_variance_direction);
+  const driverTripLabel = (trip.driver_trip_number);
 
   return (
     <article className="rounded-lg border border-slate-700 bg-slate-800/40 p-3 space-y-3 hover:border-slate-600 transition-all duration-200">
@@ -509,8 +510,13 @@ const TripCard = ({
                 isOngoing || trip.status === 'cancelled' ? 'text-slate-300' : 'text-slate-300'
               }`}
             >
-              #{trip.id ?? '-'}
+              {driverTripLabel ?? '-'}
             </span>
+            {driverTripLabel ? (
+              <span className="mt-1 block whitespace-nowrap text-center text-[11px] font-semibold leading-3 text-slate-300">
+               #{trip.id}
+              </span>
+            ) : null}
           </div>
           <div>
             <p className=" font-bold text-base  text-amber-600">

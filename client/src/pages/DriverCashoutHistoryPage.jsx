@@ -22,14 +22,14 @@ const DriverCashoutHistoryPage = () => {
   const driverName = location.state?.driverName || `Driver #${id}`;
   const driverUsername = location.state?.driverUsername || '';
 
-  useEffect(() => {
-    const fetchHistory = async () => {
-      const result = await get('/admin/driver-cashout-requests', { params: { driver_id: id } });
-      if (result.success) {
-        setRequests(result.data.requests || []);
-      }
-    };
+  const fetchHistory = async () => {
+    const result = await get('/admin/driver-cashout-requests', { params: { driver_id: id } });
+    if (result.success) {
+      setRequests(result.data.requests || []);
+    }
+  };
 
+  useEffect(() => {
     fetchHistory();
   }, [get, id]);
 
@@ -120,6 +120,7 @@ const DriverCashoutHistoryPage = () => {
                   <p className="text-cargo-text text-sm mt-1">{request.remarks}</p>
                 </div>
               ) : null}
+
             </div>
           ))}
         </div>

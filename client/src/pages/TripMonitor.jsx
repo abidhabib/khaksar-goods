@@ -1,199 +1,244 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useApi } from '../hooks/useApi';
 import { format } from 'date-fns';
-import { Route, Clock, MapPin, Activity } from 'lucide-react';
+import {
+  Route,
+  Clock,
+  MapPin,
+  Activity,
+  Car,
+  User,
+  Wallet,
+  TrendingDown,
+  TrendingUp,
+  ArrowRight,
+  ChevronRight,
+  Eye,
+  CalendarDays,
+  Package,
+} from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 
 const formatCurrency = (value) => `Rs ${Number(value || 0).toLocaleString()}`;
 
+const STATUS_CONFIG = {
+  ongoing: {
+    label: 'Ongoing',
+    color: 'text-sky-400',
+    bg: 'bg-sky-500/10',
+    border: 'border-sky-500/20',
+    dot: 'bg-sky-400',
+    icon: Clock,
+  },
+  completed: {
+    label: 'Completed',
+    color: 'text-emerald-400',
+    bg: 'bg-emerald-500/10',
+    border: 'border-emerald-500/20',
+    dot: 'bg-emerald-400',
+    icon: Activity,
+  },
+  cancelled: {
+    label: 'Cancelled',
+    color: 'text-rose-400',
+    bg: 'bg-rose-500/10',
+    border: 'border-rose-500/20',
+    dot: 'bg-rose-400',
+    icon: Package,
+  },
+};
+
 const TripMonitor = () => {
   const { get, loading } = useApi();
   const [trips, setTrips] = useState([]);
-  const [filter, setFilter] = useState('all'); // all, ongoing, completed
+  const [filter, setFilter] = useState('all');
   const navigate = useNavigate();
- 
 
   const fetchTrips = async () => {
-    // Fetch all trips from admin endpoint
     const result = await get('/admin/dashboard');
     if (result.success) {
       setTrips(result.data.recentTrips || []);
     }
   };
- useEffect(() => {
+
+  useEffect(() => {
     fetchTrips();
   }, []);
+
   const orderedTrips = useMemo(
     () => [...trips].sort((left, right) => (Number(right.id) || 0) - (Number(left.id) || 0)),
     [trips]
   );
 
-  const filteredTrips = orderedTrips.filter(trip => {
+  const filteredTrips = orderedTrips.filter((trip) => {
     if (filter === 'all') return true;
     return trip.status === filter;
   });
 
-  const statusColors = {
-    ongoing: 'bg-cargo-accent/20 text-cargo-accent border-cargo-accent/30',
-    completed: 'bg-cargo-success/20 text-cargo-success border-cargo-success/30',
-    cancelled: 'bg-cargo-danger/20 text-cargo-danger border-cargo-danger/30'
-  };
+  const ongoingCount = trips.filter((t) => t.status === 'ongoing').length;
+  const completedCount = trips.filter((t) => t.status === 'completed').length;
 
   return (
-    <div className="space-y-6 pb-10 max-w-7xl">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-cargo-text">Trip Monitor</h1>
+    <div className="space-y-4 pb-6">
+      {/* Header */}
+      <div className="flex items-center justify-between gap-3 flex-wrap">
+        <div className="flex items-center gap-3">
+          <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-slate-800 border border-slate-700">
+            <Route className="w-5 h-5 text-sky-400" />
+          </div>
+          <div>
+            <h1 className="text-xl font-semibold text-slate-100">Trip Monitor</h1>
+            <p className="text-sm text-slate-500">Live trip tracking</p>
+          </div>
         </div>
-        
-        <div className="flex items-center gap-2">
-          <button
-            onClick={() => setFilter('all')}
-            className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
-              filter === 'all' ? 'bg-primary-600 text-white' : 'bg-cargo-card text-cargo-muted hover:text-cargo-text'
-            }`}
-          >
-            All
-          </button>
-          <button
-            onClick={() => setFilter('ongoing')}
-            className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
-              filter === 'ongoing' ? 'bg-cargo-accent text-cargo-dark' : 'bg-cargo-card text-cargo-muted hover:text-cargo-text'
-            }`}
-          >
-            Ongoing
-          </button>
-          <button
-            onClick={() => setFilter('completed')}
-            className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
-              filter === 'completed' ? 'bg-cargo-success text-white' : 'bg-cargo-card text-cargo-muted hover:text-cargo-text'
-            }`}
-          >
-            Completed
-          </button>
+
+        <div className="flex items-center gap-1 rounded-lg bg-slate-900 border border-slate-800 p-1">
+          {['all', 'ongoing', 'completed'].map((tab) => {
+            const isActive = filter === tab;
+            const activeStyles =
+              tab === 'ongoing'
+                ? 'bg-sky-500/10 text-sky-400'
+                : tab === 'completed'
+                ? 'bg-emerald-500/10 text-emerald-400'
+                : 'bg-slate-800 text-slate-200';
+            return (
+              <button
+                key={tab}
+                onClick={() => setFilter(tab)}
+                className={`px-3 py-1.5 rounded-md text-sm font-medium transition-colors capitalize ${
+                  isActive ? activeStyles : 'text-slate-500 hover:text-slate-300'
+                }`}
+              >
+                {tab}
+              </button>
+            );
+          })}
         </div>
       </div>
 
       {/* Stats */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        <div className="card">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 bg-primary-600/20 rounded-lg flex items-center justify-center">
-              <Route className="w-5 h-5 text-primary-400" />
-            </div>
-            <div>
-              <p className="text-2xl font-bold text-cargo-text">
-                {trips.filter(t => t.status === 'ongoing').length}
-              </p>
-              <p className="text-xs text-cargo-muted">Ongoing Trips</p>
-            </div>
+      <div className="grid grid-cols-2 gap-3">
+        <div className="rounded-lg border border-slate-800 bg-slate-900/80 p-3">
+          <div className="flex items-center gap-2 text-slate-500 mb-1.5">
+            <Clock className="w-3.5 h-3.5" />
+            <span className="text-xs font-medium">Ongoing</span>
           </div>
+          <p className="text-2xl font-bold text-slate-100">{ongoingCount}</p>
         </div>
-        
-        <div className="card">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 bg-cargo-success/20 rounded-lg flex items-center justify-center">
-              <Activity className="w-5 h-5 text-cargo-success" />
-            </div>
-            <div>
-              <p className="text-2xl font-bold text-cargo-text">
-                {trips.filter(t => t.status === 'completed').length}
-              </p>
-              <p className="text-xs text-cargo-muted">Completed Today</p>
-            </div>
+        <div className="rounded-lg border border-slate-800 bg-slate-900/80 p-3">
+          <div className="flex items-center gap-2 text-slate-500 mb-1.5">
+            <Activity className="w-3.5 h-3.5" />
+            <span className="text-xs font-medium">Completed</span>
           </div>
+          <p className="text-2xl font-bold text-slate-100">{completedCount}</p>
         </div>
       </div>
 
       {/* Trips List */}
       {loading ? (
-        <div className="flex items-center justify-center h-64">
-          <div className="w-8 h-8 border-4 border-primary-600 border-t-transparent rounded-full animate-spin" />
+        <div className="flex items-center justify-center h-48">
+          <div className="w-7 h-7 border-2 border-sky-500 border-t-transparent rounded-full animate-spin" />
         </div>
       ) : (
-        <div className="space-y-4">
-          {filteredTrips.map(trip => (
-            <div key={trip.id} className={`card border-l-4 ${statusColors[trip.status]}`} 
-            
-            >
-              <div className="flex items-start justify-between">
-                <div className="flex-1">
-                  <div className="flex items-center gap-3 mb-3">
-                    <span className={`px-3 py-1 rounded-full text-xs font-medium ${statusColors[trip.status]}`}>
-                      {trip.status.toUpperCase()}
-                    </span>
-                    <span className="text-sm text-cargo-muted">
-                      {format(new Date(trip.started_at), 'MMM dd, yyyy HH:mm')}
-                    </span>
-                  </div>
-                  
-                  <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
-                <div>
-                    <p className="text-xs text-cargo-muted mb-1">Trip ID</p>
-                    <p className="text-sm font-medium text-cargo-text">#{trip.id}</p>
-                  </div>
-                  <div>
-                      <p className="text-xs text-cargo-muted mb-1">Driver</p>
-                      <p className="text-sm font-medium text-cargo-text">{trip.driver_name}</p>
-                    </div>
-                    <div>
-                      <p className="text-xs text-cargo-muted mb-1">Vehicle</p>
-                      <p className="text-sm font-medium text-cargo-text">{trip.car_number}</p>
-                    </div>
-                    <div>
-                      <p className="text-xs text-cargo-muted mb-1">Revenue</p>
-                      <p className="text-sm font-medium text-cargo-text">{formatCurrency(trip.freight_charge)}</p>
-                    </div>
-                    <div>
-                      <p className="text-xs text-cargo-muted mb-1">Expenses</p>
-                      <p className="text-sm font-medium text-cargo-text">
-                        {trip.total_expenses !== undefined ? formatCurrency(trip.total_expenses) : 'N/A'}
-                      </p>
-                    </div>
-                    <div>
-                      <p className="text-xs text-cargo-muted mb-1">Net</p>
-                      <p className="text-sm font-medium text-cargo-text">
-                        {trip.net_profit !== undefined
-                          ? formatCurrency(trip.net_profit)
-                          : 'N/A'}
-                      </p>
-                    </div>
-                    <div className="md:col-span-4">
-                      <button
-                        type="button"
-                        onClick={() => navigate(`/trips/${trip.id}/report`)}
-                        className="cursor-pointer hover:text-primary-400 transition-colors underline text-sm font-medium text-amber-500"
-                      >
-                        View Trip
-                      </button>
-                    </div>
+        <div className="space-y-3">
+          {filteredTrips.map((trip) => {
+            const cfg = STATUS_CONFIG[trip.status] || STATUS_CONFIG.ongoing;
+            const StatusIcon = cfg.icon;
+            const net = trip.net_profit !== undefined ? Number(trip.net_profit) : null;
 
-             
+            return (
+              <div
+                key={trip.id}
+                className="rounded-lg border border-slate-800 bg-slate-700/40 p-3 hover:border-slate-700 transition-colors cursor-pointer"
+                onClick={() => navigate(`/trips/${trip.id}/report`)}
+              >
+                {/* Card Header */}
+                <div className="flex items-start justify-between gap-3 mb-3">
+                  <div className="flex items-center gap-2 min-w-0">
+                    <div className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-md ${cfg.bg} border ${cfg.border}`}>
+                      <StatusIcon className={`w-4 h-4 ${cfg.color}`} />
+                    </div>
+                    <div className="min-w-0">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className="text-sm font-semibold text-slate-100 truncate">{trip.from_location}</span>
+                        <ArrowRight className="w-3 h-3 text-slate-600 shrink-0" />
+                        <span className="text-sm font-semibold text-slate-100 truncate">{trip.to_location}</span>
+                      </div>
+                      <div className="flex items-center gap-2 mt-0.5">
+                        <span className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-medium ${cfg.bg} ${cfg.color} border ${cfg.border}`}>
+                          <div className={`w-1 h-1 rounded-full ${cfg.dot}`} />
+                          {cfg.label}
+                        </span>
+                        <span className="text-[10px] text-slate-600 flex items-center gap-1">
+                          <CalendarDays className="w-3 h-3" />
+                          {format(new Date(trip.started_at), 'MMM d, HH:mm')}
+                        </span>
+                      </div>
+                    </div>
                   </div>
-                  
-                  <div className="flex items-center gap-2 mt-4 text-sm text-cargo-muted">
-                    <MapPin className="w-4 h-4" />
-                    <span>{trip.from_location}</span>
-                    <span>→</span>
-                    <span>{trip.to_location}</span>
+                  <ChevronRight className="w-4 h-4 text-slate-600 shrink-0 mt-1" />
+                </div>
+
+                {/* Card Body - Mobile optimized grid */}
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                  <div className="rounded-md bg-slate-950/30 border border-slate-800/60 p-2">
+                    <div className="flex items-center gap-1 text-[10px] text-slate-500 mb-0.5">
+                      <User className="w-3 h-3" />
+                      Driver
+                    </div>
+                    <p className="text-sm font-medium text-slate-200 truncate">{trip.driver_name || 'N/A'}</p>
+                  </div>
+
+                  <div className="rounded-md bg-slate-950/30 border border-slate-800/60 p-2">
+                    <div className="flex items-center gap-1 text-[10px] text-slate-500 mb-0.5">
+                      <Car className="w-3 h-3" />
+                      Vehicle
+                    </div>
+                    <p className="text-sm font-medium text-slate-200 truncate">{trip.car_number || 'N/A'}</p>
+                  </div>
+
+                  <div className="rounded-md bg-slate-950/30 border border-slate-800/60 p-2">
+                    <div className="flex items-center gap-1 text-[10px] text-slate-500 mb-0.5">
+                      <Wallet className="w-3 h-3" />
+                      Revenue
+                    </div>
+                    <p className="text-sm font-semibold text-slate-200">{formatCurrency(trip.freight_charge)}</p>
+                  </div>
+
+                  <div className="rounded-md bg-slate-950/30 border border-slate-800/60 p-2">
+                    <div className="flex items-center gap-1 text-[10px] text-slate-500 mb-0.5">
+                      <TrendingDown className="w-3 h-3" />
+                      Expenses
+                    </div>
+                    <p className="text-sm font-semibold text-slate-200">
+                      {trip.total_expenses !== undefined ? formatCurrency(trip.total_expenses) : 'N/A'}
+                    </p>
                   </div>
                 </div>
-                
-                {trip.status === 'ongoing' && (
-                  <div className="flex items-center gap-2 text-cargo-accent">
-                    <Clock className="w-5 h-5 animate-pulse" />
-                    <span className="text-sm font-medium">In Progress</span>
-                  </div>
-                )}
+
+                {/* Net + View row */}
+                <div className="flex items-center justify-between mt-2.5 pt-2.5 border-t border-slate-800">
+                 
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      navigate(`/trips/${trip.id}/report`);
+                    }}
+                    className="w-full flex items-center justify-center  gap-1.5 rounded-md bg-sky-500/10 border border-sky-500/20 px-2.5 py-2 text-[14px] font-medium text-sky-400 hover:bg-sky-500/20 transition-colors"
+                  >
+                    <Eye className="w-3 h-3" />
+                    View
+                  </button>
+                </div>
               </div>
-              
-            </div>
-          ))}
-          
+            );
+          })}
+
           {filteredTrips.length === 0 && (
-            <div className="card text-center py-12">
-              <Route className="w-12 h-12 text-cargo-muted mx-auto mb-4" />
-              <p className="text-cargo-muted">No trips found</p>
+            <div className="rounded-lg border border-slate-800 bg-slate-900/40 p-8 text-center">
+              <Route className="w-8 h-8 text-slate-700 mx-auto mb-2" />
+              <p className="text-sm text-slate-600">No trips found</p>
             </div>
           )}
         </div>
