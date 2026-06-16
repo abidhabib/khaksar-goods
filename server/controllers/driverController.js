@@ -62,6 +62,12 @@ const DRIVER_TOTAL_INCOME_SQL = (driverAlias) => `
         ), 0)
         -
         COALESCE((
+            SELECT SUM(CASE WHEN hcr.status = 'approved' THEN hcr.amount ELSE 0 END)
+            FROM helper_cashout_requests hcr
+            WHERE hcr.driver_id = ${driverAlias}
+        ), 0)
+        -
+        COALESCE((
             SELECT SUM(CASE WHEN dps.status = 'approved' THEN dps.amount ELSE 0 END)
             FROM driver_payment_submissions dps
             WHERE dps.driver_id = ${driverAlias}
