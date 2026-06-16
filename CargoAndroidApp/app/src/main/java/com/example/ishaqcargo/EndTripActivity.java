@@ -1,7 +1,16 @@
 package com.example.ishaqcargo;
 
+import android.Manifest;
 import android.content.Intent;
+import android.content.pm.PackageManager;
+import android.location.Address;
+import android.location.Geocoder;
+import android.location.Location;
+import android.location.LocationListener;
+import android.location.LocationManager;
+import android.os.Build;
 import android.os.Bundle;
+import android.os.Looper;
 import android.text.TextUtils;
 import android.view.View;
 import android.widget.TextView;
@@ -10,6 +19,7 @@ import android.widget.Toast;
 import androidx.activity.result.ActivityResultLauncher;
 import androidx.activity.result.contract.ActivityResultContracts;
 import androidx.appcompat.app.AppCompatActivity;
+import androidx.core.app.ActivityCompat;
 import androidx.core.content.ContextCompat;
 import androidx.core.graphics.Insets;
 import androidx.core.view.ViewCompat;
@@ -27,8 +37,10 @@ import org.json.JSONArray;
 import org.json.JSONObject;
 
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 
@@ -52,6 +64,24 @@ public class EndTripActivity extends AppCompatActivity {
     private double tripStartMeter;
     private String tripDestination;
     private final Map<String, Double> expenseTotals = new HashMap<>();
+    private Map<String, String> pendingExpenseFields;
+    private Runnable locationTimeoutRunnable;
+
+    private final ActivityResultLauncher<String[]> locationPermissionLauncher = registerForActivityResult(
+            new ActivityResultContracts.RequestMultiplePermissions(),
+            result -> {
+                boolean granted = Boolean.TRUE.equals(result.get(Manifest.permission.ACCESS_FINE_LOCATION))
+                        || Boolean.TRUE.equals(result.get(Manifest.permission.ACCESS_COARSE_LOCATION));
+
+                if (granted) {
+                    fetchCurrentLocationForPendingExpense();
+                    return;
+                }
+
+                Toast.makeText(this, R.string.location_permission_required, Toast.LENGTH_SHORT).show();
+                proceedWithPendingExpenseSubmission();
+            }
+    );
 
     private final ActivityResultLauncher<Intent> dieselExpenseLauncher = registerForActivityResult(
             new ActivityResultContracts.StartActivityForResult(),
@@ -116,6 +146,12 @@ public class EndTripActivity extends AppCompatActivity {
         binding.submitTripButton.setOnClickListener(v -> openEndTripDetails());
 
         loadTripExpenseHistory();
+    }
+
+    @Override
+    protected void onPause() {
+        super.onPause();
+        clearLocationTimeout();
     }
 
     private void applyWindowInsets() {
@@ -269,8 +305,12 @@ public class EndTripActivity extends AppCompatActivity {
         fields.put("category", category);
         fields.put("amount", amount);
 
+        pendingExpenseFields = new LinkedHashMap<>(fields);
         setSubmitting(true);
+        ensureLocationPermissionAndSubmit();
+    }
 
+    private void saveExpenseEntryDirect(Map<String, String> fields) {
         ApiClient.addTripExpense(baseUrl, sessionManager.getToken(), tripId, fields, null, null, new Callback() {
             @Override
             public void onFailure(Call call, IOException e) {
@@ -299,6 +339,237 @@ public class EndTripActivity extends AppCompatActivity {
                 });
             }
         });
+    }
+
+    private void ensureLocationPermissionAndSubmit() {
+        boolean fineGranted = ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED;
+        boolean coarseGranted = ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_COARSE_LOCATION) == PackageManager.PERMISSION_GRANTED;
+
+        if (fineGranted || coarseGranted) {
+            fetchCurrentLocationForPendingExpense();
+            return;
+        }
+
+        locationPermissionLauncher.launch(new String[]{
+                Manifest.permission.ACCESS_FINE_LOCATION,
+                Manifest.permission.ACCESS_COARSE_LOCATION
+        });
+    }
+
+    private void fetchCurrentLocationForPendingExpense() {
+        LocationManager locationManager = (LocationManager) getSystemService(LOCATION_SERVICE);
+        if (locationManager == null) {
+            proceedWithPendingExpenseSubmission();
+            return;
+        }
+
+        String provider = locationManager.isProviderEnabled(LocationManager.GPS_PROVIDER)
+                ? LocationManager.GPS_PROVIDER
+                : locationManager.isProviderEnabled(LocationManager.NETWORK_PROVIDER)
+                ? LocationManager.NETWORK_PROVIDER
+                : null;
+
+        if (provider == null) {
+            Toast.makeText(this, R.string.enable_location_services, Toast.LENGTH_SHORT).show();
+            proceedWithPendingExpenseSubmission();
+            return;
+        }
+
+        if (ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED
+                && ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_COARSE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
+            proceedWithPendingExpenseSubmission();
+            return;
+        }
+
+        Location cachedLocation = getBestLastKnownLocation(locationManager);
+        if (cachedLocation != null) {
+            saveCurrentLocationForExpense(cachedLocation);
+            return;
+        }
+
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+            locationManager.getCurrentLocation(provider, null, getMainExecutor(), this::saveCurrentLocationForExpense);
+        } else {
+            requestSingleLocationUpdate(locationManager, provider);
+        }
+    }
+
+    private Location getBestLastKnownLocation(LocationManager locationManager) {
+        Location bestLocation = null;
+        List<String> providers = locationManager.getProviders(true);
+        if (providers == null) {
+            return null;
+        }
+
+        for (String provider : providers) {
+            if (ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED
+                    && ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_COARSE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
+                return null;
+            }
+
+            Location candidate = locationManager.getLastKnownLocation(provider);
+            if (candidate == null) {
+                continue;
+            }
+
+            if (bestLocation == null || candidate.getTime() > bestLocation.getTime()) {
+                bestLocation = candidate;
+            }
+        }
+
+        return bestLocation;
+    }
+
+    @SuppressWarnings("deprecation")
+    private void requestSingleLocationUpdate(LocationManager locationManager, String provider) {
+        try {
+            LocationListener listener = new LocationListener() {
+                @Override
+                public void onLocationChanged(Location location) {
+                    locationManager.removeUpdates(this);
+                    saveCurrentLocationForExpense(location);
+                }
+            };
+
+            locationManager.requestLocationUpdates(provider, 0L, 0f, listener, Looper.getMainLooper());
+            clearLocationTimeout();
+            locationTimeoutRunnable = () -> {
+                try {
+                    locationManager.removeUpdates(listener);
+                } catch (Exception ignored) {
+                }
+                proceedWithPendingExpenseSubmission();
+            };
+            binding.loadingOverlay.postDelayed(locationTimeoutRunnable, 8000L);
+        } catch (Exception ignored) {
+            clearLocationTimeout();
+            proceedWithPendingExpenseSubmission();
+        }
+    }
+
+    private void clearLocationTimeout() {
+        if (locationTimeoutRunnable != null) {
+            binding.loadingOverlay.removeCallbacks(locationTimeoutRunnable);
+            locationTimeoutRunnable = null;
+        }
+    }
+
+    private void saveCurrentLocationForExpense(Location location) {
+        clearLocationTimeout();
+        if (location == null) {
+            proceedWithPendingExpenseSubmission();
+            return;
+        }
+
+        Map<String, String> fields = buildLocationFields(location);
+        ApiClient.saveCurrentLocation(baseUrl, sessionManager.getToken(), fields, new Callback() {
+            @Override
+            public void onFailure(Call call, IOException e) {
+                runOnUiThread(EndTripActivity.this::proceedWithPendingExpenseSubmission);
+            }
+
+            @Override
+            public void onResponse(Call call, Response response) {
+                response.close();
+                runOnUiThread(EndTripActivity.this::proceedWithPendingExpenseSubmission);
+            }
+        });
+    }
+
+    private Map<String, String> buildLocationFields(Location location) {
+        Map<String, String> fields = new LinkedHashMap<>();
+        fields.put("latitude", String.format(Locale.US, "%.7f", location.getLatitude()));
+        fields.put("longitude", String.format(Locale.US, "%.7f", location.getLongitude()));
+        fields.put("source", "driver_app_trip_expense");
+        fields.put("trip_id", tripId);
+
+        Address address = resolveAddress(location);
+        if (address != null) {
+            String area = firstNonEmpty(address.getSubLocality(), address.getLocality(), address.getSubAdminArea());
+            String city = firstNonEmpty(address.getLocality(), address.getSubAdminArea(), area);
+            String province = firstNonEmpty(address.getAdminArea(), address.getCountryName());
+            String addressLabel = buildAddressLabel(address, area, city, province);
+
+            putIfNotEmpty(fields, "area", area);
+            putIfNotEmpty(fields, "city", city);
+            putIfNotEmpty(fields, "province", province);
+            putIfNotEmpty(fields, "address_label", addressLabel);
+        }
+
+        return fields;
+    }
+
+    private Address resolveAddress(Location location) {
+        try {
+            Geocoder geocoder = new Geocoder(this, Locale.getDefault());
+            List<Address> addresses = geocoder.getFromLocation(location.getLatitude(), location.getLongitude(), 1);
+            if (addresses == null || addresses.isEmpty()) {
+                return null;
+            }
+            return addresses.get(0);
+        } catch (IOException | IllegalArgumentException ignored) {
+            return null;
+        }
+    }
+
+    private String buildAddressLabel(Address address, String area, String city, String province) {
+        if (address == null) {
+            return joinNonEmpty(area, city, province);
+        }
+
+        return joinNonEmpty(
+                address.getFeatureName(),
+                address.getThoroughfare(),
+                address.getSubLocality(),
+                address.getLocality(),
+                address.getAdminArea()
+        );
+    }
+
+    private String firstNonEmpty(String... values) {
+        if (values == null) {
+            return "";
+        }
+
+        for (String value : values) {
+            if (!TextUtils.isEmpty(value)) {
+                return value.trim();
+            }
+        }
+        return "";
+    }
+
+    private String joinNonEmpty(String... values) {
+        List<String> parts = new ArrayList<>();
+        if (values != null) {
+            for (String value : values) {
+                if (!TextUtils.isEmpty(value)) {
+                    String trimmed = value.trim();
+                    if (!trimmed.isEmpty() && !parts.contains(trimmed)) {
+                        parts.add(trimmed);
+                    }
+                }
+            }
+        }
+        return TextUtils.join(", ", parts);
+    }
+
+    private void putIfNotEmpty(Map<String, String> fields, String key, String value) {
+        if (!TextUtils.isEmpty(value)) {
+            fields.put(key, value.trim());
+        }
+    }
+
+    private void proceedWithPendingExpenseSubmission() {
+        Map<String, String> fields = pendingExpenseFields;
+        pendingExpenseFields = null;
+
+        if (fields == null || fields.isEmpty()) {
+            setSubmitting(false);
+            return;
+        }
+
+        saveExpenseEntryDirect(fields);
     }
 
     private void setSubmitting(boolean submitting) {
